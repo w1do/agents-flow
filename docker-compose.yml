@@ -1,0 +1,81 @@
+# Стек харнесса для Dokploy: migrate → server и worker. Postgres — отдельный стек (deploy/db).
+# Наружу порты не публикуются: домен и HTTPS выставляет Dokploy поверх expose.
+
+x-harness-common: &harness-common
+  image: ${HARNESS_IMAGE:-registry.gitlab.com/CHANGE_ME/agents-flow:main}
+  environment:
+    # Обязательные ENV (ядро и Telegram). Пустое значение считается отсутствующим, сервер не стартует.
+    DATABASE_URL: ${DATABASE_URL:-}
+    HARNESS_CONFIG: /app/config/harness.yaml
+    HARNESS_SECRET_KEY: ${HARNESS_SECRET_KEY:-}
+    TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+    TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+    TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+    # Опциональные ENV: используются этапами, которые их вводят (см. ARCHITECTURE.md §9).
+    HARNESS_PUBLIC_URL: ${HARNESS_PUBLIC_URL:-}
+    HARNESS_ADMIN_TOKEN: ${HARNESS_ADMIN_TOKEN:-}
+    POLZA_AI_URL: ${POLZA_AI_URL:-}
+    POLZA_AI_KEY: ${POLZA_AI_KEY:-}
+    POLZA_AI_MODEL: ${POLZA_AI_MODEL:-}
+    ROUTING_MIN_CONFIDENCE: ${ROUTING_MIN_CONFIDENCE:-}
+    STT_PROVIDER: ${STT_PROVIDER:-}
+    STT_API_URL: ${STT_API_URL:-}
+    STT_API_KEY: ${STT_API_KEY:-}
+    STT_MODEL: ${STT_MODEL:-}
+    NOVITA_API_KEY: ${NOVITA_API_KEY:-}
+    NOVITA_DOMAIN: ${NOVITA_DOMAIN:-}
+    GITLAB_URL: ${GITLAB_URL:-}
+    GITLAB_TOKEN: ${GITLAB_TOKEN:-}
+    CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:-}
+    AGENT_RUN_TIMEOUT_MIN: ${AGENT_RUN_TIMEOUT_MIN:-}
+    TESTS_TIMEOUT_MIN: ${TESTS_TIMEOUT_MIN:-}
+    ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+    ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    WORKER_POLL_INTERVAL_SEC: ${WORKER_POLL_INTERVAL_SEC:-}
+  # File Mount Dokploy: config/harness.yaml из раздела Files стека попадает в ../files/.
+  volumes:
+    - ../files/harness.yaml:/app/config/harness.yaml:ro
+  networks:
+    - dokploy-network
+
+services:
+  migrate:
+    <<: *harness-common
+    # Миграции нужен только DATABASE_URL: остальные секреты в контейнер migrate не передаются.
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-}
+    command: ["harness-server", "migrate"]
+    restart: "no"
+
+  server:
+    <<: *harness-common
+    # --host 0.0.0.0 обязателен: по умолчанию serve слушает только localhost.
+    command: ["harness-server", "serve", "--host", "0.0.0.0", "--port", "8000"]
+    expose:
+      - "8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  worker:
+    <<: *harness-common
+    command: ["harness-server", "worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+networks:
+  dokploy-network:
+    external: true

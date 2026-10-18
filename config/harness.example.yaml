@@ -1,0 +1,19 @@
+# Несекретные настройки harness. Скопировать в config/harness.yaml (файл не коммитится).
+# Токены, ключи и пароли сюда не пишутся: они задаются в ENV (см. .env.example).
+# Поля с именами token, key, password, secret, apikey сервер отклоняет.
+
+workspaces:
+  - id: demo
+    name: Демо-проект
+    voice_aliases: ["демо", "демо-проект"]
+    gitlab_project: group/demo
+    default_branch: main
+    test_command: "pytest"
+    agent: claude-code
+
+sandbox:
+  # Id песочницы Novita, созданной вручную (заполняется на этапе mvp-06).
+  provider_id: CHANGE_ME_SANDBOX_ID
+
+gitlab:
+  base_url: https://gitlab.com
