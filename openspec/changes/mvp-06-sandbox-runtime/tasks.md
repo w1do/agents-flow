@@ -4,7 +4,7 @@
 
 - [ ] 1.1 `adapters/novita`: Protocol `SandboxProvider` (`exec`, `write_file`, `read_file`, `pause`, `resume`, `extend_timeout`) по фактам `docs/novita.md`; синхронный SDK — через `asyncio.to_thread` — проверка: mypy
 - [ ] 1.2 Фейк `FakeSandbox` (файлы в памяти, журнал команд, программируемые ответы) — проверка: используется в тестах ниже
-- [ ] 1.3 Live-тест `-m live`: exec, write/read, pause/resume на реальной песочнице — проверка: проходит вручную
+- [ ] 1.3 Live-тест `-m live`: exec, write/read, pause/resume на реальной песочнице; многоходовой `claude -p --output-format stream-json --verbose` с tool-use — дедупликация usage по `message.id`, `output_tokens` из `result.usage`, соблюдение `--max-turns` (`error_max_turns`) (перенесено из mvp-01, `docs/novita.md`, «Не проверено живьём») — проверка: проходит вручную
 
 ## 2. Bootstrap
 
@@ -22,7 +22,7 @@
 
 - [ ] 4.1 Каркас пайплайна в `worker/dispatcher.py`: claim → activate → run → poll → (этапы kind) → cleanup → pause; регистрация пайплайнов по `kind` — проверка: тест с фейковым пайплайном
 - [ ] 4.2 `harness-server sandbox pause|resume|status` с отказом при активной задаче — проверка: тест «Пауза занятой песочницы»
-- [ ] 4.3 ARCHITECTURE.md §7, §9 (`ANTHROPIC_API_KEY`, `AGENT_RUN_TIMEOUT_MIN`), docs/deployment.md, PLAN.md — проверка: ревью
+- [ ] 4.3 ARCHITECTURE.md §7, §9 (`CLAUDE_CODE_OAUTH_TOKEN`, `AGENT_RUN_TIMEOUT_MIN`), docs/deployment.md, PLAN.md — проверка: ревью
 
 ## 5. Память проекта
 

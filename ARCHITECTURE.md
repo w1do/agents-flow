@@ -138,8 +138,9 @@ implement:  backlog → active → testing → ready (MR создан) → merge
   (`exec`, `write_file`, `read_file`, `pause`, `resume`, `extend_timeout`) скрывает Novita SDK.
 - Bootstrap (`deploy/sandbox/bootstrap.sh`): pinned `claude`, `git`, `openspec`, клон репозиториев,
   `.mcp.json` с `${AGENTS_FLOW_TOKEN}` (значение приходит в env exec-команды). Секретов в файле нет. Идемпотентен.
-- Креды (`ANTHROPIC_API_KEY`, `GITLAB_TOKEN`, токен задачи) передаются только в env конкретной exec-команды
-  и не записываются на диск песочницы.
+- Креды (`CLAUDE_CODE_OAUTH_TOKEN`, `GITLAB_TOKEN`, токен задачи) передаются только в env конкретной exec-команды
+  и не записываются на диск песочницы. Claude Code авторизуется подпиской через `CLAUDE_CODE_OAUTH_TOKEN`
+  (D-18); `ANTHROPIC_API_KEY` в песочнице не задаётся: по документации Claude Code он перекрывает OAuth-токен (спайком не проверялось). `--bare` не используется. Риски токена подписки (экфильтрация, лимиты по окнам) — в `openspec/changes/mvp-06-sandbox-runtime/design.md`, Risks.
 - Агент запускается в фоне, вывод `stream-json` пишется в `~/.harness/tasks/<id>/stream.jsonl`, итог — в
   `~/.harness/tasks/<id>/status.json`. Worker опрашивает файл статуса через exec.
 
@@ -173,7 +174,7 @@ gitlab (base_url).
 | `STT_PROVIDER`, `STT_API_URL`, `STT_API_KEY`, `STT_MODEL` | Распознавание речи (по умолчанию Whisper через Polza) |
 | `NOVITA_API_KEY`, `NOVITA_DOMAIN` | Песочницы |
 | `GITLAB_URL`, `GITLAB_TOKEN` | Push и MR |
-| `ANTHROPIC_API_KEY` | Claude Code в песочнице (передаётся только в exec) |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Токен подписки Claude для Claude Code в песочнице (`claude setup-token`, срок ~1 год; передаётся только в exec, D-18) |
 | `AGENT_RUN_TIMEOUT_MIN`, `TESTS_TIMEOUT_MIN` | Лимит времени агента и гейта тестов |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Консоль, после MVP |
 

@@ -9,11 +9,11 @@
   },
   {
     "relativePath": "ARCHITECTURE.md",
-    "summary": "Целевая архитектура harness: компоненты server/worker, слои, таблицы, статусы, поток MVP, MCP, песочница, безопасность, ENV, деплой Dokploy",
+    "summary": "Архитектура agents-flow: сервер FastAPI/MCP, worker, адаптеры песочницы Novita и Telegram, статусы задач, связи с ТЗ и решениями D-NN, ссылки на спайк mvp-01.",
     "role": "doc",
-    "contentHash": "e8a5ef18e64914685b2724e98d73323ec70449c5462c9c06e9933b06c06a6bd0",
+    "contentHash": "21ccf35a3957fca7aa0b59b4f52a5d0b1f9011fb1f26b456320a79da36a9e38d",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:26.908Z"
+    "updatedAt": "2026-10-18T08:27:10.123Z"
   },
   {
     "relativePath": "CLAUDE.md",
@@ -25,27 +25,27 @@
   },
   {
     "relativePath": "PLAN.md",
-    "summary": "План и статус OpenSpec-изменений: MVP mvp-01..09, 40 изменений по 7 волнам с зависимостями, покрытие разделов ТЗ",
+    "summary": "План MVP по порядку: статусы изменений OpenSpec (mvp-01-novita-spike в статусе review до openspec archive, mvp-06-sandbox-runtime), критерии приёмки и открытые пункты.",
     "role": "doc",
-    "contentHash": "9f05c165efe5aed89f3fff8fc4592ce5ce94ae91663dae91576879a6235fd8a4",
+    "contentHash": "fa97cc98814d45ee081b9afbe8cc93bdaabddaacd79a667759057582802adc40",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:26.932Z"
+    "updatedAt": "2026-10-18T08:27:10.133Z"
   },
   {
     "relativePath": "docs/README.md",
-    "summary": "Оглавление документации проекта agents-flow harness",
+    "summary": "Оглавление каталога docs: ТЗ, решения D-NN, открытые вопросы, отчёт спайка Novita (docs/novita.md) и ссылки между ними.",
     "role": "doc",
-    "contentHash": "b391a708f3de17487f1095f947c1660b9f10af4b865900e51b4826322ef60b87",
+    "contentHash": "0f856ea1ae21e2ada4437a9c23fc463ffb60baf302c3a3e6904742092247e928",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:26.943Z"
+    "updatedAt": "2026-10-18T08:27:10.142Z"
   },
   {
     "relativePath": "docs/decisions.md",
-    "summary": "ADR-лог D-01..D-17: GitLab, статусы ТЗ v5, без Go-клиента, STT через Polza, uv, worker, MCP SDK, ветка от плана и др.",
+    "summary": "Журнал решений поверх ТЗ: D-18 Claude Code подпиской через CLAUDE_CODE_OAUTH_TOKEN без --bare; D-19 таймаут по умолчанию уничтожает песочницу, set_timeout от вызова; связи с спайком mvp-01.",
     "role": "doc",
-    "contentHash": "97a36faba54545b9eff58d90f56557f42067c34b2e407c6727619f0ce11904ee",
+    "contentHash": "8a6d7fd8b19327b74725074773a3a5837ee2bea78ef89ffb325eeac1833b1ca4",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:26.954Z"
+    "updatedAt": "2026-10-18T08:27:10.150Z"
   },
   {
     "relativePath": "docs/deployment.md",
@@ -80,12 +80,20 @@
     "updatedAt": "2026-10-18T07:40:27.001Z"
   },
   {
-    "relativePath": "docs/open-questions.md",
-    "summary": "Открытые вопросы ТЗ §17: статус и в каком OpenSpec-изменении решаются",
+    "relativePath": "docs/novita.md",
+    "summary": "Отчёт спайка Novita: pause сохраняет файлы и процессы, set_timeout от вызова, таймаут убивает, CommandExitException, лимит 10 vCPU, CLAUDE_CODE_OAUTH_TOKEN без --bare, stream-json --verbose.",
     "role": "doc",
-    "contentHash": "4dd42da8e4e591c1717cf0f93dc2401c097133fe004a77d766068daade435d3c",
+    "contentHash": "98c18d05ab9afba21644bda29200367e2242f0bab1e5801a13c880cb53adb5b2",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:27.013Z"
+    "updatedAt": "2026-10-18T08:27:14.096Z"
+  },
+  {
+    "relativePath": "docs/open-questions.md",
+    "summary": "Открытые вопросы проекта: вопросы 5–7 после спайка Novita (цена паузы, кастомные шаблоны песочницы, многоходовая сверка usage, перенесённая в mvp-06).",
+    "role": "doc",
+    "contentHash": "d726abd3ed3a9306c114c24bfa6cdf30d09f16fb49e8191e42c1dd9fa1fcd372",
+    "author": "agent",
+    "updatedAt": "2026-10-18T08:27:10.159Z"
   },
   {
     "relativePath": "docs/tz/tz-v5.md",
@@ -753,11 +761,11 @@
   },
   {
     "relativePath": "openspec/changes/mvp-01-novita-spike/tasks.md",
-    "summary": "Чек-лист задач mvp-01-novita-spike с проверками, документацией и синхронизацией памяти",
+    "summary": "Чек-лист mvp-01-novita-spike: 13/13 выполнено (Novita exec/pause/timeout, Claude Code stream-json, итоги в docs/novita.md, D-18/D-19, память). Ждёт openspec archive.",
     "role": "doc",
-    "contentHash": "c734aed623a04d1fbafa6cc97a48ffb3dd3b13b89586c2f04ed561d890a42546",
+    "contentHash": "522e52d480dea3b7a439926bbc1fcabf52eb2640cba8ad4e1d8898751c42e3e4",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.433Z"
+    "updatedAt": "2026-10-18T08:27:50.400Z"
   },
   {
     "relativePath": "openspec/changes/mvp-02-foundation/.openspec.yaml",
@@ -937,19 +945,19 @@
   },
   {
     "relativePath": "openspec/changes/mvp-06-sandbox-runtime/design.md",
-    "summary": "Design mvp-06-sandbox-runtime: технические решения, альтернативы и риски",
+    "summary": "Дизайн OpenSpec mvp-06-sandbox-runtime: рантайм песочницы Novita, пауза/возобновление, таймауты, запуск Claude Code; приведён к итогам спайка mvp-01.",
     "role": "doc",
-    "contentHash": "46e1dabbeffae7b7243cba4457b8063a54d07ad32104995989d85c04f3e393ad",
+    "contentHash": "7520c18dccb6f69ef594f69a00ddc45e58fb9ccb438519dc36068bd1a8f06f76",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.506Z"
+    "updatedAt": "2026-10-18T08:27:10.178Z"
   },
   {
     "relativePath": "openspec/changes/mvp-06-sandbox-runtime/proposal.md",
-    "summary": "MVP proposal mvp-06-sandbox-runtime: SandboxProvider Novita, bootstrap.sh, activate/run_agent/poll/cleanup/pause, креды только в env",
+    "summary": "Предложение OpenSpec mvp-06-sandbox-runtime: рантайм песочницы Novita по итогам спайка mvp-01; цель, границы, открытые вопросы о цене паузы и многоходовом usage.",
     "role": "doc",
-    "contentHash": "10cc00ceff9c934aa598ede1a9b8c6899aad06ec3835e6d916a5861af6440d82",
+    "contentHash": "e5ae91f5ddab796969a2af85b0607d4ba3546c437890aea1502eb4c53f413074",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.509Z"
+    "updatedAt": "2026-10-18T08:27:10.186Z"
   },
   {
     "relativePath": "openspec/changes/mvp-06-sandbox-runtime/specs/sandbox-runtime/spec.md",
@@ -961,11 +969,11 @@
   },
   {
     "relativePath": "openspec/changes/mvp-06-sandbox-runtime/tasks.md",
-    "summary": "Чек-лист задач mvp-06-sandbox-runtime с проверками, документацией и синхронизацией памяти",
+    "summary": "Задачи OpenSpec mvp-06-sandbox-runtime: реализация рантайма песочницы; пункты по итогам спайка mvp-01 (pause, set_timeout, usage Claude Code) перенесены сюда.",
     "role": "doc",
-    "contentHash": "08cb5279f432e28def9382ac62f8da39f669063271acaef750dfaa7ebd937188",
+    "contentHash": "6886da887fcb3c05dc4bc50297f9616e10c7be62b709863d4b2eddd05bf8c6e3",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.516Z"
+    "updatedAt": "2026-10-18T08:27:10.195Z"
   },
   {
     "relativePath": "openspec/changes/mvp-07-agents-flow-mcp/.openspec.yaml",
@@ -1734,5 +1742,13 @@
     "contentHash": "8c7b4c2157dcbf6ec99822aeee54077f7ffbab444fc14fa26500bad0d350eeba",
     "author": "agent",
     "updatedAt": "2026-10-18T07:40:37.841Z"
+  },
+  {
+    "relativePath": "tools/spikes/novita_check.py",
+    "summary": "Спайк Novita: novita_check проверяет exec, files, pause/resume, set_timeout, expire, claude stream-json, HTTPS, cleanup по metadata purpose=mvp-01-spike; redact; флаги --only, --self-test.",
+    "role": "module",
+    "contentHash": "89bdc8446f9c4007480bcbcc90443039c92c5173a1a2f0e930698bb5e2b7a96c",
+    "author": "agent",
+    "updatedAt": "2026-10-18T08:27:10.104Z"
   }
 ]

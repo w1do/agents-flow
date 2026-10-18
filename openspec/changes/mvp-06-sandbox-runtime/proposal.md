@@ -32,7 +32,7 @@
 
 ## Impact
 
-- ENV: `NOVITA_API_KEY`, `NOVITA_DOMAIN`, `ANTHROPIC_API_KEY`, `AGENT_RUN_TIMEOUT_MIN` (по умолчанию 60).
+- ENV: `NOVITA_API_KEY`, `NOVITA_DOMAIN`, `CLAUDE_CODE_OAUTH_TOKEN` (токен подписки, D-18), `AGENT_RUN_TIMEOUT_MIN` (по умолчанию 60).
 - Конфиг: `sandbox.provider_id`, `workspace.agent` (команда и pinned-версия).
 - Зависит от: `mvp-01-novita-spike` (факты API), `mvp-03-task-store`.
 - Ссылки: ТЗ §9, §10, §16.0 п.4 и 7, §16.1 A5.

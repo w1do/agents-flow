@@ -18,11 +18,14 @@
   секретов), запускает его через `nohup` с env-кредами в одном exec и сразу возвращает pid. Скрипт по завершении
   пишет `status.json` (`exit_code`, `finished_at`, `session_id`). Worker опрашивает `status.json` раз в 15 с.
   Альтернатива — держать exec до конца: обрыв соединения убивает отслеживание.
-- **Креды только в env.** `ANTHROPIC_API_KEY`, `AGENTS_FLOW_TOKEN`, `GITLAB_TOKEN` передаются в env exec-команды
-  и наследуются процессом агента; на диск не пишутся (D-12). Git-доступ — через `GIT_ASKPASS`-скрипт, читающий env.
+- **Креды только в env.** `CLAUDE_CODE_OAUTH_TOKEN` (токен подписки из `claude setup-token`, D-18), `AGENTS_FLOW_TOKEN`,
+  `GITLAB_TOKEN` передаются в env exec-команды и наследуются процессом агента; на диск не пишутся (D-12).
+  `ANTHROPIC_API_KEY` в песочнице не задаётся: по документации Claude Code он перекрывает OAuth-токен (спайком не проверялось). Git-доступ — через `GIT_ASKPASS`-скрипт, читающий env.
 - **Запуск агента:** `claude -p "$(cat prompt.md)" --output-format stream-json --verbose --max-turns N
-  --permission-mode bypassPermissions --mcp-config ~/.harness/mcp.json`; флаги подтверждены в `mvp-01`.
-  Если `--bare` подтверждён — добавляется, чтобы не подхватывать hooks хоста.
+  --permission-mode bypassPermissions --mcp-config ~/.harness/mcp.json`; флаги подтверждены в `mvp-01`:
+  `--verbose` обязателен для `stream-json`, `--max-turns` скрыт в `--help`, но принимается (exit 0).
+  `--bare` не используется: по документации Claude Code он не читает `CLAUDE_CODE_OAUTH_TOKEN` (D-18, `docs/novita.md`). Изоляцию от hooks и
+  настроек хоста обеспечивает чистый профиль песочницы: bootstrap не кладёт hooks и plugins.
 - **Идемпотентная активация.** Если у песочницы `current_task_id == task.id`, `activate` возвращает текущее
   состояние; если занята другой задачей — задача ждёт (`claim` не берёт её). Блокировка `FOR UPDATE SKIP LOCKED` на `sandboxes`.
 - **Порядок в конце:** `cleanup` → успех → `pause`. Ошибка очистки → песочница `error`, сообщение в лог, без паузы.
@@ -31,5 +34,9 @@
 
 ## Risks / Trade-offs
 
-- [Novita завершает песочницу по таймауту во время работы] → на старте `extend_timeout` на `AGENT_RUN_TIMEOUT_MIN + 10`; полноценное продление — `sandbox-timeout-extend`.
-- [Пауза не сохраняет процессы (итог `mvp-01`)] → в MVP пауза только после очистки, когда процессов нет.
+- [Novita по умолчанию уничтожает песочницу по таймауту вместе с данными (итог `mvp-01`, D-19)] → на старте `extend_timeout` на `AGENT_RUN_TIMEOUT_MIN + 10` (отсчёт от вызова); полноценное продление — `sandbox-timeout-extend`.
+- [Пауза сохраняет файлы и процессы (подтверждено `mvp-01`)] → порядок `cleanup` → `pause` оставлен ради чистоты состояния, а не из-за ограничений Novita.
+- [Лимит команды Novita 10 vCPU, рабочая песочница оператора занимает 8] → в MVP одна песочница задач (2 vCPU); пул — `sandbox-pool`.
+- [Ненулевой код exec бросает `CommandExitException`] → адаптер ловит исключение и возвращает `exit_code` и `stderr`.
+- [OAuth-токен подписки доступен процессу агента; агент выполняет произвольный код, исходящий HTTPS открыт → возможна экфильтрация (решение пользователя, D-18)] → токен передаётся `envs` только команде запуска `claude` (не bootstrap, тестам и git); `GITLAB_TOKEN` и `AGENTS_FLOW_TOKEN` — только в узкие команды; всё, что уходит из песочницы (diff, логи, `stream.jsonl`, `status.json`, MR, Telegram), проходит `security/redaction` с шаблоном `sk-ant-[A-Za-z0-9_-]+` и точным значением, покрыто тестом; токен не пишется в `.mcp.json`, `GIT_ASKPASS`-скрипт и `status.json`; вывод `env`, `printenv` и `/proc/*/environ` не логируется; токен хранится только в ENV Dokploy, доступ к нему у worker; ротация не реже 90 дней и сразу при подозрении; рекомендуется отдельный аккаунт или подписка под харнесс; ограничение исходящего трафика (allowlist), если Novita его поддерживает, иначе остаточный риск; live-тесты: токен не попадает в артефакты, `ANTHROPIC_API_KEY` не передаётся ни в одну команду.
+- [Лимиты подписки по окнам использования; `total_cost_usd` условен] → бюджет задач (`task-limits`) учитывает токены из `usage`, а не только USD (вопрос 8).
