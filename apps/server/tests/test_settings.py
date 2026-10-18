@@ -113,3 +113,53 @@ def test_webhook_secret_accepts_telegram_alphabet(
     settings = load_settings()
 
     assert settings.telegram_webhook_secret.get_secret_value() == "Abc_123-xyz"
+
+
+def test_admin_token_too_short_rejected(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch
+) -> None:
+    # 31 символ: на один меньше минимума; значение не должно попасть в текст ошибки (D-23).
+    short_token = "a" * 31
+    monkeypatch.setenv("HARNESS_ADMIN_TOKEN", short_token)
+
+    with pytest.raises(SettingsError) as info:
+        load_settings()
+
+    message = str(info.value)
+    assert "HARNESS_ADMIN_TOKEN" in message
+    assert short_token not in message
+
+
+def test_admin_token_min_length_accepted(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HARNESS_ADMIN_TOKEN", "b" * 32)
+
+    settings = load_settings()
+
+    assert settings.harness_admin_token is not None
+    assert len(settings.harness_admin_token.get_secret_value()) == 32
+
+
+def test_admin_token_optional(valid_env: dict[str, str]) -> None:
+    settings = load_settings()
+
+    assert settings.harness_admin_token is None
+
+
+@pytest.mark.parametrize(
+    "token",
+    [" " * 32, " " + "c" * 32, "c" * 32 + " ", "\t" + "c" * 32 + "\n"],
+)
+def test_admin_token_surrounding_whitespace_rejected(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch, token: str
+) -> None:
+    # Пробелы по краям отклоняются, даже когда длина без них достаточна; значение не выводится.
+    monkeypatch.setenv("HARNESS_ADMIN_TOKEN", token)
+
+    with pytest.raises(SettingsError) as info:
+        load_settings()
+
+    message = str(info.value)
+    assert "HARNESS_ADMIN_TOKEN" in message
+    assert "c" * 32 not in message

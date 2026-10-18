@@ -1,22 +1,28 @@
-"""Окружение Alembic на async engine. URL берётся из DATABASE_URL, метаданных моделей пока нет.
+"""Окружение Alembic на async engine. URL берётся из DATABASE_URL; метаданные — Base.metadata.
 
-Модели появятся в mvp-03; тогда target_metadata станет Base.metadata, а autogenerate заработает.
+Импорт пакета моделей регистрирует все таблицы MVP, поэтому autogenerate и alembic check видят
+схему.
 """
 
 import asyncio
 import os
 from logging.config import fileConfig
 
+import harness_server.db.models  # noqa: F401  регистрирует таблицы в Base.metadata
 from alembic import context
+from harness_server.db.base import Base
 from sqlalchemy import Connection, pool
 from sqlalchemy.ext.asyncio import create_async_engine
 
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers=False: миграции запускаются в процессе приложения
+    # (harness-server migrate), и без этого флага логгеры harness_server.* уже созданных
+    # модулей отключаются молча.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
-target_metadata = None
+target_metadata = Base.metadata
 
 
 def _database_url() -> str:

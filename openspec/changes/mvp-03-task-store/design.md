@@ -151,22 +151,41 @@ DTO (Pydantic v2):
 TaskText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20_000)]
 WorkspaceId = Annotated[str, StringConstraints(min_length=1, max_length=64)]
 
+
 class TaskCreateIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     text: TaskText
     workspace_id: WorkspaceId | None = None
 
+
 class TaskEventOut(BaseModel):
     model_config = ConfigDict(extra="forbid", from_attributes=True)
-    id: UUID; task_id: UUID; status: TaskStatus; text: str | None
-    source: TaskEventSource; created_at: datetime
+    id: UUID
+    task_id: UUID
+    status: TaskStatus
+    text: str | None
+    source: TaskEventSource
+    created_at: datetime
+
 
 class TaskOut(BaseModel):
     model_config = ConfigDict(extra="forbid", from_attributes=True)
-    id: UUID; kind: TaskKind; workspace_id: str | None; parent_id: UUID | None; text: str
-    status: TaskStatus; priority: int; source: TaskSource; spec_item_id: UUID | None
-    branch: str | None; mr_url: str | None; result: str | None; tests_state: TestsState
-    created_at: datetime; updated_at: datetime
+    id: UUID
+    kind: TaskKind
+    workspace_id: str | None
+    parent_id: UUID | None
+    text: str
+    status: TaskStatus
+    priority: int
+    source: TaskSource
+    spec_item_id: UUID | None
+    branch: str | None
+    mr_url: str | None
+    result: str | None
+    tests_state: TestsState
+    created_at: datetime
+    updated_at: datetime
+
 
 class TaskDetailOut(TaskOut):
     events: list[TaskEventOut]
@@ -234,6 +253,7 @@ _last_ms = 0
 _last_seq = 0
 _SEQ_MAX = 0xFFF
 
+
 def uuid7() -> uuid.UUID:
     """UUIDv7 (RFC 9562): 48 бит unix-мс, версия 7, 12 бит счётчика, вариант 10, 62 бита случайных.
 
@@ -268,23 +288,34 @@ NAMING_CONVENTION: Final = {
     "pk": "pk_%(table_name)s",
 }
 
+
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
+
 def enum_type(enum_cls: type[StrEnum]) -> sa.Enum:
     """VARCHAR(16) со значениями enum (не именами). CHECK объявляется отдельно через enum_check (D-22)."""
-    return sa.Enum(enum_cls, native_enum=False, create_constraint=False, length=16,
-                   validate_strings=True, values_callable=lambda cls: [m.value for m in cls])
+    return sa.Enum(
+        enum_cls,
+        native_enum=False,
+        create_constraint=False,
+        length=16,
+        validate_strings=True,
+        values_callable=lambda cls: [m.value for m in cls],
+    )
+
 
 def enum_check(column: str, enum_cls: type[StrEnum]) -> sa.CheckConstraint:
     """CHECK column IN (...) с именем ck_<table>_<column>. Значения — константы enum, не ввод."""
     values = ", ".join(f"'{member.value}'" for member in enum_cls)
     return sa.CheckConstraint(f"{column} IN ({values})", name=column)
 
+
 class TimestampMixin:
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 ```
 
 Все таблицы имеют `id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid7)`,
@@ -388,6 +419,7 @@ def create_engine(database_url: str) -> AsyncEngine:
     """Async engine приложения; pool_pre_ping — см. комментарий в app.py (обрыв после рестарта Postgres)."""
     return create_async_engine(database_url, pool_pre_ping=True)
 
+
 def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
     """expire_on_commit=False: объекты читаются после commit без нового запроса (нет ленивой загрузки в async)."""
     return async_sessionmaker(engine, expire_on_commit=False)
@@ -451,15 +483,17 @@ Docstring у каждой публичной функции. Логи — тол
 
 ```python
 _bearer = HTTPBearer(auto_error=False)
-_UNAUTHORIZED = HTTPException(status_code=401, detail="unauthorized",
-                              headers={"WWW-Authenticate": "Bearer"})
+_UNAUTHORIZED = HTTPException(
+    status_code=401, detail="unauthorized", headers={"WWW-Authenticate": "Bearer"}
+)
+
 
 async def require_admin_token(
     request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> None:
     """Временный операторский доступ (D-23). Fail-closed: без настроенного токена — 401."""
-    expected = request.app.state.settings.harness_admin_token   # тип Settings
+    expected = request.app.state.settings.harness_admin_token  # тип Settings
     if expected is None or credentials is None or credentials.scheme.lower() != "bearer":
         raise _UNAUTHORIZED
     given_digest = hashlib.sha256(credentials.credentials.encode()).digest()
@@ -467,12 +501,16 @@ async def require_admin_token(
     if not hmac.compare_digest(given_digest, expected_digest):
         raise _UNAUTHORIZED
 
+
 async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
     factory: async_sessionmaker[AsyncSession] = request.app.state.session_factory
     async with factory() as session:
         yield session
 
-def get_config(request: Request) -> HarnessConfig: return request.app.state.config
+
+def get_config(request: Request) -> HarnessConfig:
+    return request.app.state.config
+
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 ConfigDep = Annotated[HarnessConfig, Depends(get_config)]
@@ -512,7 +550,9 @@ Router-зависимость `require_admin_token` решается до вал
 def _check_admin_token_length(cls, value: SecretStr | None) -> SecretStr | None:
     # Токен даёт полный операторский доступ к /tasks; короткий легко подобрать (D-23).
     if value is not None and len(value.get_secret_value()) < _ADMIN_TOKEN_MIN_LENGTH:
-        raise ValueError(f"должна быть не короче {_ADMIN_TOKEN_MIN_LENGTH} символов (openssl rand -hex 32)")
+        raise ValueError(
+            f"должна быть не короче {_ADMIN_TOKEN_MIN_LENGTH} символов (openssl rand -hex 32)"
+        )
     return value
 ```
 
@@ -522,7 +562,7 @@ def _check_admin_token_length(cls, value: SecretStr | None) -> SecretStr | None:
   module docstring (список сегментов).
 - `GitLabConfig`: `@field_validator("base_url")` — `parts = urlsplit(value)`; если `parts.username is not
   None or parts.password is not None or "@" in parts.netloc` → `ValueError("адрес не должен содержать
-  учётные данные (user:pass@host); токен задаётся в ENV GITLAB_TOKEN")`. Значение в текст ошибки не
+  учётные данные перед символом @; токен задаётся в ENV GITLAB_TOKEN")`. Значение в текст ошибки не
   попадает (`_format_errors` уже вызывается с `include_input=False`).
 
 ## Data flow / control flow
@@ -583,28 +623,39 @@ def migrated_database_url(database_url: str) -> Iterator[str]:
     try:
         alembic_command.upgrade(AlembicConfig(str(REPO_ROOT / "alembic.ini")), "head")
     finally:
-        if previous is None: os.environ.pop("DATABASE_URL", None)
-        else: os.environ["DATABASE_URL"] = previous
+        if previous is None:
+            os.environ.pop("DATABASE_URL", None)
+        else:
+            os.environ["DATABASE_URL"] = previous
     yield database_url
 
+
 @pytest_asyncio.fixture(scope="session", loop_scope="session")
-async def db_engine(migrated_database_url: str) -> AsyncIterator[AsyncEngine]: ...  # create_async_engine; dispose
+async def db_engine(
+    migrated_database_url: str,
+) -> AsyncIterator[AsyncEngine]: ...  # create_async_engine; dispose
+
 
 @pytest_asyncio.fixture(loop_scope="session")
 async def db_session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
     """Сессия в внешней транзакции; commit сервиса → SAVEPOINT; в конце всё откатывается."""
     async with db_engine.connect() as connection:
         transaction = await connection.begin()
-        session = AsyncSession(bind=connection, join_transaction_mode="create_savepoint",
-                               expire_on_commit=False)
+        session = AsyncSession(
+            bind=connection, join_transaction_mode="create_savepoint", expire_on_commit=False
+        )
         try:
             yield session
         finally:
             await session.close()
             await transaction.rollback()
 
-TRUNCATE_ALL = ("TRUNCATE TABLE telegram_updates, telegram_messages, task_tokens, sandboxes, spec_items, "
-                "checkpoints, routings, task_events, tasks CASCADE")
+
+TRUNCATE_ALL = (
+    "TRUNCATE TABLE telegram_updates, telegram_messages, task_tokens, sandboxes, spec_items, "
+    "checkpoints, routings, task_events, tasks CASCADE"
+)
+
 
 @pytest_asyncio.fixture(loop_scope="session")
 async def committed_session_factory(db_engine) -> AsyncIterator[async_sessionmaker[AsyncSession]]:

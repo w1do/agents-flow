@@ -1,7 +1,8 @@
 # db — миграции и Postgres
 
-Схема меняется только миграциями Alembic в `db/migrations`. Моделей пока нет: они появятся в
-`mvp-03-task-store`, тогда в `env.py` подключается `target_metadata`.
+Схема меняется только миграциями Alembic в `db/migrations`. Метаданные — `Base.metadata`
+(`harness_server.db.base`); `env.py` импортирует пакет моделей, поэтому autogenerate и `alembic check`
+видят все таблицы.
 
 ## Миграции
 
@@ -9,7 +10,7 @@
 |---|---|
 | Окружение Alembic (async engine, URL из `DATABASE_URL`) | `db/migrations/env.py` |
 | Шаблон ревизии | `db/migrations/script.py.mako` |
-| Ревизии | `db/migrations/versions/` (пока пусто) |
+| Ревизии | `db/migrations/versions/`: `0001_initial` (9 таблиц MVP) |
 | Конфиг | `alembic.ini` в корне |
 
 Применить миграции до head:
@@ -19,6 +20,23 @@
 ```
 
 Команда требует `DATABASE_URL`. `./tools/harness` загружает его из `.env`.
+
+Проверка расхождения ORM и БД (после `upgrade head` не должно быть вывода о различиях):
+
+```bash
+uv run alembic check
+```
+
+## Ревизия 0001 (mvp-03)
+
+Миграция написана вручную, без импорта кода приложения: значения CHECK записаны литералами.
+Таблицы: `tasks`, `task_events`, `routings`, `checkpoints`, `spec_items`, `sandboxes`, `task_tokens`,
+`telegram_messages`, `telegram_updates`. FK `tasks.spec_item_id → spec_items` создаётся последним
+(цикл таблиц). Откат удаляет все таблицы MVP: `uv run alembic downgrade base`.
+
+Перечисления хранятся как `VARCHAR(16)` с CHECK `ck_<таблица>_<колонка>` (D-22); нативный `ENUM`
+Postgres не используется. Тесты БД (`apps/server/tests/conftest.py`) поднимают Postgres через
+testcontainers или берут `TEST_DATABASE_URL` и применяют миграции до head один раз за сессию.
 
 ## Локальный Postgres
 

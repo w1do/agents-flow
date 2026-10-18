@@ -17,6 +17,8 @@
 | Гейт | `Gate` | Механическая проверка сервером: секреты, коммит, тесты, push, MR |
 | Пункт спецификации | `SpecItem` | Зеркало пункта OpenSpec из `tasks.md` |
 | Событие задачи | `TaskEvent` | Запись в ленте этапов, источник сообщения в Telegram |
+| Источник события | `TaskEventSource` | Кто записал событие: `telegram`, `agent`, `worker`, `api` |
+| Роль агента | `AgentRole` | Роль токена задачи: `planner`, `implementer` |
 | Токен задачи | `TaskToken` | Bearer для MCP, действует до конца задачи |
 | Операторский токен | `OperatorToken` | Bearer со скоупами `read`/`operate`/`admin` (после MVP) |
 | Сообщение задачи | `TaskMessage` | Одно сообщение в Telegram, этапы дописываются |

@@ -142,3 +142,99 @@ def test_at_least_one_workspace_required(tmp_path: Path) -> None:
         load_config(_write(tmp_path, body))
 
     assert "workspaces" in str(info.value)
+
+
+@pytest.mark.parametrize("key", ["tokens", "secrets", "passwd", "pwd", "credential", "credentials"])
+def test_extended_secret_segments_rejected(tmp_path: Path, key: str) -> None:
+    body = (
+        "workspaces:\n"
+        "  - id: demo\n"
+        "    name: Demo\n"
+        "    voice_aliases: []\n"
+        "    gitlab_project: group/demo\n"
+        + TAIL
+        + f"extra:\n  gitlab_{key}: value-should-not-appear\n"
+    )
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "value-should-not-appear" not in str(info.value)
+    assert f"extra.gitlab_{key}" in str(info.value)
+
+
+def test_gitlab_base_url_with_userinfo_rejected(tmp_path: Path) -> None:
+    body = (
+        "workspaces:\n"
+        "  - id: demo\n"
+        "    name: Demo\n"
+        "    voice_aliases: []\n"
+        "    gitlab_project: group/demo\n"
+        "sandbox:\n"
+        "  provider_id: sbx-1\n"
+        "gitlab:\n"
+        "  base_url: https://user:pass@gitlab.example.com\n"
+    )
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    message = str(info.value)
+    assert "gitlab.base_url" in message
+    assert "pass" not in message
+
+
+def test_gitlab_base_url_with_user_only_rejected(tmp_path: Path) -> None:
+    body = (
+        "workspaces:\n"
+        "  - id: demo\n"
+        "    name: Demo\n"
+        "    voice_aliases: []\n"
+        "    gitlab_project: group/demo\n"
+        "sandbox:\n"
+        "  provider_id: sbx-1\n"
+        "gitlab:\n"
+        "  base_url: https://user@gitlab.example.com\n"
+    )
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "gitlab.base_url" in str(info.value)
+
+
+_BASE_URL_TEMPLATE = (
+    "workspaces:\n"
+    "  - id: demo\n"
+    "    name: Demo\n"
+    "    voice_aliases: []\n"
+    "    gitlab_project: group/demo\n"
+    "sandbox:\n"
+    "  provider_id: sbx-1\n"
+    "gitlab:\n"
+    '  base_url: "{url}"\n'
+)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "user:pass@gitlab.example.com",
+        "https:/user:pw@gitlab.example.com",
+        "//user:pw@gitlab.example.com",
+        "ftp://gitlab.example.com",
+        "gitlab.example.com",
+        "https://user:pw@gitlab.example.com",
+        "https://gitlab.example.com@evil.example.com",
+    ],
+)
+def test_gitlab_url_forms_rejected(tmp_path: Path, url: str) -> None:
+    # Строки без схемы http(s) и с userinfo без «//» раньше проходили проверку (security mvp-03).
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, _BASE_URL_TEMPLATE.format(url=url)))
+
+    message = str(info.value)
+    assert "gitlab.base_url" in message
+    assert "pass" not in message
+    assert "pw" not in message
+    assert "evil" not in message

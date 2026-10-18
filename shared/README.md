@@ -8,6 +8,8 @@ Pydantic-модели, которые видят внешние потребит
 | Модуль | Модели |
 |---|---|
 | `harness_shared/health.py` | `HealthResponse` (`status: "ok"`), `ReadyResponse` (`status: "ready" \| "unavailable"`, `database: bool`) |
+| `harness_shared/tasks.py` | Перечисления `TaskKind`, `TaskStatus`, `TaskSource`, `TaskEventSource`, `TestsState`; DTO `TaskCreateIn`, `TaskOut`, `TaskEventOut`, `TaskDetailOut` |
+| `harness_shared/sandboxes.py` | Перечисления `SandboxStatus`, `AgentRole` |
 
 ## Использование
 

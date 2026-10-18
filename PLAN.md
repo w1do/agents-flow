@@ -23,7 +23,7 @@ MR создан → сообщение в Telegram.
 |---|---|---|---|---|---|
 | 1 | [`mvp-01-novita-spike`](openspec/changes/archive/2026-10-18-mvp-01-novita-spike/) | Проверка Novita и Claude Code в песочнице (A1, A2) | — | — | done |
 | 2 | [`mvp-02-foundation`](openspec/changes/archive/2026-10-18-mvp-02-foundation/) | Каркас монорепо, конфиг, health, Compose, CI | platform-config | — | done |
-| 3 | [`mvp-03-task-store`](openspec/changes/mvp-03-task-store/) | Схема БД, статусы, очередь, POST/GET /tasks | task-lifecycle | mvp-02 | todo |
+| 3 | [`mvp-03-task-store`](openspec/changes/mvp-03-task-store/) | Схема БД, статусы, очередь, POST/GET /tasks | task-lifecycle | mvp-02 | review |
 | 4 | [`mvp-04-telegram-intake`](openspec/changes/mvp-04-telegram-intake/) | Webhook, голос→текст, кнопки проекта, одно сообщение | telegram-bot, speech-to-text | mvp-03 | todo |
 | 5 | [`mvp-05-command-routing`](openspec/changes/mvp-05-command-routing/) | Polza: классы work/status, кандидаты, запасной путь | command-routing | mvp-04 | todo |
 | 6 | [`mvp-06-sandbox-runtime`](openspec/changes/mvp-06-sandbox-runtime/) | Адаптер Novita, bootstrap, запуск агента, очистка, пауза | sandbox-runtime | mvp-01, mvp-03 | todo |
