@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# Единая точка входа для разработки: обёртка над uv run и harness-server.
+# Запуск из любого каталога: ./tools/harness <команда>.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+usage() {
+  cat <<'EOF'
+Использование: ./tools/harness <команда>
+
+  check     ruff check, ruff format --check, mypy strict, pytest (нужен Docker для testcontainers)
+  fmt       привести код в порядок: ruff format и ruff check --fix
+  dev       локально запустить server и worker; остановка обоих по Ctrl+C
+  migrate   применить миграции Alembic до head (нужен DATABASE_URL в .env)
+  help      показать эту справку
+EOF
+}
+
+# Значения из .env попадают в окружение только для команд, которым нужны ENV.
+# check не загружает .env: тесты сами задают свои переменные и изолированы от окружения.
+# .env не исполняется (ни source, ни eval): читаются только строки KEY=VALUE. Так значение
+# с пробелом, $(...) или ; не выполнится как команда. Значения в вывод не попадают.
+load_env_file() {
+  local file=".env" line key value first last lineno=0
+  [ -f "$file" ] || return 0
+  while IFS= read -r line || [ -n "$line" ]; do
+    lineno=$((lineno + 1))
+    case "$line" in
+      '' | '#'*) continue ;;
+    esac
+    if [[ "$line" != *=* ]]; then
+      echo "Пропущена строка $lineno в .env: нет знака '='" >&2
+      continue
+    fi
+    key="${line%%=*}"
+    value="${line#*=}"
+    if [[ ! "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+      echo "Пропущена строка $lineno в .env: некорректное имя переменной" >&2
+      continue
+    fi
+    # Снимаем одну пару внешних кавычек и больше ничего не интерпретируем.
+    if [ "${#value}" -ge 2 ]; then
+      first="${value:0:1}"
+      last="${value: -1}"
+      if { [ "$first" = '"' ] && [ "$last" = '"' ]; } || { [ "$first" = "'" ] && [ "$last" = "'" ]; }; then
+        value="${value:1:${#value}-2}"
+      fi
+    fi
+    export "$key=$value"
+  done < "$file"
+}
+
+cmd_check() {
+  uv run ruff check .
+  uv run ruff format --check .
+  uv run mypy apps shared
+  uv run pytest
+}
+
+cmd_fmt() {
+  uv run ruff format .
+  uv run ruff check --fix .
+}
+
+cmd_dev() {
+  load_env_file
+  # Локально сервер слушает только localhost; наружу его выставляет Dokploy, а не dev-режим.
+  uv run harness-server serve --host 127.0.0.1 &
+  local server_pid=$!
+  uv run harness-server worker &
+  local worker_pid=$!
+  trap 'kill "$server_pid" "$worker_pid" 2>/dev/null || true; wait 2>/dev/null || true' EXIT INT TERM
+  wait
+}
+
+cmd_migrate() {
+  load_env_file
+  uv run harness-server migrate
+}
+
+main() {
+  local command="${1:-help}"
+  case "$command" in
+    check) cmd_check ;;
+    fmt) cmd_fmt ;;
+    dev) cmd_dev ;;
+    migrate) cmd_migrate ;;
+    help | -h | --help) usage ;;
+    *)
+      echo "Неизвестная команда: $command" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+}
+
+main "$@"

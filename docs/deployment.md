@@ -16,12 +16,21 @@
 ## CI (`.gitlab-ci.yml`)
 
 ```
-check  (каждый MR и main): ruff, mypy, pytest, alembic check, openspec validate --all
-build  (main):             docker build с --cache-from registry → :$CI_COMMIT_SHORT_SHA и :main
-deploy (main):             curl -X POST "$DOKPLOY_WEBHOOK_URL"
+check:python    (MR и main): uv sync --frozen, ruff check, ruff format --check, mypy, pytest;
+                             Postgres — сервис postgres:16-alpine, TEST_DATABASE_URL задан в job
+check:openspec  (MR и main): openspec validate --all
+build:image     (main):      buildx build --push, cache из registry (:buildcache)
+                             → :$CI_COMMIT_SHORT_SHA и :main
+deploy:dokploy  (main):      curl -fsS -X POST "$DOKPLOY_WEBHOOK_URL"
 ```
 
 В переменных GitLab только `DOKPLOY_WEBHOOK_URL` и встроенные `CI_REGISTRY_*`. Цель — push → выкат до 10 минут.
+
+`alembic check` в CI пока не запускается: без моделей `target_metadata` пустой, и команда падает.
+Шаг добавляется в `check:python` вместе с моделями (mvp-03).
+
+Пайплайн GitLab не проверен на MR: remote репозитория — GitHub. Проверены структура YAML и
+команды job `check:python` локально.
 
 ## Первый запуск
 

@@ -10,17 +10,26 @@
 Процесс ролей (Architect → Implementer → Reviewer, проверки, память) описан в глобальном CLAUDE.md
 пользователя; проектные правила — в [CLAUDE.md](../CLAUDE.md).
 
-## Локальный запуск (появится в mvp-02-foundation)
+## Локальный запуск
 
 ```bash
 uv sync                               # зависимости workspace (apps/server, shared)
-docker compose -f deploy/db/docker-compose.yml up -d   # Postgres
-cp .env.example .env                  # заполнить значения (не коммитится)
+cp .env.example .env                  # заполнить секреты (не коммитится); пароль БД уже совпадает с командой ниже
 cp config/harness.example.yaml config/harness.yaml
-./tools/harness migrate
-./tools/harness dev                   # server :8000 + worker
-./tools/harness check                 # ruff, mypy, pytest
+docker run -d --name harness-pg -p 127.0.0.1:5432:5432 -e POSTGRES_DB=harness -e POSTGRES_USER=harness -e POSTGRES_PASSWORD=CHANGE_ME postgres:16-alpine
+./tools/harness migrate               # миграции до head
+./tools/harness dev                   # server на 127.0.0.1:8000 и worker (остановка по Ctrl+C)
+curl -fsS localhost:8000/health/ready # в другом терминале: 200 при доступной БД
+./tools/harness check                 # ruff, ruff format, mypy, pytest (Postgres для тестов поднимается сам, нужен Docker)
 ```
+
+Локальная БД слушает только `127.0.0.1:5432`. Удалить: `docker rm -f harness-pg`. Если контейнер
+уже существует, сначала удалите его. Пароль `CHANGE_ME` задан в `.env.example` и совпадает с
+`POSTGRES_PASSWORD`; для локальной БД его можно оставить. Стек `deploy/db` предназначен для Dokploy
+и описан в [db/README.md](../db/README.md).
+
+Команды CLI, сборка образа и проверка compose — в `apps/server/README.md`, `db/README.md` и
+[deployment.md](deployment.md).
 
 Webhook Telegram локально — через публичный туннель на `/telegram/webhook`; адрес в `HARNESS_PUBLIC_URL`.
 
@@ -38,5 +47,5 @@ Webhook Telegram локально — через публичный туннел
 
 - ruff (lint + format), mypy `--strict`, line-length 100.
 - Async везде на I/O. Синхронные SDK вызываются через `asyncio.to_thread` внутри адаптера.
-- Миграция Alembic на каждое изменение моделей; `alembic check` в CI.
+- Миграция Alembic на каждое изменение моделей; `alembic check` в CI (включается в mvp-03, когда появится target_metadata).
 - Сообщения коммитов: `<change-id>: <что сделано>`.

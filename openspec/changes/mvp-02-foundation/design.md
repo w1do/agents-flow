@@ -29,3 +29,11 @@ D-11 (конфиг в YAML) задают рамки.
 
 - [Dokploy не видит сеть БД] → оба стека в `dokploy-network`, адрес БД по имени сервиса из стека БД.
 - [Длинный CI из-за testcontainers] → в CI Postgres как `services:` GitLab, testcontainers только локально.
+- [Пайплайн GitLab на MR не запускался: remote репозитория — GitHub] → YAML и команды job `check:python` проверены локально; подтвердить на первом MR в GitLab.
+- [`alembic check` не работает при `target_metadata=None`] → убран из CI, включается в mvp-03 вместе с моделями.
+- [Postgres и харнесс в общей `dokploy-network`, порт 5432 виден другим стекам сети] → защита паролем; отдельная internal-сеть невозможна между двумя стеками Dokploy, пересмотреть при hardening.
+- [Образы `docker:27`, `python:3.12-slim-bookworm` закреплены тегом, без digest] → принято для MVP.
+- [Нет проверки плейсхолдера `CHANGE_ME`, нет `cap_drop`/`read_only` у контейнеров] → hardening после MVP.
+- [Разбор `.env` в `tools/harness` без автотеста; CRLF оставляет `\r` в значениях] → проверено вручную на спецсимволах; `.env` в LF.
+- [Сервис `migrate` монтирует `harness.yaml`, который ему не нужен] → безвредно, убрать при следующей правке compose.
+- [Локальная разработка: Postgres через `docker run -p 127.0.0.1:5432:5432`, стек `deploy/db` без `ports`] → описано в docs/development.md и db/README.md.

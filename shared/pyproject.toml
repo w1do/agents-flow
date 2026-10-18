@@ -1,0 +1,12 @@
+[project]
+name = "harness-shared"
+version = "0.1.0"
+description = "agents-flow harness: публичные Pydantic-модели, общие для сервера и консоли"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pydantic>=2.8",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14"]
+build-backend = "uv_build"

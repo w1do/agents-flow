@@ -10,6 +10,7 @@
 
 - Готово: ТЗ v5 сохранено, CLAUDE.md, ARCHITECTURE.md, docs/, OpenSpec-изменения для MVP (9) и после MVP (40).
 - Блокеров нет: вопрос 3 закрыт (GitLab, D-01).
+- `mvp-02-foundation`: реализован, статус `review` (ожидает ревью).
 - Следующий шаг: `mvp-01-novita-spike` и `mvp-02-foundation` (можно параллельно).
 
 ## MVP — сквозной срез (ТЗ §16.0)
@@ -20,7 +21,7 @@ MR создан → сообщение в Telegram.
 | # | Изменение | Что даёт | Capability | Зависит от | Статус |
 |---|---|---|---|---|---|
 | 1 | [`mvp-01-novita-spike`](openspec/changes/mvp-01-novita-spike/) | Проверка Novita и Claude Code в песочнице (A1, A2) | — | — | review |
-| 2 | [`mvp-02-foundation`](openspec/changes/mvp-02-foundation/) | Каркас монорепо, конфиг, health, Compose, CI | platform-config | — | todo |
+| 2 | [`mvp-02-foundation`](openspec/changes/mvp-02-foundation/) | Каркас монорепо, конфиг, health, Compose, CI | platform-config | — | review |
 | 3 | [`mvp-03-task-store`](openspec/changes/mvp-03-task-store/) | Схема БД, статусы, очередь, POST/GET /tasks | task-lifecycle | mvp-02 | todo |
 | 4 | [`mvp-04-telegram-intake`](openspec/changes/mvp-04-telegram-intake/) | Webhook, голос→текст, кнопки проекта, одно сообщение | telegram-bot, speech-to-text | mvp-03 | todo |
 | 5 | [`mvp-05-command-routing`](openspec/changes/mvp-05-command-routing/) | Polza: классы work/status, кандидаты, запасной путь | command-routing | mvp-04 | todo |

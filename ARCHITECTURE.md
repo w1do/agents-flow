@@ -42,7 +42,7 @@ Novita, результат приходит как Merge Request в GitLab, ст
 
 ```
 apps/server/src/harness_server/
-├── main.py            # create_app(): FastAPI + смонтированный MCP, lifespan
+├── app.py             # create_app(): FastAPI + смонтированный MCP, lifespan
 ├── cli.py             # harness-server: serve | worker | migrate | sandbox pause|resume | reset-password
 ├── settings.py        # pydantic-settings: ENV, путь к config/harness.yaml
 ├── config.py          # загрузка и валидация config/harness.yaml (workspaces, sandbox, gitlab)
@@ -160,23 +160,31 @@ implement:  backlog → active → testing → ready (MR создан) → merge
 
 `config/harness.yaml` (путь в `HARNESS_CONFIG`, без секретов, пример — `config/harness.example.yaml`):
 workspaces (id, name, voice_aliases, gitlab_project, default_branch, test_command, agent), sandbox (provider_id),
-gitlab (base_url).
+gitlab (base_url). Ключи с сегментами `token`, `key`, `password`, `secret`, `apikey` сервер отклоняет.
+
+Обязательные ENV (решение D-20): `DATABASE_URL`, `HARNESS_CONFIG`, `HARNESS_SECRET_KEY`, `TELEGRAM_BOT_TOKEN`,
+`TELEGRAM_CHAT_ID`, `TELEGRAM_WEBHOOK_SECRET`. Сервер и worker не стартуют, если их нет или они пустые.
+Остальные опциональны, пока их не использует свой этап («с этапа» — в `.env.example`).
+Секреты в таблице помечены «секрет»; в коде это `SecretStr`.
 
 | ENV | Назначение |
 |---|---|
-| `DATABASE_URL` | Postgres (asyncpg) |
+| `DATABASE_URL` | **Обязательная.** Postgres (asyncpg). Секрет: содержит пароль |
+| `HARNESS_CONFIG` | **Обязательная.** Путь к `harness.yaml` |
+| `HARNESS_SECRET_KEY` | **Обязательная.** Соль/ключ для хешей токенов. Секрет |
 | `HARNESS_PUBLIC_URL` | Публичный HTTPS-адрес сервера, им пользуется MCP-конфиг песочницы |
-| `HARNESS_CONFIG` | Путь к `harness.yaml` |
-| `HARNESS_SECRET_KEY` | Соль/ключ для хешей токенов |
-| `HARNESS_ADMIN_TOKEN` | Временный операторский bearer для `POST /tasks`, `GET /tasks/{id}` (до `operator-tokens`) |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_WEBHOOK_SECRET` | Бот и владелец |
-| `POLZA_AI_URL`, `POLZA_AI_KEY`, `POLZA_AI_MODEL`, `ROUTING_MIN_CONFIDENCE` | Классификация и порог уверенности |
-| `STT_PROVIDER`, `STT_API_URL`, `STT_API_KEY`, `STT_MODEL` | Распознавание речи (по умолчанию Whisper через Polza) |
-| `NOVITA_API_KEY`, `NOVITA_DOMAIN` | Песочницы |
-| `GITLAB_URL`, `GITLAB_TOKEN` | Push и MR |
-| `CLAUDE_CODE_OAUTH_TOKEN` | Токен подписки Claude для Claude Code в песочнице (`claude setup-token`, срок ~1 год; передаётся только в exec, D-18) |
-| `AGENT_RUN_TIMEOUT_MIN`, `TESTS_TIMEOUT_MIN` | Лимит времени агента и гейта тестов |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Консоль, после MVP |
+| `HARNESS_ADMIN_TOKEN` | Временный операторский bearer для `POST /tasks`, `GET /tasks/{id}` (до `operator-tokens`). Секрет |
+| `TELEGRAM_BOT_TOKEN` | **Обязательная.** Токен бота. Секрет |
+| `TELEGRAM_CHAT_ID` | **Обязательная.** Владелец бота |
+| `TELEGRAM_WEBHOOK_SECRET` | **Обязательная.** Секрет webhook. Секрет |
+| `POLZA_AI_URL`, `POLZA_AI_KEY`, `POLZA_AI_MODEL`, `ROUTING_MIN_CONFIDENCE` | Классификация и порог уверенности (`POLZA_AI_KEY` — секрет) |
+| `STT_PROVIDER`, `STT_API_URL`, `STT_API_KEY`, `STT_MODEL` | Распознавание речи (по умолчанию Whisper через Polza; `STT_API_KEY` — секрет) |
+| `NOVITA_API_KEY`, `NOVITA_DOMAIN` | Песочницы (`NOVITA_API_KEY` — секрет) |
+| `GITLAB_URL`, `GITLAB_TOKEN` | Push и MR (`GITLAB_TOKEN` — секрет) |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Токен подписки Claude для Claude Code в песочнице (`claude setup-token`, срок ~1 год; передаётся только в exec, D-18). Секрет |
+| `AGENT_RUN_TIMEOUT_MIN`, `TESTS_TIMEOUT_MIN` | Лимит времени агента и гейта тестов (по умолчанию 60 и 15) |
+| `WORKER_POLL_INTERVAL_SEC` | Интервал опроса очереди worker, в секундах (по умолчанию 5) |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Консоль, после MVP (`ADMIN_PASSWORD` — секрет) |
 
 Новая переменная или сервис добавляется одним изменением в Compose, `.env.example` и эту таблицу.
 

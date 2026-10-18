@@ -1,0 +1,58 @@
+[project]
+name = "agents-flow"
+version = "0.1.0"
+description = "agents-flow harness: монорепо (uv workspace)"
+requires-python = ">=3.12,<3.13"
+# Корень зависит от harness-server, чтобы `uv sync` ставил все члены workspace в .venv.
+dependencies = ["harness-server"]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+harness-server = { workspace = true }
+
+[tool.uv.workspace]
+members = ["apps/server", "shared"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "respx>=0.21",
+    "testcontainers[postgres]>=4.8",
+    "asgi-lifespan>=2.1",
+    "types-PyYAML>=6.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# tools/spikes — одноразовые спайки (mvp-01), не часть линта; .uv-cache — кэш CI.
+extend-exclude = ["tools/spikes", ".uv-cache"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "ASYNC", "RUF"]
+# Документация и комментарии написаны по-русски: кириллическая «с», «а» и т.п. — не ошибка.
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.mypy]
+strict = true
+# Пакеты src-layout: без этих путей mypy не видит harness_server / harness_shared.
+mypy_path = "apps/server/src:shared/src"
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = ["testcontainers.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["apps/server/tests"]
+addopts = "-m 'not live'"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+markers = [
+    "live: интеграция с Novita, Telegram, GitLab; запускается вручную (pytest -m live)",
+]
