@@ -8,6 +8,7 @@
 | [tz/tz-v5.md](tz/tz-v5.md) | Исходное ТЗ v5 (не редактируется) |
 | [decisions.md](decisions.md) | Решения поверх ТЗ (D-NN) |
 | [open-questions.md](open-questions.md) | Открытые вопросы ТЗ §17 и где они решаются |
+| [novita.md](novita.md) | Результаты спайка Novita (mvp-01): возможности песочницы, Claude Code, ограничения |
 | [mcp-agents-flow.md](mcp-agents-flow.md) | Каталог инструментов MCP, доступы, ошибки |
 | [glossary.md](glossary.md) | Словарь имён |
 | [development.md](development.md) | Процесс, локальный запуск, тесты, стиль |

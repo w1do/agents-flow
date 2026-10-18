@@ -19,7 +19,7 @@ MR создан → сообщение в Telegram.
 
 | # | Изменение | Что даёт | Capability | Зависит от | Статус |
 |---|---|---|---|---|---|
-| 1 | [`mvp-01-novita-spike`](openspec/changes/mvp-01-novita-spike/) | Проверка Novita и Claude Code в песочнице (A1, A2) | — | — | todo |
+| 1 | [`mvp-01-novita-spike`](openspec/changes/mvp-01-novita-spike/) | Проверка Novita и Claude Code в песочнице (A1, A2) | — | — | review |
 | 2 | [`mvp-02-foundation`](openspec/changes/mvp-02-foundation/) | Каркас монорепо, конфиг, health, Compose, CI | platform-config | — | todo |
 | 3 | [`mvp-03-task-store`](openspec/changes/mvp-03-task-store/) | Схема БД, статусы, очередь, POST/GET /tasks | task-lifecycle | mvp-02 | todo |
 | 4 | [`mvp-04-telegram-intake`](openspec/changes/mvp-04-telegram-intake/) | Webhook, голос→текст, кнопки проекта, одно сообщение | telegram-bot, speech-to-text | mvp-03 | todo |
