@@ -146,7 +146,7 @@ Node и npm в шаблоне по умолчанию есть, `npm install -g 
 Основная песочница удаляется до проверки expire, поэтому лимит 10 vCPU не мешает. Код выхода скрипта 0,
 файл `--report` создан с правами `600`, значений секретов в нём нет.
 
-```
+```text
 exec: OK
 exec nonzero: raises CommandExitException exit_code=3 stderr=OK
 pause/resume: files=OK process=OK pause_s=0.4 resume_s=0.2
