@@ -1,0 +1,1738 @@
+[
+  {
+    "relativePath": "AGENTS.md",
+    "summary": "Правила для Codex и других агентов: ссылка на CLAUDE.md и краткая выжимка обязательных правил репозитория",
+    "role": "doc",
+    "contentHash": "d6b8e03ea04b0c35d80688535a11c061cd5ff80817b0dc90ae81748bcf73b880",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:26.888Z"
+  },
+  {
+    "relativePath": "ARCHITECTURE.md",
+    "summary": "Целевая архитектура harness: компоненты server/worker, слои, таблицы, статусы, поток MVP, MCP, песочница, безопасность, ENV, деплой Dokploy",
+    "role": "doc",
+    "contentHash": "e8a5ef18e64914685b2724e98d73323ec70449c5462c9c06e9933b06c06a6bd0",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:26.908Z"
+  },
+  {
+    "relativePath": "CLAUDE.md",
+    "summary": "Правила агентов проекта: project-memory, OpenSpec-процесс, стек, жёсткие правила (services/adapters, статусы, секреты), тесты, ./tools/harness",
+    "role": "doc",
+    "contentHash": "c5043fa6b70a38c2375889936d2cd9ece72c7e2be0b362e5e2473e6da1c8e2e4",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:26.920Z"
+  },
+  {
+    "relativePath": "PLAN.md",
+    "summary": "План и статус OpenSpec-изменений: MVP mvp-01..09, 40 изменений по 7 волнам с зависимостями, покрытие разделов ТЗ",
+    "role": "doc",
+    "contentHash": "9f05c165efe5aed89f3fff8fc4592ce5ce94ae91663dae91576879a6235fd8a4",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:26.932Z"
+  },
+  {
+    "relativePath": "docs/README.md",
+    "summary": "Оглавление документации проекта agents-flow harness",
+    "role": "doc",
+    "contentHash": "b391a708f3de17487f1095f947c1660b9f10af4b865900e51b4826322ef60b87",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:26.943Z"
+  },
+  {
+    "relativePath": "docs/decisions.md",
+    "summary": "ADR-лог D-01..D-17: GitLab, статусы ТЗ v5, без Go-клиента, STT через Polza, uv, worker, MCP SDK, ветка от плана и др.",
+    "role": "doc",
+    "contentHash": "97a36faba54545b9eff58d90f56557f42067c34b2e407c6727619f0ce11904ee",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:26.954Z"
+  },
+  {
+    "relativePath": "docs/deployment.md",
+    "summary": "Деплой: два Compose-стека Dokploy (БД и harness: migrate, server, worker), сеть dokploy-network, GitLab CI check/build/deploy, первый запуск",
+    "role": "doc",
+    "contentHash": "b845328866b596f401a42ef14e8f4eba5477b92d0d760d68224791e85b7559f4",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:26.965Z"
+  },
+  {
+    "relativePath": "docs/development.md",
+    "summary": "Процесс разработки по OpenSpec, локальный запуск через uv и ./tools/harness, уровни тестов, стиль кода",
+    "role": "doc",
+    "contentHash": "fdd1d855c1a9b414531eaec195e979279609958843119105d8a7bbd1fa37b87b",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:26.976Z"
+  },
+  {
+    "relativePath": "docs/glossary.md",
+    "summary": "Словарь имён: workspace, Task, planner, implementer, CommandClass, Sandbox, Gate, SpecItem, TaskToken, Checkpoint, Handoff",
+    "role": "doc",
+    "contentHash": "1f1784c125b80915e2e4f365b9a0197327ba2e0b0d80abcc5f36574470f4e92a",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:26.988Z"
+  },
+  {
+    "relativePath": "docs/mcp-agents-flow.md",
+    "summary": "Каталог инструментов MCP agents-flow: доступы токенов, ошибки, MVP report_task/sync_spec/create_task/list_tasks, инструменты после MVP",
+    "role": "doc",
+    "contentHash": "e86fa94c1c1eb0588d76856ca2d924639ed08f850b1f25f74617f943fc1f9908",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:27.001Z"
+  },
+  {
+    "relativePath": "docs/open-questions.md",
+    "summary": "Открытые вопросы ТЗ §17: статус и в каком OpenSpec-изменении решаются",
+    "role": "doc",
+    "contentHash": "4dd42da8e4e591c1717cf0f93dc2401c097133fe004a77d766068daade435d3c",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:27.013Z"
+  },
+  {
+    "relativePath": "docs/tz/tz-v5.md",
+    "summary": "Исходное ТЗ v5 голосового AI-харнесса (Telegram, Polza, Novita, MCP agents-flow), не редактируется",
+    "role": "doc",
+    "contentHash": "984c1c776a1ddb24044342db9ea7050ec8aec3d27b67daabec227436d2f97a14",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:27.024Z"
+  },
+  {
+    "relativePath": "openspec/changes/agent-heartbeat/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения agent-heartbeat (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.141Z"
+  },
+  {
+    "relativePath": "openspec/changes/agent-heartbeat/proposal.md",
+    "summary": "OpenSpec proposal agent-heartbeat (волна 3): Heartbeat агента и статус stalled. Зависит от mvp-07-agents-flow-mcp. ТЗ §16.1 C2",
+    "role": "doc",
+    "contentHash": "c423dd0ff6988316e6aea5abcf751dc82c21fef38d803752c31464ea84ef7cbd",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.148Z"
+  },
+  {
+    "relativePath": "openspec/changes/agent-heartbeat/specs/sandbox-runtime/spec.md",
+    "summary": "Delta-спека sandbox-runtime для agent-heartbeat: Обнаружение зависания",
+    "role": "doc",
+    "contentHash": "cee3dffaf8c6f54f9418d1810bcd68f406c67e30a7323cc01216e815a19ff0f5",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.153Z"
+  },
+  {
+    "relativePath": "openspec/changes/agent-heartbeat/tasks.md",
+    "summary": "Чек-лист задач agent-heartbeat: Heartbeat агента и статус stalled; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "2985c2c6513b5d8e18ce53a439c379d542ed831db079bd75fbb545cb405c22cd",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.157Z"
+  },
+  {
+    "relativePath": "openspec/changes/agent-sessions/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения agent-sessions (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.161Z"
+  },
+  {
+    "relativePath": "openspec/changes/agent-sessions/proposal.md",
+    "summary": "OpenSpec proposal agent-sessions (волна 3): Сессии агента, пороги контекста и handoff. Зависит от checkpoints, budget-usage. ТЗ §10.1",
+    "role": "doc",
+    "contentHash": "8956202f5fc317d78fa43d363ff1b03a5f04a3c2cf5a69d4a8677b832db2966a",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.165Z"
+  },
+  {
+    "relativePath": "openspec/changes/agent-sessions/specs/agent-sessions/spec.md",
+    "summary": "Delta-спека agent-sessions для agent-sessions: Смена сессии по порогу, Одна сессия за раз",
+    "role": "doc",
+    "contentHash": "a3335605f6fcc86f759ba92e39fda77ec8231bd629bf927f63662d8cfbac371d",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.169Z"
+  },
+  {
+    "relativePath": "openspec/changes/agent-sessions/tasks.md",
+    "summary": "Чек-лист задач agent-sessions: Сессии агента, пороги контекста и handoff; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "c3907346ae5b334b29d0eacd0728d3b0a018c2e63158d54b3a85c6e8cedb89d7",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.172Z"
+  },
+  {
+    "relativePath": "openspec/changes/budget-usage/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения budget-usage (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.176Z"
+  },
+  {
+    "relativePath": "openspec/changes/budget-usage/proposal.md",
+    "summary": "OpenSpec proposal budget-usage (волна 3): Учёт расхода токенов. Зависит от mvp-09-delivery-mr. ТЗ §10 п.3, §11 (`usage`), §16 п.8",
+    "role": "doc",
+    "contentHash": "cddd042c7e8ad0b9953a7dc44c48c1816ff200ba31d106bf7d9aad16ba24d33f",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.179Z"
+  },
+  {
+    "relativePath": "openspec/changes/budget-usage/specs/budget/spec.md",
+    "summary": "Delta-спека budget для budget-usage: Учёт по итогам сессии",
+    "role": "doc",
+    "contentHash": "0ed082cdb0e8762929c338118e4d7fa3c24fb7cac965e75ea9f6f171e5478c51",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.183Z"
+  },
+  {
+    "relativePath": "openspec/changes/budget-usage/tasks.md",
+    "summary": "Чек-лист задач budget-usage: Учёт расхода токенов; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "98d96dc77521f3ec3432c3274b589324238603c2849c4fa877d05983a3c4663d",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.186Z"
+  },
+  {
+    "relativePath": "openspec/changes/check-tasks/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения check-tasks (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.190Z"
+  },
+  {
+    "relativePath": "openspec/changes/check-tasks/proposal.md",
+    "summary": "OpenSpec proposal check-tasks (волна 1): Задачи проверки (класс «проверка»). Зависит от mvp-09-delivery-mr. ТЗ §5.0 класс 2",
+    "role": "doc",
+    "contentHash": "772f7b44eba0f2e6389bb7ff6735a45a6444329ad01aa6aba2d56b20f8676cc3",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.193Z"
+  },
+  {
+    "relativePath": "openspec/changes/check-tasks/specs/task-lifecycle/spec.md",
+    "summary": "Delta-спека task-lifecycle для check-tasks: Проверка без изменений, Сомнение между работой и проверкой",
+    "role": "doc",
+    "contentHash": "cd9e5b544db9e6e6abd92121fa328983df4d886ccc6d0352dc777fb6844f678b",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.197Z"
+  },
+  {
+    "relativePath": "openspec/changes/check-tasks/tasks.md",
+    "summary": "Чек-лист задач check-tasks: Задачи проверки (класс «проверка»); реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "42aaae1ee01a22c0a20d6da2b1aa6f39cf744ba4bcbb90a0955013c50dbe39d6",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.200Z"
+  },
+  {
+    "relativePath": "openspec/changes/checkpoints/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения checkpoints (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.204Z"
+  },
+  {
+    "relativePath": "openspec/changes/checkpoints/proposal.md",
+    "summary": "OpenSpec proposal checkpoints (волна 3): Чекпоинты агента. Зависит от mvp-09-delivery-mr. ТЗ §10 п.5, §10.1 (чекпоинт сессии), §11",
+    "role": "doc",
+    "contentHash": "99c16052b32c8dd4ce7fabfe0b07c3930681c4cf38337f89d510de2216dbb657",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.208Z"
+  },
+  {
+    "relativePath": "openspec/changes/checkpoints/specs/agent-checkpoints/spec.md",
+    "summary": "Delta-спека agent-checkpoints для checkpoints: Сохранение чекпоинта, Запасной чекпоинт",
+    "role": "doc",
+    "contentHash": "92183fc7a29ec2422f27591e35a3b67c970384496eaa1dd7019a867832961e94",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.212Z"
+  },
+  {
+    "relativePath": "openspec/changes/checkpoints/tasks.md",
+    "summary": "Чек-лист задач checkpoints: Чекпоинты агента; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "8f65a1a09c14fe8bea28104c8ffed81dfccd6060e7b132f3d8d17e4c56a56c93",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.215Z"
+  },
+  {
+    "relativePath": "openspec/changes/cli-version-pin/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения cli-version-pin (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.219Z"
+  },
+  {
+    "relativePath": "openspec/changes/cli-version-pin/proposal.md",
+    "summary": "OpenSpec proposal cli-version-pin (волна 5): Закрепление версий CLI агентов. Зависит от sandbox-profile. ТЗ §16.1 C8",
+    "role": "doc",
+    "contentHash": "974b729effe4d84bf2b555a36e9768aabb2d0cf62f1d9f64c7e89162e142367a",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.222Z"
+  },
+  {
+    "relativePath": "openspec/changes/cli-version-pin/specs/sandbox-profile/spec.md",
+    "summary": "Delta-спека sandbox-profile для cli-version-pin: Закреплённые версии",
+    "role": "doc",
+    "contentHash": "bed27e70a3afc9903b2f0cb34456bcc23148012dd5938d7e33afc98ed99a13ed",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.226Z"
+  },
+  {
+    "relativePath": "openspec/changes/cli-version-pin/tasks.md",
+    "summary": "Чек-лист задач cli-version-pin: Закрепление версий CLI агентов; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "4111b17ffeddb098a3a1ef259a01811d2f5c93d97704867f20f172626c561851",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.229Z"
+  },
+  {
+    "relativePath": "openspec/changes/codex-agent/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения codex-agent (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.232Z"
+  },
+  {
+    "relativePath": "openspec/changes/codex-agent/proposal.md",
+    "summary": "OpenSpec proposal codex-agent (волна 5): Второй тип агента: Codex. Зависит от sandbox-pool, skills-library. ТЗ §16 п.9, §17 вопрос 13",
+    "role": "doc",
+    "contentHash": "a489c541ce358e7c9868f6ce629759bf849d276916ac789363e690eaea231711",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.236Z"
+  },
+  {
+    "relativePath": "openspec/changes/codex-agent/specs/sandbox-runtime/spec.md",
+    "summary": "Delta-спека sandbox-runtime для codex-agent: Запуск агента по типу",
+    "role": "doc",
+    "contentHash": "86ec1c23dd12d166d3c6dddc519d977204703ef89f364b9dd76edb3eb6ec757b",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.239Z"
+  },
+  {
+    "relativePath": "openspec/changes/codex-agent/tasks.md",
+    "summary": "Чек-лист задач codex-agent: Второй тип агента: Codex; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "41417bf32553d6dc4049024ec72f8638ed1c62e04adec1acadeed1e44af1f6ee",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.242Z"
+  },
+  {
+    "relativePath": "openspec/changes/confirm-second-factor/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения confirm-second-factor (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.246Z"
+  },
+  {
+    "relativePath": "openspec/changes/confirm-second-factor/proposal.md",
+    "summary": "OpenSpec proposal confirm-second-factor (волна 3): Второй фактор для опасных команд. Зависит от control-commands. ТЗ §16.1 C6",
+    "role": "doc",
+    "contentHash": "fb2e657b33e199d61f84c29b4ee34480b6e58598266a0235877f51c34005f590",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.250Z"
+  },
+  {
+    "relativePath": "openspec/changes/confirm-second-factor/specs/telegram-bot/spec.md",
+    "summary": "Delta-спека telegram-bot для confirm-second-factor: Код для опасных команд",
+    "role": "doc",
+    "contentHash": "49af46b60e97d1a931e988a29d1e8f30f7014a8973e43e3e1aa66ff00e5a37f9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.253Z"
+  },
+  {
+    "relativePath": "openspec/changes/confirm-second-factor/tasks.md",
+    "summary": "Чек-лист задач confirm-second-factor: Второй фактор для опасных команд; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "64504641c5c9ec2bc704043ee5a97c092c661010b40d516771a9163643870e87",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.256Z"
+  },
+  {
+    "relativePath": "openspec/changes/console-auth/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения console-auth (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.260Z"
+  },
+  {
+    "relativePath": "openspec/changes/console-auth/proposal.md",
+    "summary": "OpenSpec proposal console-auth (волна 6): Консоль: каркас и вход администратора. Зависит от operator-tokens. ТЗ §8 (вход), §14",
+    "role": "doc",
+    "contentHash": "4b15863dc6f10dbde30846d541917d3436c795d488e2233e69b631a6e3d9f199",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.263Z"
+  },
+  {
+    "relativePath": "openspec/changes/console-auth/specs/operator-console/spec.md",
+    "summary": "Delta-спека operator-console для console-auth: Один администратор, Сброс пароля на сервере",
+    "role": "doc",
+    "contentHash": "bec2398ff6dbbd1857158e609318ee979c11abaf91f3b2da92ad42c5564bade8",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.266Z"
+  },
+  {
+    "relativePath": "openspec/changes/console-auth/tasks.md",
+    "summary": "Чек-лист задач console-auth: Консоль: каркас и вход администратора; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "9faf4396aee02f28ec2803c08676a497addd986ea13340a21b162374cbd1d78e",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.269Z"
+  },
+  {
+    "relativePath": "openspec/changes/console-observability/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения console-observability (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.273Z"
+  },
+  {
+    "relativePath": "openspec/changes/console-observability/proposal.md",
+    "summary": "OpenSpec proposal console-observability (волна 6): Консоль: канбан и наблюдаемость. Зависит от console-auth, mcp-operator-tools. ТЗ §8 (наблюдаемость)",
+    "role": "doc",
+    "contentHash": "fc261ff0c3ad341edb6db5a3bfd75aab58f8d11f626732f6aa2dee4928945f10",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.276Z"
+  },
+  {
+    "relativePath": "openspec/changes/console-observability/specs/operator-console/spec.md",
+    "summary": "Delta-спека operator-console для console-observability: Только чтение через MCP",
+    "role": "doc",
+    "contentHash": "9c5b64576b0566f0dff6609349660bc3d1c31ae57ae47a477b7f1df36d4e8325",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.279Z"
+  },
+  {
+    "relativePath": "openspec/changes/console-observability/tasks.md",
+    "summary": "Чек-лист задач console-observability: Консоль: канбан и наблюдаемость; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "283a02ff5cc46dbf29ee48cf6e5ebb09777019b1850ea0c92b4990474f2aa6a2",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.283Z"
+  },
+  {
+    "relativePath": "openspec/changes/console-settings/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения console-settings (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.288Z"
+  },
+  {
+    "relativePath": "openspec/changes/console-settings/proposal.md",
+    "summary": "OpenSpec proposal console-settings (волна 6): Консоль: настройки агентов, workspace и песочниц. Зависит от console-auth, sandbox-profile, skills-library, integrations-mcp-config. ТЗ §8",
+    "role": "doc",
+    "contentHash": "9f6c505a022627019ddb6193df3eb5896e206669133bbebd2ae6b2531f4eef04",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.292Z"
+  },
+  {
+    "relativePath": "openspec/changes/console-settings/specs/operator-console/spec.md",
+    "summary": "Delta-спека operator-console для console-settings: Настройки в базе",
+    "role": "doc",
+    "contentHash": "5e2a194ca97decaf71a85cb18d141b4fbd7e5b3745ac57fc22ebc9bfc8ee3f3d",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.296Z"
+  },
+  {
+    "relativePath": "openspec/changes/console-settings/tasks.md",
+    "summary": "Чек-лист задач console-settings: Консоль: настройки агентов, workspace и песочниц; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "03c4765dd73eaa8cbc92a45f7646661a42bdd0ae2ca850a8794a69743f55980f",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.299Z"
+  },
+  {
+    "relativePath": "openspec/changes/control-commands/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения control-commands (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.303Z"
+  },
+  {
+    "relativePath": "openspec/changes/control-commands/proposal.md",
+    "summary": "OpenSpec proposal control-commands (волна 3): Голосовые команды управления. Зависит от mcp-operator-tools, task-pause-resume. ТЗ §5.1",
+    "role": "doc",
+    "contentHash": "4d9a3d570c938193d04f86e4af10b8eb7e841c01065d89efeb48f58b82b7fbcb",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.307Z"
+  },
+  {
+    "relativePath": "openspec/changes/control-commands/specs/command-routing/spec.md",
+    "summary": "Delta-спека command-routing для control-commands: Закрытый список действий, Подтверждение по риску, Неоднозначная цель",
+    "role": "doc",
+    "contentHash": "2f05aebcf89c0da98bdf0a4d4c542df430aa98254869f38fd98692bed9a9a4e2",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.310Z"
+  },
+  {
+    "relativePath": "openspec/changes/control-commands/tasks.md",
+    "summary": "Чек-лист задач control-commands: Голосовые команды управления; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "a120df5214c8bb7cd94086ffe484eed819fc9c09e0309f3002d6b1b1678a09e7",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.314Z"
+  },
+  {
+    "relativePath": "openspec/changes/db-retention-backups/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения db-retention-backups (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.317Z"
+  },
+  {
+    "relativePath": "openspec/changes/db-retention-backups/proposal.md",
+    "summary": "OpenSpec proposal db-retention-backups (волна 7): Хранение данных и бэкапы. Зависит от mvp-09-delivery-mr. ТЗ §15 (позже), §16.1 C7",
+    "role": "doc",
+    "contentHash": "1fe85fda7625d6b40c75ce9a4968a6d13a5b3be3a5a668ab75046c527d6be6ee",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.321Z"
+  },
+  {
+    "relativePath": "openspec/changes/db-retention-backups/specs/operations/spec.md",
+    "summary": "Delta-спека operations для db-retention-backups: Политика хранения, Проверенный бэкап",
+    "role": "doc",
+    "contentHash": "dd7f0ca3803cf0aee10b28ca60c285b3aabd89a77ecdadf1ace87d42eeb4a15c",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.325Z"
+  },
+  {
+    "relativePath": "openspec/changes/db-retention-backups/tasks.md",
+    "summary": "Чек-лист задач db-retention-backups: Хранение данных и бэкапы; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "54a407ac4b4a8e3319b87ca0afaff1957e09444144766d861ad05e342189dfca",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.328Z"
+  },
+  {
+    "relativePath": "openspec/changes/dry-run/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения dry-run (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.331Z"
+  },
+  {
+    "relativePath": "openspec/changes/dry-run/proposal.md",
+    "summary": "OpenSpec proposal dry-run (волна 4): Тестовый прогон workspace. Зависит от gates-tests-deploy. ТЗ §16.1 C10",
+    "role": "doc",
+    "contentHash": "cf7a9154671be2b87626ab56a8bd47300029b8dd40a14df491242ff91d8ddcb2",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.334Z"
+  },
+  {
+    "relativePath": "openspec/changes/dry-run/specs/delivery-gates/spec.md",
+    "summary": "Delta-спека delivery-gates для dry-run: Dry-run обязателен",
+    "role": "doc",
+    "contentHash": "c10dce97c9a122b8bbf4ad288e437c77f60fb51ca518239776ca1037b30a1745",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.338Z"
+  },
+  {
+    "relativePath": "openspec/changes/dry-run/tasks.md",
+    "summary": "Чек-лист задач dry-run: Тестовый прогон workspace; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "469bd74d74cd45897871f89953cdfc18c1e2b2c837e45bac0eda0a550ae1f197",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.341Z"
+  },
+  {
+    "relativePath": "openspec/changes/gates-tests-deploy/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения gates-tests-deploy (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.345Z"
+  },
+  {
+    "relativePath": "openspec/changes/gates-tests-deploy/proposal.md",
+    "summary": "OpenSpec proposal gates-tests-deploy (волна 4): Гейты тестов и деплоя по workspace. Зависит от processes. ТЗ §10 п.4, §12 (гейты workspace)",
+    "role": "doc",
+    "contentHash": "ad0db0b2cd52f14fe8a581c3aaf9d9cab0b3a2c54439fd1a5ae68aa7fce04169",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.348Z"
+  },
+  {
+    "relativePath": "openspec/changes/gates-tests-deploy/specs/delivery-gates/spec.md",
+    "summary": "Delta-спека delivery-gates для gates-tests-deploy: Гейты задаются workspace, Гейт деплоя",
+    "role": "doc",
+    "contentHash": "374dbe4d59482c0b5355477554cf685d51de9ca986b75af4600151d3e0b0897e",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.351Z"
+  },
+  {
+    "relativePath": "openspec/changes/gates-tests-deploy/tasks.md",
+    "summary": "Чек-лист задач gates-tests-deploy: Гейты тестов и деплоя по workspace; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "64b14f2f2702c838dd34f6556be25dce42c72e00ffe66791d8c516da298cfb66",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.354Z"
+  },
+  {
+    "relativePath": "openspec/changes/harness-snap/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения harness-snap (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.358Z"
+  },
+  {
+    "relativePath": "openspec/changes/harness-snap/proposal.md",
+    "summary": "OpenSpec proposal harness-snap (волна 3): Снимки работы раз в минуту. Зависит от checkpoints. ТЗ §10.1 (снимок), §16.1 C1",
+    "role": "doc",
+    "contentHash": "6a04f9acd1c01cc9b0014d0cc55c2c9ae9ae5db36e3cc2c5b09c672ee3e3d98f",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.361Z"
+  },
+  {
+    "relativePath": "openspec/changes/harness-snap/specs/agent-checkpoints/spec.md",
+    "summary": "Delta-спека agent-checkpoints для harness-snap: Периодический снимок",
+    "role": "doc",
+    "contentHash": "5dba8b03104fb526dee71b4b6b67e7e2c80253f6a2ffe8e3692be216b4021337",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.364Z"
+  },
+  {
+    "relativePath": "openspec/changes/harness-snap/tasks.md",
+    "summary": "Чек-лист задач harness-snap: Снимки работы раз в минуту; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "f3b8181c46194ec00f295ce1673b481b9cce755e87e96b753b34a1d1731ebf29",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.368Z"
+  },
+  {
+    "relativePath": "openspec/changes/health-alerts/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения health-alerts (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.371Z"
+  },
+  {
+    "relativePath": "openspec/changes/health-alerts/proposal.md",
+    "summary": "OpenSpec proposal health-alerts (волна 7): Внешний healthcheck и «жив». Зависит от mvp-04-telegram-intake. ТЗ §16.1 C9",
+    "role": "doc",
+    "contentHash": "7ab30162b753a4478b5770e3c69bcf2445f6aa65d936d95ecaa5de58f18d1671",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.375Z"
+  },
+  {
+    "relativePath": "openspec/changes/health-alerts/specs/operations/spec.md",
+    "summary": "Delta-спека operations для health-alerts: Ежедневный сигнал",
+    "role": "doc",
+    "contentHash": "3271706230091a6c983b13ad378dad5fafef94b00d13633d946dcc3908dd5bcc",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.378Z"
+  },
+  {
+    "relativePath": "openspec/changes/health-alerts/tasks.md",
+    "summary": "Чек-лист задач health-alerts: Внешний healthcheck и «жив»; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "0f599ade5aa2b87955f996e71276565c045b145fb50990ab06aa7131ab1974cb",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.381Z"
+  },
+  {
+    "relativePath": "openspec/changes/idle-pause/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения idle-pause (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.385Z"
+  },
+  {
+    "relativePath": "openspec/changes/idle-pause/proposal.md",
+    "summary": "OpenSpec proposal idle-pause (волна 5): Пауза простаивающих песочниц. Зависит от sandbox-pool. ТЗ §16.1 C11",
+    "role": "doc",
+    "contentHash": "947723912436db11b7b6169eafb6747730171356f6b5396fc02cb86f45f50c82",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.388Z"
+  },
+  {
+    "relativePath": "openspec/changes/idle-pause/specs/sandbox-runtime/spec.md",
+    "summary": "Delta-спека sandbox-runtime для idle-pause: Автопауза",
+    "role": "doc",
+    "contentHash": "a4cb0fa159cbc0d6007dfb3f987b5aec3f51a716cbf11c07b26ecf4195642e2e",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.392Z"
+  },
+  {
+    "relativePath": "openspec/changes/idle-pause/tasks.md",
+    "summary": "Чек-лист задач idle-pause: Пауза простаивающих песочниц; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "173bc0d1a0d10345d4976d2a06739f181e131c111cf480dcb87cd4f1c48b2602",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.395Z"
+  },
+  {
+    "relativePath": "openspec/changes/integrations-mcp-config/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения integrations-mcp-config (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.399Z"
+  },
+  {
+    "relativePath": "openspec/changes/integrations-mcp-config/proposal.md",
+    "summary": "OpenSpec proposal integrations-mcp-config (волна 5): Интеграции и MCP-серверы. Зависит от skills-library. ТЗ §12 (интеграции), §11 (интеграции и MCP)",
+    "role": "doc",
+    "contentHash": "d78578b7dbf093df350a3836cb2dee1e2839cc63559ad6cd5b6fd75c3567e42b",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.402Z"
+  },
+  {
+    "relativePath": "openspec/changes/integrations-mcp-config/specs/integrations/spec.md",
+    "summary": "Delta-спека integrations для integrations-mcp-config: Секреты только ссылками, Конфиг MCP для агента",
+    "role": "doc",
+    "contentHash": "49a66d6ebd34034afe044b7fa009c497dea680b5c675ffa1e3a3d8c8c717d446",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.406Z"
+  },
+  {
+    "relativePath": "openspec/changes/integrations-mcp-config/tasks.md",
+    "summary": "Чек-лист задач integrations-mcp-config: Интеграции и MCP-серверы; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "8f7cac00e51b4f20c31ad42e28c3b5f7fd068774dccb82d83b33ec7c359eb7af",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.409Z"
+  },
+  {
+    "relativePath": "openspec/changes/mcp-operator-tools/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения mcp-operator-tools (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.413Z"
+  },
+  {
+    "relativePath": "openspec/changes/mcp-operator-tools/proposal.md",
+    "summary": "OpenSpec proposal mcp-operator-tools (волна 2): Операторские инструменты задач и спецификации. Зависит от operator-tokens. ТЗ §11 (операторские инструменты: задачи, спецификация)",
+    "role": "doc",
+    "contentHash": "4df3f39ae48ef28533e526c5b9554ac362026b6f9f362bcdb83fc40ae65f73ea",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.416Z"
+  },
+  {
+    "relativePath": "openspec/changes/mcp-operator-tools/specs/agents-flow-mcp/spec.md",
+    "summary": "Delta-спека agents-flow-mcp для mcp-operator-tools: Опасные инструменты требуют подтверждения, Управление задачами оператором",
+    "role": "doc",
+    "contentHash": "deee1d6b3587e7877ad591396b6fb06656cbcb99120e92b427ea5695387c0e71",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.420Z"
+  },
+  {
+    "relativePath": "openspec/changes/mcp-operator-tools/tasks.md",
+    "summary": "Чек-лист задач mcp-operator-tools: Операторские инструменты задач и спецификации; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "955f8ecd83f62fb8a48704f73c84df8ffa52712c426158214271179428a724b7",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.423Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-01-novita-spike/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения mvp-01-novita-spike",
+    "role": "config",
+    "contentHash": "fbeccb8e6385e25552f368fd6265fb9ae44bc41667c902cfb823162523f04f0b",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.427Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-01-novita-spike/proposal.md",
+    "summary": "MVP proposal mvp-01-novita-spike: Спайк: проверка Novita exec/files/pause/resume/timeout и claude CLI stream-json в песочнице, отчёт docs/novita.md",
+    "role": "doc",
+    "contentHash": "743d3d79d3170cd2f73051656e11aee1ada2d0ee69637f2420cc25643517e7f5",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.430Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-01-novita-spike/tasks.md",
+    "summary": "Чек-лист задач mvp-01-novita-spike с проверками, документацией и синхронизацией памяти",
+    "role": "doc",
+    "contentHash": "c734aed623a04d1fbafa6cc97a48ffb3dd3b13b89586c2f04ed561d890a42546",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.433Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-02-foundation/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения mvp-02-foundation",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.437Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-02-foundation/design.md",
+    "summary": "Design mvp-02-foundation: технические решения, альтернативы и риски",
+    "role": "doc",
+    "contentHash": "3bed41ff39ad8ed169566f01904d9cc36fb072050a4e2ea5ec8ca993550d8b35",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.440Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-02-foundation/proposal.md",
+    "summary": "MVP proposal mvp-02-foundation: Каркас: uv workspace, settings/config harness.yaml, /health, CLI harness-server, ./tools/harness, Compose, GitLab CI",
+    "role": "doc",
+    "contentHash": "1e58816fb03d52ce8c76ef923499cc2d678fe816a897d4487a36a70091970fda",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.443Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-02-foundation/specs/platform-config/spec.md",
+    "summary": "Delta-спека platform-config (mvp-02-foundation): требования и сценарии WHEN/THEN",
+    "role": "doc",
+    "contentHash": "46b262db482965888ce2eef96a05d864bdd17a5484a81dcc177509e577a211c4",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.446Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-02-foundation/tasks.md",
+    "summary": "Чек-лист задач mvp-02-foundation с проверками, документацией и синхронизацией памяти",
+    "role": "doc",
+    "contentHash": "3f930af0aad53710615c66a2ec4b40c85123ae5940e3fb003c3c2c8d71f98786",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.450Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-03-task-store/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения mvp-03-task-store",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.453Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-03-task-store/design.md",
+    "summary": "Design mvp-03-task-store: технические решения, альтернативы и риски",
+    "role": "doc",
+    "contentHash": "fdd2502b48cd81b9259f3eeb4c65ec23f2b44da3890392f092eca634aed805bf",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.456Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-03-task-store/proposal.md",
+    "summary": "MVP proposal mvp-03-task-store: Схема БД, машина статусов ТЗ v5, task_events, очередь SKIP LOCKED, POST/GET /tasks",
+    "role": "doc",
+    "contentHash": "733d182d6337d8516925f3351f2e3d52231c98f26e5efff2f78b71bce093f3e1",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.459Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-03-task-store/specs/task-lifecycle/spec.md",
+    "summary": "Delta-спека task-lifecycle (mvp-03-task-store): требования и сценарии WHEN/THEN",
+    "role": "doc",
+    "contentHash": "f9b9fe908262f3e946a755a9b9bbe0048eaaafb1c700bd9f8e95140d10164afc",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.463Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-03-task-store/tasks.md",
+    "summary": "Чек-лист задач mvp-03-task-store с проверками, документацией и синхронизацией памяти",
+    "role": "doc",
+    "contentHash": "b11e98c688eb3221d0d5ffc01464b7ec457e83588b33ff5c15dfd3ff5e46f871",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.466Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-04-telegram-intake/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения mvp-04-telegram-intake",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.470Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-04-telegram-intake/design.md",
+    "summary": "Design mvp-04-telegram-intake: технические решения, альтернативы и риски",
+    "role": "doc",
+    "contentHash": "e016dd967c3b47b037eb3275d8460c5943971398dd432a2f89273ce686a1c83f",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.473Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-04-telegram-intake/proposal.md",
+    "summary": "MVP proposal mvp-04-telegram-intake: Webhook Telegram: секрет, chat_id, дедуп update_id, STT, кнопки проекта, одно обновляемое сообщение",
+    "role": "doc",
+    "contentHash": "45cab1b231db5158a1ccbd62a9039e54f1009ba2bbc5e4c354c684f3140fc9f8",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.476Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-04-telegram-intake/specs/speech-to-text/spec.md",
+    "summary": "Delta-спека speech-to-text (mvp-04): голос владельца в текст через STT-провайдер, ошибка распознавания — просьба прислать текст без создания задачи",
+    "role": "doc",
+    "contentHash": "6f669ea162954bde5d63465020019e118c69eed141a4b4d7e7167c054bc9a5f1",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:41:03.154Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-04-telegram-intake/specs/telegram-bot/spec.md",
+    "summary": "Delta-спека telegram-bot (mvp-04-telegram-intake): требования и сценарии WHEN/THEN",
+    "role": "doc",
+    "contentHash": "6e519e1c70537926d88042bf7496f9c06b3b720c9fc7644eac471c5549ecfc65",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.479Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-04-telegram-intake/tasks.md",
+    "summary": "Чек-лист задач mvp-04-telegram-intake с проверками, документацией и синхронизацией памяти",
+    "role": "doc",
+    "contentHash": "7d6459266d3eb668b7d02fb7e92d086d4051ce5f67d922bcf37aabce221602bc",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.483Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-05-command-routing/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения mvp-05-command-routing",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.486Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-05-command-routing/design.md",
+    "summary": "Design mvp-05-command-routing: технические решения, альтернативы и риски",
+    "role": "doc",
+    "contentHash": "44c1220b36b1bcac6895d2b333933156c8cbb9f0ff5ec60c61757b69edf67648",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.490Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-05-command-routing/proposal.md",
+    "summary": "MVP proposal mvp-05-command-routing: Polza: классы work/status/unknown, до 3 кандидатов workspace, порог уверенности, запасной путь",
+    "role": "doc",
+    "contentHash": "e8152eb16bdcb5c19fc844fa9cda75d8980a13c7cf4b4e31ea38cd0c0c81cae0",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.493Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-05-command-routing/specs/command-routing/spec.md",
+    "summary": "Delta-спека command-routing (mvp-05-command-routing): требования и сценарии WHEN/THEN",
+    "role": "doc",
+    "contentHash": "6f2f08f33261bc1b212fd4af58ddb8892ed6910e8bddf584199b2610ff649665",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.496Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-05-command-routing/tasks.md",
+    "summary": "Чек-лист задач mvp-05-command-routing с проверками, документацией и синхронизацией памяти",
+    "role": "doc",
+    "contentHash": "78f9db0b3362af297c0f279243dbe0bd0c28fe556cfb80a49ac8f26f0dd4482e",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.499Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-06-sandbox-runtime/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения mvp-06-sandbox-runtime",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.502Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-06-sandbox-runtime/design.md",
+    "summary": "Design mvp-06-sandbox-runtime: технические решения, альтернативы и риски",
+    "role": "doc",
+    "contentHash": "46e1dabbeffae7b7243cba4457b8063a54d07ad32104995989d85c04f3e393ad",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.506Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-06-sandbox-runtime/proposal.md",
+    "summary": "MVP proposal mvp-06-sandbox-runtime: SandboxProvider Novita, bootstrap.sh, activate/run_agent/poll/cleanup/pause, креды только в env",
+    "role": "doc",
+    "contentHash": "10cc00ceff9c934aa598ede1a9b8c6899aad06ec3835e6d916a5861af6440d82",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.509Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-06-sandbox-runtime/specs/sandbox-runtime/spec.md",
+    "summary": "Delta-спека sandbox-runtime (mvp-06-sandbox-runtime): требования и сценарии WHEN/THEN",
+    "role": "doc",
+    "contentHash": "9de0d0d774711ec52c1b4d7d75df021906ff8a45c9c2b9c148e4a3c78f83b834",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.512Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-06-sandbox-runtime/tasks.md",
+    "summary": "Чек-лист задач mvp-06-sandbox-runtime с проверками, документацией и синхронизацией памяти",
+    "role": "doc",
+    "contentHash": "08cb5279f432e28def9382ac62f8da39f669063271acaef750dfaa7ebd937188",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.516Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-07-agents-flow-mcp/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения mvp-07-agents-flow-mcp",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.519Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-07-agents-flow-mcp/design.md",
+    "summary": "Design mvp-07-agents-flow-mcp: технические решения, альтернативы и риски",
+    "role": "doc",
+    "contentHash": "3cc6f78e0c59c8c881a869d8eed1b6c4031efdb6c5473f2ca31365794a77978b",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.523Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-07-agents-flow-mcp/proposal.md",
+    "summary": "MVP proposal mvp-07-agents-flow-mcp: MCP agents-flow на /mcp: токен задачи, роли planner/implementer, report_task, sync_spec, create_task",
+    "role": "doc",
+    "contentHash": "8245bf5a8b19c744f8aa2e3b43a4da9296acf7a383cac559e6954ef060081b74",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.526Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-07-agents-flow-mcp/specs/agents-flow-mcp/spec.md",
+    "summary": "Delta-спека agents-flow-mcp (mvp-07-agents-flow-mcp): требования и сценарии WHEN/THEN",
+    "role": "doc",
+    "contentHash": "70c985bc010e53b703c540c63bd79b3ca15db041dc0086530b03f8f24334a6c9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.529Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-07-agents-flow-mcp/tasks.md",
+    "summary": "Чек-лист задач mvp-07-agents-flow-mcp с проверками, документацией и синхронизацией памяти",
+    "role": "doc",
+    "contentHash": "dcb29d3f38c60a16f21c57402d82e051cfab31e4f6820811a168c75589b2f5aa",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.532Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-08-spec-planning/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения mvp-08-spec-planning",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.536Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-08-spec-planning/design.md",
+    "summary": "Design mvp-08-spec-planning: технические решения, альтернативы и риски",
+    "role": "doc",
+    "contentHash": "97ae8ce2e148e2be7d3236de5255fbb7f98f0b45b947d5b5f0c38127c1b749c8",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.539Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-08-spec-planning/proposal.md",
+    "summary": "MVP proposal mvp-08-spec-planning: Пайплайн plan: планировщик OpenSpec, проверки openspec validate, secret_scan, push ветки, задачи в backlog",
+    "role": "doc",
+    "contentHash": "9bd258ed443105eae1175b41d4236325013b7925e279847c6a8cf264979289db",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.542Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-08-spec-planning/specs/spec-planning/spec.md",
+    "summary": "Delta-спека spec-planning (mvp-08-spec-planning): требования и сценарии WHEN/THEN",
+    "role": "doc",
+    "contentHash": "6347861af4dd68610daa231de99d0414b5484f2f5b1fa64c43c8ccbbd9f5c0f6",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.545Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-08-spec-planning/tasks.md",
+    "summary": "Чек-лист задач mvp-08-spec-planning с проверками, документацией и синхронизацией памяти",
+    "role": "doc",
+    "contentHash": "ed16d003e9db0e3fdaeb39773ac0343d1b21dcaccf6caaad804d6f55ced7df3e",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.549Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-09-delivery-mr/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения mvp-09-delivery-mr",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.552Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-09-delivery-mr/design.md",
+    "summary": "Design mvp-09-delivery-mr: технические решения, альтернативы и риски",
+    "role": "doc",
+    "contentHash": "e65e1e433fa8881ef7f17df8cfd2ffea36b0216d7aa59630d764b428e2506eae",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.555Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-09-delivery-mr/proposal.md",
+    "summary": "MVP proposal mvp-09-delivery-mr: Пайплайн implement: гейты commit/secrets/tests(no_tests)/push/MR GitLab, идемпотентность, итог в Telegram",
+    "role": "doc",
+    "contentHash": "9031b988c41bdcfed2f937724165d2c30c4455c6df73112fbe067c8d618048ee",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.559Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-09-delivery-mr/specs/delivery-gates/spec.md",
+    "summary": "Delta-спека delivery-gates (mvp-09-delivery-mr): требования и сценарии WHEN/THEN",
+    "role": "doc",
+    "contentHash": "1c4f272cf41a80f91f619d1f89e6b601dba210bbdbc322224dd38284392a6545",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.562Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-09-delivery-mr/tasks.md",
+    "summary": "Чек-лист задач mvp-09-delivery-mr с проверками, документацией и синхронизацией памяти",
+    "role": "doc",
+    "contentHash": "7ed8f7d84ea5d5776feaea789ede71f53bc3343e075ad2d03c3a3d14e2e42f89",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.565Z"
+  },
+  {
+    "relativePath": "openspec/changes/operator-tokens/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения operator-tokens (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.568Z"
+  },
+  {
+    "relativePath": "openspec/changes/operator-tokens/proposal.md",
+    "summary": "OpenSpec proposal operator-tokens (волна 2): Операторские токены и журнал вызовов. Зависит от mvp-07-agents-flow-mcp. ТЗ §11 (два вида доступа), §14",
+    "role": "doc",
+    "contentHash": "fa04809e68432d493c42c8b16857fad23e1c8c372eaeecabbeb96adddc9eeb96",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.572Z"
+  },
+  {
+    "relativePath": "openspec/changes/operator-tokens/specs/agents-flow-mcp/spec.md",
+    "summary": "Delta-спека agents-flow-mcp для operator-tokens: Скоупы операторского токена, Журнал вызовов",
+    "role": "doc",
+    "contentHash": "0fe2d562830a93f86cf2acd24ef5dc6d1aa8f570c9f1e23c06c6ec506d9fa111",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.576Z"
+  },
+  {
+    "relativePath": "openspec/changes/operator-tokens/tasks.md",
+    "summary": "Чек-лист задач operator-tokens: Операторские токены и журнал вызовов; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "2023b70cb3f8635b00888423c30f7525d25001439abd882ba4ba7890b7076af0",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.579Z"
+  },
+  {
+    "relativePath": "openspec/changes/processes/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения processes (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.583Z"
+  },
+  {
+    "relativePath": "openspec/changes/processes/proposal.md",
+    "summary": "OpenSpec proposal processes (волна 3): Процессы в песочнице. Зависит от mvp-09-delivery-mr. ТЗ §4 (Process), §11 (`report_process`, `list_processes`)",
+    "role": "doc",
+    "contentHash": "1d2e5e64a80f48c3cf3c8c3bd3a235797f617045047b21bb7035adeee1ddf46f",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.586Z"
+  },
+  {
+    "relativePath": "openspec/changes/processes/specs/task-processes/spec.md",
+    "summary": "Delta-спека task-processes для processes: Учёт процессов",
+    "role": "doc",
+    "contentHash": "3ceea673900c134c77f9b4209ad4110700cb42b9dae03c83f52ba127e5fa861c",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.590Z"
+  },
+  {
+    "relativePath": "openspec/changes/processes/tasks.md",
+    "summary": "Чек-лист задач processes: Процессы в песочнице; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "32356529dcca6d6b929011098b310b344674de8fe27cd1925e7ee6a9c976baaf",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.593Z"
+  },
+  {
+    "relativePath": "openspec/changes/repo-queue/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения repo-queue (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.596Z"
+  },
+  {
+    "relativePath": "openspec/changes/repo-queue/proposal.md",
+    "summary": "OpenSpec proposal repo-queue (волна 5): Очередь на репозиторий. Зависит от sandbox-pool. ТЗ §16.1 B3",
+    "role": "doc",
+    "contentHash": "71be7852d89a90bc351d44dbaa1910f8fc1a7a481b23534538ba6ab6f453fc7a",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.599Z"
+  },
+  {
+    "relativePath": "openspec/changes/repo-queue/specs/delivery-gates/spec.md",
+    "summary": "Delta-спека delivery-gates для repo-queue: Одна задача на репозиторий, Конфликт при rebase",
+    "role": "doc",
+    "contentHash": "c9fc62bc8e4bc67cb29a5dc15db1a045c3f109a44f6ad4ed672ee4761b752f63",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.603Z"
+  },
+  {
+    "relativePath": "openspec/changes/repo-queue/tasks.md",
+    "summary": "Чек-лист задач repo-queue: Очередь на репозиторий; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "3086f23b69fe92509d68ee2e63f00ecb47cdf1286fde46ba326860c55e5c1e76",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.606Z"
+  },
+  {
+    "relativePath": "openspec/changes/revert-task/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения revert-task (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.609Z"
+  },
+  {
+    "relativePath": "openspec/changes/revert-task/proposal.md",
+    "summary": "OpenSpec proposal revert-task (волна 4): Откат влитой задачи. Зависит от staging-auto-merge. ТЗ §16.1 B4",
+    "role": "doc",
+    "contentHash": "0bc2a4579b4313731231c424f844c8b954821fb38cea61393930a41a571677da",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.612Z"
+  },
+  {
+    "relativePath": "openspec/changes/revert-task/specs/delivery-gates/spec.md",
+    "summary": "Delta-спека delivery-gates для revert-task: Откат через те же гейты",
+    "role": "doc",
+    "contentHash": "21102c370c664057ffdc75e5c5390f23dc585e0651a6f96e4096e3ee261dc2bc",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.615Z"
+  },
+  {
+    "relativePath": "openspec/changes/revert-task/tasks.md",
+    "summary": "Чек-лист задач revert-task: Откат влитой задачи; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "127d9519dce31fb18071d0facef1103bbb85b32cb90616ea65c5e3736aea896d",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.619Z"
+  },
+  {
+    "relativePath": "openspec/changes/routing-uncertainty/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения routing-uncertainty (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.622Z"
+  },
+  {
+    "relativePath": "openspec/changes/routing-uncertainty/proposal.md",
+    "summary": "OpenSpec proposal routing-uncertainty (волна 1): Неуверенность маршрутизации и напоминание. Зависит от mvp-05-command-routing. ТЗ §5.0, §6 (нет уверенности в выборе проекта)",
+    "role": "doc",
+    "contentHash": "fb0a34310ddfc2b681c6623257490f9e7089fa73082516a2600b1fd1fccb9ff2",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.625Z"
+  },
+  {
+    "relativePath": "openspec/changes/routing-uncertainty/specs/command-routing/spec.md",
+    "summary": "Delta-спека command-routing для routing-uncertainty: Напоминание о невыбранном проекте, Пометка неуверенности",
+    "role": "doc",
+    "contentHash": "36339ebddac6d12f15494e6eb6d4deda789d4cf5013b835303d3ce538b2c45f9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.628Z"
+  },
+  {
+    "relativePath": "openspec/changes/routing-uncertainty/tasks.md",
+    "summary": "Чек-лист задач routing-uncertainty: Неуверенность маршрутизации и напоминание; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "e15d90379473f0f3e65096afe699631e0dd5063e47d9b9aeab653b9e562efb1f",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.632Z"
+  },
+  {
+    "relativePath": "openspec/changes/sandbox-pool/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения sandbox-pool (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.635Z"
+  },
+  {
+    "relativePath": "openspec/changes/sandbox-pool/proposal.md",
+    "summary": "OpenSpec proposal sandbox-pool (волна 5): Пул песочниц. Зависит от mvp-06-sandbox-runtime, operator-tokens. ТЗ §9 (модель), §17 вопрос 2",
+    "role": "doc",
+    "contentHash": "44ba82051f6859f3002d810b6af8aaa517406da248c13f10c509e14f844727c3",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.639Z"
+  },
+  {
+    "relativePath": "openspec/changes/sandbox-pool/specs/sandbox-runtime/spec.md",
+    "summary": "Delta-спека sandbox-runtime для sandbox-pool: Выбор песочницы по типу агента, Удаление с подтверждением",
+    "role": "doc",
+    "contentHash": "9edbe7d109870cf9d936f390ee26eece8ad809955d2428eb467c80ee32fb753d",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.642Z"
+  },
+  {
+    "relativePath": "openspec/changes/sandbox-pool/tasks.md",
+    "summary": "Чек-лист задач sandbox-pool: Пул песочниц; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "2fe5171c620558c77206b5951cc2c361700fec3151c4f88e20a029c6bb88ee10",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.646Z"
+  },
+  {
+    "relativePath": "openspec/changes/sandbox-profile/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения sandbox-profile (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.650Z"
+  },
+  {
+    "relativePath": "openspec/changes/sandbox-profile/proposal.md",
+    "summary": "OpenSpec proposal sandbox-profile (волна 5): Версионируемый профиль песочницы. Зависит от sandbox-pool. ТЗ §9 (создание одной командой), §13, §7 (`GET /bootstrap`), §17 вопрос 4",
+    "role": "doc",
+    "contentHash": "95ed9dccea9ae1125a448fbd44b0d9e46fc510e0aa00a5f7827125b64836a7ff",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.653Z"
+  },
+  {
+    "relativePath": "openspec/changes/sandbox-profile/specs/sandbox-profile/spec.md",
+    "summary": "Delta-спека sandbox-profile для sandbox-profile: Bootstrap по одноразовой ссылке, Версии профиля",
+    "role": "doc",
+    "contentHash": "041cbac4ce3c1c9c016f723b98ddd08a166746a7877b1dfa8194357a5bc9e809",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.656Z"
+  },
+  {
+    "relativePath": "openspec/changes/sandbox-profile/tasks.md",
+    "summary": "Чек-лист задач sandbox-profile: Версионируемый профиль песочницы; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "2294e583784c564342feff4fbe88c0bf5b410d1be0d3017cac0e020e15d5486a",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.660Z"
+  },
+  {
+    "relativePath": "openspec/changes/sandbox-timeout-extend/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения sandbox-timeout-extend (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.664Z"
+  },
+  {
+    "relativePath": "openspec/changes/sandbox-timeout-extend/proposal.md",
+    "summary": "OpenSpec proposal sandbox-timeout-extend (волна 3): Продление сессии и повтор связи. Зависит от mvp-06-sandbox-runtime. ТЗ §7 (диспетчер), §9 (таймаут), §17 вопрос 7",
+    "role": "doc",
+    "contentHash": "632620c8d12cf34f0b0a4f46924678674f1d11fb6c8f9c4cfe88f17933b9c23f",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.667Z"
+  },
+  {
+    "relativePath": "openspec/changes/sandbox-timeout-extend/specs/sandbox-runtime/spec.md",
+    "summary": "Delta-спека sandbox-runtime для sandbox-timeout-extend: Песочница живёт, пока идёт задача",
+    "role": "doc",
+    "contentHash": "4f700d40de383af8f17382359b1fa3e5a3073024c2c931f710b6658fc7624c8c",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.671Z"
+  },
+  {
+    "relativePath": "openspec/changes/sandbox-timeout-extend/tasks.md",
+    "summary": "Чек-лист задач sandbox-timeout-extend: Продление сессии и повтор связи; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "89d58e7bb136f97fc1b93cc2acf53c512e7ef33ce139eb1c65d14f72a3f6f6ca",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.674Z"
+  },
+  {
+    "relativePath": "openspec/changes/skills-library/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения skills-library (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.677Z"
+  },
+  {
+    "relativePath": "openspec/changes/skills-library/proposal.md",
+    "summary": "OpenSpec proposal skills-library (волна 5): Библиотека skills через MCP. Зависит от sandbox-profile. ТЗ §12, §17 вопросы 13–14",
+    "role": "doc",
+    "contentHash": "72eaafb989f8606282f500aa3e636540043fc10b463853cb30f9d0679d4b4ca7",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.682Z"
+  },
+  {
+    "relativePath": "openspec/changes/skills-library/specs/skills-library/spec.md",
+    "summary": "Delta-спека skills-library для skills-library: Манифест skills workspace, Применение со следующего этапа",
+    "role": "doc",
+    "contentHash": "a37ae4c93a2e64aebd3c0834ca65e5e98a681142553c9ebc1123805b4b755e18",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.686Z"
+  },
+  {
+    "relativePath": "openspec/changes/skills-library/tasks.md",
+    "summary": "Чек-лист задач skills-library: Библиотека skills через MCP; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "b3572c33c60212a757831ffd6770dd050eabb6f4fa74c1c66434733ee24a5fc2",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.689Z"
+  },
+  {
+    "relativePath": "openspec/changes/spec-approval/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения spec-approval (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.692Z"
+  },
+  {
+    "relativePath": "openspec/changes/spec-approval/proposal.md",
+    "summary": "OpenSpec proposal spec-approval (волна 4): Утверждение спецификации кнопкой. Зависит от mvp-08-spec-planning. ТЗ §17 вопрос 15",
+    "role": "doc",
+    "contentHash": "9de7136aa599845e035ba04503534e491da43a877c5e4f7b123c1511ab3e5e51",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.695Z"
+  },
+  {
+    "relativePath": "openspec/changes/spec-approval/specs/spec-planning/spec.md",
+    "summary": "Delta-спека spec-planning для spec-approval: Задачи ждут утверждения",
+    "role": "doc",
+    "contentHash": "6a39ea5644c3e7652431d334ac62123728337142ae2dfd446c778d7e36e37aba",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.699Z"
+  },
+  {
+    "relativePath": "openspec/changes/spec-approval/tasks.md",
+    "summary": "Чек-лист задач spec-approval: Утверждение спецификации кнопкой; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "3fbe8eb84b5206e63a19f95bea1339d50d8301790fc5ae6bd901148ef8e57535",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.702Z"
+  },
+  {
+    "relativePath": "openspec/changes/spec-drift/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения spec-drift (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.706Z"
+  },
+  {
+    "relativePath": "openspec/changes/spec-drift/proposal.md",
+    "summary": "OpenSpec proposal spec-drift (волна 4): Расхождение спецификации и зеркала. Зависит от mvp-08-spec-planning. ТЗ §10.1, §16.1 C13",
+    "role": "doc",
+    "contentHash": "ccbd07e8cafca229ed8fff751ad35f92bdfe612fb26335b74207084ace58a9c8",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.709Z"
+  },
+  {
+    "relativePath": "openspec/changes/spec-drift/specs/spec-planning/spec.md",
+    "summary": "Delta-спека spec-planning для spec-drift: Побеждает репозиторий",
+    "role": "doc",
+    "contentHash": "99f7dafe4ee63e29fda920eb646eb4097cf2e7fec2465b7124c60060f9d73011",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.712Z"
+  },
+  {
+    "relativePath": "openspec/changes/spec-drift/tasks.md",
+    "summary": "Чек-лист задач spec-drift: Расхождение спецификации и зеркала; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "2abab58c5c2eaa58a7f429ba3d44d63bfecfa03b78e5a1f50f6e2cd63c4773ad",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.716Z"
+  },
+  {
+    "relativePath": "openspec/changes/staging-auto-merge/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения staging-auto-merge (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.720Z"
+  },
+  {
+    "relativePath": "openspec/changes/staging-auto-merge/proposal.md",
+    "summary": "OpenSpec proposal staging-auto-merge (волна 4): Авто-мердж через staging. Зависит от gates-tests-deploy. ТЗ §6 (влита MR), §16.1 B5, §17 вопрос 10",
+    "role": "doc",
+    "contentHash": "d328c80ceac622b5f330e8bf07b8ddae686eef3cc45814a236ef11207a3b902a",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.723Z"
+  },
+  {
+    "relativePath": "openspec/changes/staging-auto-merge/specs/delivery-gates/spec.md",
+    "summary": "Delta-спека delivery-gates для staging-auto-merge: Мердж только после зелёных гейтов",
+    "role": "doc",
+    "contentHash": "2d50381b24d0bf383d15a346c2e9e1ed1251d704e195ef0bb538cc5c9a6c8dfd",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.727Z"
+  },
+  {
+    "relativePath": "openspec/changes/staging-auto-merge/tasks.md",
+    "summary": "Чек-лист задач staging-auto-merge: Авто-мердж через staging; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "141a719e4ce9e8010422eb665b1972415eca6f11cbb63820fb5f90c3904eca8f",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.730Z"
+  },
+  {
+    "relativePath": "openspec/changes/stalled-reassign/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения stalled-reassign (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.734Z"
+  },
+  {
+    "relativePath": "openspec/changes/stalled-reassign/proposal.md",
+    "summary": "OpenSpec proposal stalled-reassign (волна 5): Перенос сорванной задачи. Зависит от agent-heartbeat, sandbox-pool, harness-snap. ТЗ §7, §10.1 (потеря песочницы)",
+    "role": "doc",
+    "contentHash": "e60868de22d59d005e062388c59e7f497111e20117485fb395d3738b5d1dbebb",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.737Z"
+  },
+  {
+    "relativePath": "openspec/changes/stalled-reassign/specs/sandbox-runtime/spec.md",
+    "summary": "Delta-спека sandbox-runtime для stalled-reassign: Продолжение на другой песочнице",
+    "role": "doc",
+    "contentHash": "cb83af01d0db983684f3013ead28f8754f252e170b6a482f902e1fc28de81594",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.741Z"
+  },
+  {
+    "relativePath": "openspec/changes/stalled-reassign/tasks.md",
+    "summary": "Чек-лист задач stalled-reassign: Перенос сорванной задачи; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "74f3cd779ca177c8dfb3ae7db9c1ccc43ee5d56e8cbf6809f3db820519761eb1",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.744Z"
+  },
+  {
+    "relativePath": "openspec/changes/status-commands/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения status-commands (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.747Z"
+  },
+  {
+    "relativePath": "openspec/changes/status-commands/proposal.md",
+    "summary": "OpenSpec proposal status-commands (волна 3): Команды статуса. Зависит от mvp-05-command-routing, budget-usage. ТЗ §5.0 класс 3, §6 (команды статуса)",
+    "role": "doc",
+    "contentHash": "7a9cd942f8a42b179143e1587ca02402eae67408e89f68726d626075ed826b6f",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.751Z"
+  },
+  {
+    "relativePath": "openspec/changes/status-commands/specs/command-routing/spec.md",
+    "summary": "Delta-спека command-routing для status-commands: Ответы на вопросы о состоянии",
+    "role": "doc",
+    "contentHash": "e63c9422c8a8ea19099462f50565706367e77a9fb946aa0f600dcab4ee51f9f4",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.754Z"
+  },
+  {
+    "relativePath": "openspec/changes/status-commands/tasks.md",
+    "summary": "Чек-лист задач status-commands: Команды статуса; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "34a74084e8bc52121b50f0d74f87c3d986a2d36bcc9e64397a38cbbe756b3cd5",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.758Z"
+  },
+  {
+    "relativePath": "openspec/changes/task-limits/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения task-limits (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.761Z"
+  },
+  {
+    "relativePath": "openspec/changes/task-limits/proposal.md",
+    "summary": "OpenSpec proposal task-limits (волна 3): Лимиты задачи. Зависит от budget-usage. ТЗ §16.1 C3, §17 вопрос 8",
+    "role": "doc",
+    "contentHash": "2a7e444fbb86e7413cab9490dcc495930c1e8b8a2032648c5f423f1682e5f12c",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.765Z"
+  },
+  {
+    "relativePath": "openspec/changes/task-limits/specs/budget/spec.md",
+    "summary": "Delta-спека budget для task-limits: Остановка по лимиту",
+    "role": "doc",
+    "contentHash": "a3849a1f1fc962ad47a83d2f279e1a445167adeeede4c62e7c413b787624ba6c",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.768Z"
+  },
+  {
+    "relativePath": "openspec/changes/task-limits/tasks.md",
+    "summary": "Чек-лист задач task-limits: Лимиты задачи; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "3f25c47fa4035691ed657d4630b1e1cf1e05d16eb63dd1e91d79893541e29557",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.771Z"
+  },
+  {
+    "relativePath": "openspec/changes/task-pause-resume/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения task-pause-resume (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.774Z"
+  },
+  {
+    "relativePath": "openspec/changes/task-pause-resume/proposal.md",
+    "summary": "OpenSpec proposal task-pause-resume (волна 3): Пауза и возобновление задачи. Зависит от checkpoints. ТЗ §5.1 (что значит пауза), §17 вопрос 11",
+    "role": "doc",
+    "contentHash": "0905e5dea6aaf8fe4256627b81018a7c016d907c2ec444e5bbf7e847936dc891",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.777Z"
+  },
+  {
+    "relativePath": "openspec/changes/task-pause-resume/specs/task-lifecycle/spec.md",
+    "summary": "Delta-спека task-lifecycle для task-pause-resume: Пауза без потери работы, Продолжение с чекпоинта",
+    "role": "doc",
+    "contentHash": "5b4881ee69fd668c80e9057bd3f9de6b345eee834aefb17995949ee5b5c9b962",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.781Z"
+  },
+  {
+    "relativePath": "openspec/changes/task-pause-resume/tasks.md",
+    "summary": "Чек-лист задач task-pause-resume: Пауза и возобновление задачи; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "9fca8f1b1fa1f83d98e1b21f9886b30080bd363bade9a745671226185e4dadb1",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.784Z"
+  },
+  {
+    "relativePath": "openspec/changes/telegram-full-stages/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения telegram-full-stages (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.788Z"
+  },
+  {
+    "relativePath": "openspec/changes/telegram-full-stages/proposal.md",
+    "summary": "OpenSpec proposal telegram-full-stages (волна 1): Полные этапы и кнопки задачи. Зависит от mvp-09-delivery-mr. ТЗ §6",
+    "role": "doc",
+    "contentHash": "d7e12d8cf6837ede26bc062400a59fe822268a73263c1c4918f2bf0df12a976e",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.791Z"
+  },
+  {
+    "relativePath": "openspec/changes/telegram-full-stages/specs/telegram-bot/spec.md",
+    "summary": "Delta-спека telegram-bot для telegram-full-stages: Полные этапы, Отклонения отдельными сообщениями, Кнопки через сервисы",
+    "role": "doc",
+    "contentHash": "af98597b29fd33f5a0c247cea0c6bfdca18c02735e42dca578975edfa1eb4a59",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.794Z"
+  },
+  {
+    "relativePath": "openspec/changes/telegram-full-stages/tasks.md",
+    "summary": "Чек-лист задач telegram-full-stages: Полные этапы и кнопки задачи; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "8accf90f2852a83f7b492d9bb9e530addf22dca880f673ea98ec38b9dd7c857c",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.797Z"
+  },
+  {
+    "relativePath": "openspec/changes/telegram-other-project/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения telegram-other-project (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.801Z"
+  },
+  {
+    "relativePath": "openspec/changes/telegram-other-project/proposal.md",
+    "summary": "OpenSpec proposal telegram-other-project (волна 1): Кнопка «Другой проект». Зависит от mvp-05-command-routing. ТЗ §5 шаг 3",
+    "role": "doc",
+    "contentHash": "d46b1d1387e66964cb0fc5c09ac5759ff8c9123b888f036001db934e1bebae3d",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.804Z"
+  },
+  {
+    "relativePath": "openspec/changes/telegram-other-project/specs/telegram-bot/spec.md",
+    "summary": "Delta-спека telegram-bot для telegram-other-project: Полный список проектов",
+    "role": "doc",
+    "contentHash": "ffb1254a020c8ab717b8a56a885f72a25dae9425836f45eeadf2ecc7ab9b106c",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.807Z"
+  },
+  {
+    "relativePath": "openspec/changes/telegram-other-project/tasks.md",
+    "summary": "Чек-лист задач telegram-other-project: Кнопка «Другой проект»; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "6e363bcf93d8b88ca4292450a67442b1e69975e26ae622767878b929fd194c05",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.811Z"
+  },
+  {
+    "relativePath": "openspec/changes/voice-robustness/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения voice-robustness (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.814Z"
+  },
+  {
+    "relativePath": "openspec/changes/voice-robustness/proposal.md",
+    "summary": "OpenSpec proposal voice-robustness (волна 1): Надёжность голосового пути. Зависит от mvp-04-telegram-intake. ТЗ §16.1 C5",
+    "role": "doc",
+    "contentHash": "fe25758343959775197896bbb753676f32c3d268d4545f7024f6cf821950de1d",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.818Z"
+  },
+  {
+    "relativePath": "openspec/changes/voice-robustness/specs/speech-to-text/spec.md",
+    "summary": "Delta-спека speech-to-text для voice-robustness: Ограничения голосового сообщения, Словарь названий проектов",
+    "role": "doc",
+    "contentHash": "e04409d9f15dde49b43597f5d299529efb2a492f22e4f585f02b588eea5b8b51",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.821Z"
+  },
+  {
+    "relativePath": "openspec/changes/voice-robustness/tasks.md",
+    "summary": "Чек-лист задач voice-robustness: Надёжность голосового пути; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "368d5f16cd3453f9fe5b0ec547e59b97f217e247d84ba6ec2dff97ec3636f2be",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.824Z"
+  },
+  {
+    "relativePath": "openspec/changes/workspace-settings-snapshot/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения workspace-settings-snapshot (schema spec-driven)",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.828Z"
+  },
+  {
+    "relativePath": "openspec/changes/workspace-settings-snapshot/proposal.md",
+    "summary": "OpenSpec proposal workspace-settings-snapshot (волна 6): Фиксация настроек workspace на старте задачи. Зависит от console-settings. ТЗ §16.1 C12",
+    "role": "doc",
+    "contentHash": "ce87f686691b79f017eb1f68b0ae2ca327f3036b83bd2e671d325f751654b0b1",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.831Z"
+  },
+  {
+    "relativePath": "openspec/changes/workspace-settings-snapshot/specs/task-lifecycle/spec.md",
+    "summary": "Delta-спека task-lifecycle для workspace-settings-snapshot: Настройки задачи неизменны",
+    "role": "doc",
+    "contentHash": "231ab144e91ab2f6ecc42886ef834b297b521efed696246377ae672bf05f07e2",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.834Z"
+  },
+  {
+    "relativePath": "openspec/changes/workspace-settings-snapshot/tasks.md",
+    "summary": "Чек-лист задач workspace-settings-snapshot: Фиксация настроек workspace на старте задачи; реализация, документация, синхронизация памяти",
+    "role": "doc",
+    "contentHash": "524b0566d5103467dac40048021ce04271179d8deeab41f941ea7d9f4c33d4e7",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.838Z"
+  },
+  {
+    "relativePath": "openspec/config.yaml",
+    "summary": "Конфиг OpenSpec: контекст проекта на русском, стек, статусы, правила proposal/design/tasks, guidance apply/archive",
+    "role": "config",
+    "contentHash": "8c7b4c2157dcbf6ec99822aeee54077f7ffbab444fc14fa26500bad0d350eeba",
+    "author": "agent",
+    "updatedAt": "2026-10-18T07:40:37.841Z"
+  }
+]

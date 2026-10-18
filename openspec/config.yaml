@@ -1,0 +1,31 @@
+schema: spec-driven
+
+context: |
+  Проект agents-flow harness: голосовой AI-харнесс в Telegram (см. ARCHITECTURE.md, docs/tz/tz-v5.md).
+  Все артефакты OpenSpec пишутся на русском языке; ключевые слова SHALL/MUST, WHEN/THEN и имена сущностей — как в коде.
+  Решения поверх ТЗ — docs/decisions.md; они обязательны для всех изменений.
+  Стек: Python 3.12, FastAPI async, SQLAlchemy 2 async, Pydantic v2, Alembic, uv, MCP Python SDK (Streamable HTTP),
+  Postgres, GitLab (MR, CI, Registry), Dokploy, Novita Agent Sandbox, Polza AI, Telegram Bot API.
+  Статусы задачи только из набора: new, choosing, planning, backlog, active, testing, ready, merged, error, stalled, paused, trash.
+  Бизнес-логика только в services/, внешние API только через adapters/ с Protocol и фейком.
+  Секреты не попадают в код, конфиги, логи, git, БД и Telegram.
+
+rules:
+  proposal:
+    - Указывать ссылку на раздел ТЗ (например, «ТЗ §5.0») и зависимости от других изменений
+    - Явно перечислять, что не входит в изменение
+  design:
+    - Для каждого решения указывать отвергнутую альтернативу
+  tasks:
+    - Задача не больше 2 часов работы
+    - Каждая группа несёт свои тесты и правки документации (ARCHITECTURE.md, PLAN.md, README части)
+    - Последняя группа — синхронизация project-memory (memory_update, memory_annotate, memory_status)
+
+operations:
+  apply:
+    guidance:
+      - Перед началом memory_status и memory_search по теме изменения, а не сканирование репозитория
+      - После каждой группы ./tools/harness check
+  archive:
+    guidance:
+      - Обновить статус изменения в PLAN.md
