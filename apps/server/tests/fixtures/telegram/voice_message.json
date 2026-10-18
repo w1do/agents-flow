@@ -1,0 +1,16 @@
+{
+  "update_id": 10002,
+  "message": {
+    "message_id": 502,
+    "from": {"id": 424242, "is_bot": false, "first_name": "Owner"},
+    "chat": {"id": 424242, "type": "private"},
+    "date": 1760000000,
+    "voice": {
+      "file_id": "VOICE_FILE_1",
+      "file_unique_id": "VOICE_UNIQUE_1",
+      "duration": 3,
+      "mime_type": "audio/ogg",
+      "file_size": 2048
+    }
+  }
+}

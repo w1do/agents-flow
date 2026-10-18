@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, String, Uuid, func
 from sqlalchemy.dialects.postgresql import JSONB
@@ -26,7 +27,10 @@ class TelegramMessage(TimestampMixin, Base):
 
 
 class TelegramUpdate(Base):
-    """Учёт входящих апдейтов Telegram: дубликаты отбрасываются по (kind, external_id)."""
+    """Учёт входящих апдейтов Telegram: дубликаты отбрасываются по (kind, external_id).
+
+    payload хранится только до обработки: нормализованный апдейт без данных отправителя.
+    """
 
     __tablename__ = "telegram_updates"
     __table_args__ = (CheckConstraint("kind IN ('update', 'callback')", name="kind"),)
@@ -37,3 +41,6 @@ class TelegramUpdate(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Нормализованный апдейт владельца до обработки; обнуляется после неё (D-27).
+    # none_as_null: None пишется SQL NULL, а не JSON 'null'; иначе payload IS NULL не сработает.
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True), nullable=True)

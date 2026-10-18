@@ -1,33 +1,71 @@
 # Tasks
 
+Точные сигнатуры, строки бота, схема и имена тестов — в design.md (разделы указаны в скобках как «§N»).
+После каждой группы: `uv run ruff format . && ./tools/harness check`. Новых зависимостей не добавлять.
+Если шаг невозможно выполнить по тексту design.md — остановиться и сообщить, не придумывать замену.
+
+Нумерация задач сохранена; порядок выполнения обязателен и отличается от нумерации:
+6.1 → 6.2 → 1.4 → 1.5 → 1.3 → 1.1 → 1.2 → 2.4 → 2.2 → 3.4 → 3.5 → 3.3 → 3.1 → 3.2 → 1.6 → 2.3 → 2.5 → 2.1 →
+3.6 → 4.1 → 4.4 → 4.5 → 4.2 → 4.6 → 5.1. Задача 4.3 выполняется пользователем.
+
 ## 1. Адаптеры
 
-- [ ] 1.1 `adapters/telegram`: Protocol `TelegramClient`, httpx-реализация (5 методов + `download_file`), фейк; контрактные тесты respx — проверка: pytest
-- [ ] 1.2 `adapters/stt`: Protocol `SpeechToText`, OpenAI-совместимая реализация (multipart, таймаут), фейк; тесты на успех, ошибку, пустой текст — проверка: pytest
-- [ ] 1.3 `security/redaction.py` базовый: шаблоны токенов (Telegram, GitLab `glpat-`, Anthropic `sk-ant-`, общий `Bearer`), функция `redact(text, extra_values)`; тесты — проверка: pytest (дополняется в `mvp-09`)
+- [x] 1.1 `adapters/__init__.py`, `adapters/telegram/{__init__,types,protocol,client,fake}.py`: Protocol `TelegramClient` (6 методов: `send_message`, `edit_message_text`, `answer_callback_query`, `get_file`, `download_file`, `set_webhook`), `HttpxTelegramClient`, `FakeTelegramClient`, ошибки `TelegramError`/`MessageNotEditable`/`FileTooLarge` без URL и токена (design §1–§4); контрактные тесты respx `tests/test_telegram_client.py` — проверка: `uv run pytest apps/server/tests/test_telegram_client.py`
+- [x] 1.2 `adapters/stt/{__init__,protocol,openai_compat,fake}.py`: Protocol `SpeechToText`, `SttError`, `OpenAiCompatibleStt` (multipart, `voice.ogg` как есть, таймаут), `FakeSpeechToText` (design §5); `tests/test_stt_client.py` — успех, ошибка, пустой текст, таймаут — проверка: `uv run pytest apps/server/tests/test_stt_client.py`
+- [x] 1.3 `security/__init__.py`, `security/redaction.py` базовый: шаблоны токенов (Telegram, GitLab `glpat-`, Anthropic `sk-ant-`, общий `Bearer`), функция `redact(text, extra_values)` (design §6); `tests/test_redaction.py` — проверка: `uv run pytest apps/server/tests/test_redaction.py` (дополняется в `mvp-09`)
+- [x] 1.4 `settings.py`: `TELEGRAM_CHAT_ID` — целое число (`_check_chat_id`), `stt_provider: Literal["openai"] | None`, `voice_max_bytes` (ENV `VOICE_MAX_BYTES`, по умолчанию и максимум 20 МиБ) (design §20); `conftest.py::ALL_ENV_NAMES` + `"VOICE_MAX_BYTES"`; тесты `test_chat_id_must_be_numeric`, `test_negative_chat_id_accepted`, `test_stt_provider_unknown_rejected`, `test_voice_max_bytes_default`, `test_voice_max_bytes_over_limit_rejected` — проверка: `uv run pytest apps/server/tests/test_settings.py`
+- [x] 1.5 `config.py::WorkspaceConfig.id`: `max_length=28`, `pattern=r"^[A-Za-z0-9_-]+$"` (design §21, D-28); тесты `test_workspace_id_too_long_rejected`, `test_workspace_id_with_colon_rejected`, `test_workspace_id_28_chars_accepted` — проверка: `uv run pytest apps/server/tests/test_config.py`
+- [x] 1.6 `wiring.py`: `BotAdapters`, `build_http_client`, `build_adapters`, `secret_values`, `build_bot_context` (design §16) — проверка: `uv run mypy apps shared`; используется тестами 2.1, 2.3, 4.1
 
 ## 2. Webhook и приём
 
-- [ ] 2.1 `api/telegram_webhook.py`: секрет, chat_id, дедуп в `telegram_updates`, фоновая обработка, `200` — проверка: тесты сценариев «Неверный секрет», «Чужой чат», «Повторная доставка»
-- [ ] 2.2 `telegram/parse.py`: разбор update в `IncomingText | IncomingVoice | ButtonPress` (Pydantic) — проверка: тесты на записанных JSON Telegram
-- [ ] 2.3 Дообработка необработанных апдейтов при старте worker (`processed_at is null` и старше 1 мин) — проверка: pytest
+- [x] 2.1 `api/telegram_webhook.py` (design §15): секрет (router-зависимость), фильтр chat_id, `record_incoming`, фоновая `process_recorded`, `200 {"ok": true}`; подключение роутера в `app.py` — проверка: `tests/test_telegram_webhook.py`, сценарии «Неверный секрет», «Чужой чат», «Повторная доставка», «Выбор workspace» по HTTP, «Повторное нажатие кнопки» (`test_duplicate_callback_processed_once`), `test_payload_cleared_after_processing`
+- [x] 2.2 `telegram/__init__.py`, `telegram/parse.py`: разбор update в `IncomingText | IncomingVoice | ButtonPress` (Pydantic, дискриминатор `type`), `dump_incoming`, `load_incoming`, `dedup_key`; `/команды` и неподдерживаемые апдейты → `None` (design §7); 6 JSON-фикстур в `tests/fixtures/telegram/` и фикстура `telegram_update` в `conftest.py` — проверка: `uv run pytest apps/server/tests/test_telegram_parse.py`
+- [x] 2.3 Дообработка необработанных апдейтов при старте worker (`processed_at IS NULL` и `received_at` старше 1 мин) по `telegram_updates.payload`, досылка недостающих карточек; `services/intake.py::recover_pending` и `worker.py::start_worker`/`serve_worker(settings, config)`, `cli.py::worker` (design §12, §18, D-27) — проверка: `uv run pytest apps/server/tests/test_recovery.py apps/server/tests/test_worker.py`
+- [x] 2.4 Миграция `db/migrations/versions/20261018_0002_telegram_update_payload.py` (ручная, `revision="0002"`, `down_revision="0001"`, без импорта `harness_server`) и поле `TelegramUpdate.payload: Mapped[dict[str, Any] | None]` JSONB (design §22, D-27); тест `test_telegram_updates_payload_column` — проверка: `uv run pytest apps/server/tests/test_migrations.py` (включая `alembic check` и roundtrip)
+- [x] 2.5 `api/deps.py`: `require_webhook_secret`, `get_bot_context`, `BotContextDep` (design §14); `app.py`: параметр `adapters: BotAdapters | None = None`, `app.state.bot`, закрытие httpx-клиента в lifespan (design §17) — проверка: существующие `tests/test_tasks_api.py` зелёные, `test_wrong_secret_returns_401`, `test_missing_secret_returns_401`
 
 ## 3. Сервисы
 
-- [ ] 3.1 `services/intake.py`: текст/голос → задача `plan` (`new` → `choosing`) + кнопки всех workspace из конфига; ошибка STT → ответ без задачи — проверка: тесты сервиса с фейками
-- [ ] 3.2 `services/intake.choose_workspace`: кнопка → `planning`, повторное нажатие → подсказка — проверка: тесты сценариев «Выбор workspace» и «Повторное нажатие»
-- [ ] 3.3 `services/notify.py` + `telegram/render.py`: одно сообщение, дописывание строк, обработка «not modified», redaction — проверка: тест сценария «Два этапа»
+- [x] 3.1 `services/intake.py`: `record_incoming`, `process_recorded` (строка-замок `FOR UPDATE SKIP LOCKED`, порядок: STT → задача `plan` `new` → `choosing` → отметка апдейта и `payload = NULL` → карточка), `_transcribe`, `_create_choosing_task`; ошибка STT → ответ «не удалось распознать, пришлите текстом» без задачи (design §12) — проверка: `tests/test_intake_service.py` (сценарии «Голосовая задача», «Провайдер недоступен», пустой текст, STT не настроен, лимит размера, двойной `process_recorded`, сбой отправки карточки)
+- [x] 3.2 `services/intake.choose_workspace`: кнопка → `planning` с workspace, повторное нажатие → «проект уже выбран»; ответы «кнопка устарела», «проект не найден», «задача не найдена» (design §12) — проверка: тесты сценариев «Выбор workspace» и «Повторное нажатие» (`test_choose_workspace_sets_planning`, `test_repeat_press_after_choice`) и `test_unknown_workspace_button`, `test_garbage_callback`, `test_missing_task_button`
+- [x] 3.3 `services/notify.py` (`send_task_card`, `append_stage`, `reply`) + `telegram/render.py` (тексты, `short_title`, `stage_line`, `render_card`, `build_callback_data`/`parse_callback_data`, `workspace_keyboard`): одно сообщение, дописывание строк, обработка «not modified» и недоступного сообщения, redaction (design §8, §11) — проверка: `tests/test_notify_service.py` (сценарий «Два этапа» — `test_two_stages_single_message`) и `tests/test_telegram_render.py`
+- [x] 3.4 `services/tasks.py::select_workspace` — назначение workspace и `choosing` → `planning` одной транзакцией с `FOR UPDATE` (design §10) — проверка: `test_select_workspace_moves_to_planning`, `test_select_workspace_twice_rejected`, `test_select_workspace_unknown_workspace`, `test_select_workspace_missing_task` в `tests/test_task_service.py`
+- [x] 3.5 `services/context.py::BotContext` и фикстура `make_bot_context` в `conftest.py` (design §9, Test strategy) — проверка: `uv run mypy apps shared`
+- [x] 3.6 `services/webhook.py`: `webhook_url`, `register_webhook`, `ALLOWED_UPDATES = ("message", "callback_query")` (design §13) — проверка: `uv run pytest apps/server/tests/test_webhook_service.py`
 
 ## 4. Команды и документация
 
-- [ ] 4.1 `harness-server telegram set-webhook` (URL из `HARNESS_PUBLIC_URL`, секрет из ENV) — проверка: тест CLI с фейком
-- [ ] 4.2 ARCHITECTURE.md §5, §9 (ENV STT), docs/deployment.md (шаг set-webhook), README сервера, PLAN.md — проверка: ревью
-- [ ] 4.3 Ручная проверка `-m live`: текст и голос из реального чата создают задачу с кнопками — проверка: запись результата в PR
+- [x] 4.1 `harness-server telegram set-webhook` (URL из `HARNESS_PUBLIC_URL` + `/telegram/webhook`, только https; секрет из `TELEGRAM_WEBHOOK_SECRET`; `cli.py` вызывает `wiring.build_adapters` через модуль) (design §19) — проверка: тест CLI с фейком `test_telegram_set_webhook_uses_public_url`, `test_set_webhook_requires_public_url`, `test_set_webhook_reports_telegram_error`, `"telegram"` в `test_help_lists_commands`
+- [x] 4.2 ARCHITECTURE.md §2 (пакеты `adapters/telegram`, `adapters/stt`, `security/redaction.py`, `telegram/parse.py`/`render.py`, `services/intake.py`/`notify.py`/`context.py`/`webhook.py`, `api/telegram_webhook.py`, `wiring.py`), §3 (`telegram_updates.payload` JSONB NULL, обнуляется после обработки, миграция `0002`), §5 п.1 (нормализованный апдейт, восстановление при старте worker), §8 (логгер httpx, ошибки адаптеров без URL), §9 (`VOICE_MAX_BYTES`, `TELEGRAM_WEBHOOK_SECRET` ≥ 32, `TELEGRAM_CHAT_ID` — число, `STT_PROVIDER=openai`, `HARNESS_PUBLIC_URL` для `set-webhook`); docs/deployment.md (шаг `harness-server telegram set-webhook` после деплоя); `apps/server/README.md` (новые модули, тесты, инструкция ручной проверки 4.3); `db/README.md` (ревизия `0002`); PLAN.md (mvp-04 → `review` после ревью) — проверка: ревью
+- [ ] 4.3 Ручная проверка `-m live`: текст и голос из реального чата создают задачу с кнопками; нажатие кнопки переводит в `planning` и убирает клавиатуру — проверка: запись результата в PR. **Выполняет пользователь.** Implementer не отмечает этот пункт: он пишет тест 4.5 и инструкцию в `apps/server/README.md`; чекбокс остаётся открытым до подтверждения пользователя
+- [x] 4.4 `cli.py::_configure_logging`: логгеры `httpx` и `httpcore` — WARNING (в URL Telegram — токен) (design §19, D-29) — проверка: `test_configure_logging_silences_httpx`
+- [x] 4.5 `tests/test_telegram_live.py` с маркером `live` (по умолчанию не запускается; ENV `LIVE_TELEGRAM_BOT_TOKEN`, `LIVE_TELEGRAM_CHAT_ID`, без них — skip) и инструкция в `apps/server/README.md`: запуск `uv run pytest -m live apps/server/tests/test_telegram_live.py`, затем ручной сценарий 4.3 (`set-webhook`, текст, голос, кнопка) — проверка: `./tools/harness check` не запускает live-тест; `uv run pytest -m live …` без ENV даёт skip
+- [x] 4.6 `docker-compose.yml`: `VOICE_MAX_BYTES: ${VOICE_MAX_BYTES:-}` рядом с `WORKER_POLL_INTERVAL_SEC` в `server` и `worker`; `.env.example`: строка `VOICE_MAX_BYTES=` и комментарий «`TELEGRAM_WEBHOOK_SECRET` — 32–256 символов `A-Za-z0-9_-`» — **`.env.example` только по явному разрешению пользователя**, без разрешения пункт закрывается без этой части с пометкой — проверка: ревью
 
 ## 5. Память проекта
 
-- [ ] 5.1 `memory_update` по изменённым путям, `memory_annotate` для каждого нового файла, `memory_status` без устаревших файлов
+- [x] 5.1 `memory_update` по всем изменённым и новым путям, `memory_annotate` для каждого нового и изменённого файла, `memory_status` без устаревших файлов; вернуть список путей оркестратору
 
 ## 6. Хвосты ревью mvp-02
 
-- [ ] 6.1 `settings.py::_check_webhook_secret_format`: минимальная длина `TELEGRAM_WEBHOOK_SECRET` ≥ 32 (как `HARNESS_SECRET_KEY`); Telegram допускает секрет 1–256 символов из `A-Za-z0-9_-` — проверка: тест, секрет из 1 символа отклоняется, секрет из 32 символов принимается
+- [x] 6.1 `settings.py::_check_webhook_secret_format`: минимальная длина `TELEGRAM_WEBHOOK_SECRET` ≥ 32 (как `HARNESS_SECRET_KEY`); Telegram допускает секрет 1–256 символов из `A-Za-z0-9_-` (design §20) — проверка: тест, секрет из 1 символа отклоняется (`test_webhook_secret_too_short_rejected`), секрет из 32 символов принимается (`test_webhook_secret_32_chars_accepted`)
+- [x] 6.2 Тестовые данные под 6.1: `conftest.py::valid_env` — `TELEGRAM_WEBHOOK_SECRET="test-webhook-secret-0123456789abcdef"`, если текущее значение короче 32; `test_settings.py::test_webhook_secret_accepts_telegram_alphabet` — значение `"Abc_123-xyz" * 3` — проверка: `uv run pytest apps/server/tests` целиком зелёный
+
+## 7. Исправления по ревью (цикл 1)
+
+- [x] 7.1 S1 (F1): `settings.py::_check_chat_id` — только положительный id личного чата; отрицательный и `0` отклоняются без значения в тексте ошибки; решение D-30 в `docs/decisions.md`, ARCHITECTURE.md §9 — проверка: `test_group_or_zero_chat_id_rejected`, `test_positive_chat_id_accepted` в `tests/test_settings.py`
+- [x] 7.2 S2a (F2): `services/intake.py::recover_pending` — необработанные апдейты старше `PAYLOAD_TTL` (24 ч) помечаются `processed_at`, payload очищается, без обработки; лог только kind/external_id и причина — проверка: `test_expired_update_payload_dropped_without_processing` в `tests/test_recovery.py`
+- [x] 7.3 S2b (F2): `telegram/parse.py` удаляет `\x00` из текста; текст из одних NUL игнорируется — проверка: `test_parse_removes_nul_from_text`, `test_text_of_only_nul_is_ignored` в `tests/test_telegram_parse.py`; сбой создания задачи оставляет строку необработанной — проверка: `test_failed_processing_keeps_update_for_retry` в `tests/test_recovery.py`
+- [x] 7.4 S3 (F3): `db/session.py::create_engine` — `hide_parameters=True` — проверка: `uv run ruff format . && ./tools/harness check` (отдельного теста нет: проверка тривиальна, см. design.md, решение 13)
+- [x] 7.5 S4 (F4, F5, F6): `services/intake.py::_create_choosing_task` — redact до `create_task` (текст и STT); `services/notify.py` — redact до `short_title` и усечения; `_answer` — через redact — проверка: `test_secret_in_text_not_stored`, `test_secret_in_voice_transcript_not_stored`, `test_long_token_at_text_start_not_partly_leaked` в `tests/test_intake_service.py`
+- [x] 7.6 S5 (F7): `adapters/telegram/client.py::download_file` — общий дедлайн `DOWNLOAD_TIMEOUT_SEC = 60` через `asyncio.timeout`, ошибка `TelegramError` без URL — проверка: `test_download_file_deadline_raises_without_url` в `tests/test_telegram_client.py`
+- [x] 7.7 S6 (F8): `settings.py` — `STT_API_URL` только `https://`; `services/webhook.py::webhook_url` — отклоняет query и fragment — проверка: `test_stt_api_url_must_be_https`, `test_stt_api_url_https_accepted` в `tests/test_settings.py`; `test_webhook_url_requires_https` (параметры с `?` и `#`) в `tests/test_webhook_service.py`
+- [x] 7.8 R1, R2: `services/intake.py` — задвоенная строка docstring `_create_choosing_task` убрана; переносы docstring в `intake.py`, `notify.py`, `context.py` переписаны; `apps/server/README.md` — описано восстановление апдейтов при старте worker — проверка: `./tools/harness check`, ревью
+- [x] 7.9 R3: тест конкурентности двух `process_recorded` на одном ключе — одна задача и одна карточка — проверка: `test_concurrent_process_creates_one_task` в `tests/test_intake_service.py`
+
+## 8. Исправления по ревью (цикл 2)
+
+- [x] 8.1 C1 (medium): `db/models/telegram.py::TelegramUpdate.payload` — `JSONB(none_as_null=True)`, очистка пишет SQL NULL, а не JSON `'null'` (D-27); миграция `0002` не меняется — проверка: `test_payload_cleared_after_processing` в `tests/test_telegram_webhook.py` (ORM-счётчик `payload IS NULL AND processed_at IS NOT NULL` и литеральный `text()`), `test_recover_processes_stale_update` и `test_expired_update_payload_dropped_without_processing` в `tests/test_recovery.py`; до правки модели новые проверки падали
+- [x] 8.2 C2 (low): `.env.example` — комментарий к `TELEGRAM_CHAT_ID`: положительный числовой id личного чата владельца, группы не поддерживаются (D-30); значение пустое — проверка: ревью, `test_positive_chat_id_accepted` и `test_group_or_zero_chat_id_rejected` в `tests/test_settings.py`
+- [x] 8.3 C3 (low): TTL необработанных апдейтов (`PAYLOAD_TTL`) применяется в `recover_pending` только при старте worker, периодическая очистка не реализуется — проверка: описано в `design.md` (решение 2, раздел `recover_pending`) и в `ARCHITECTURE.md` §5 п.1; тест `test_expired_update_payload_dropped_without_processing`

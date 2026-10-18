@@ -130,6 +130,34 @@ def test_binary_file_is_rejected_without_content(tmp_path: Path) -> None:
     assert "binary-marker" not in message
 
 
+def test_workspace_id_too_long_rejected(tmp_path: Path) -> None:
+    long_id = "w" * 29
+    body = "workspaces:\n" + WORKSPACE_BLOCK.format(id=long_id) + TAIL
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "workspaces[0].id" in str(info.value)
+
+
+def test_workspace_id_with_colon_rejected(tmp_path: Path) -> None:
+    body = "workspaces:\n" + WORKSPACE_BLOCK.format(id="a:b") + TAIL
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "workspaces[0].id" in str(info.value)
+
+
+def test_workspace_id_28_chars_accepted(tmp_path: Path) -> None:
+    # Максимум: префикс ws:<32 hex>: занимает 36 байт, на id остаётся 28 (D-28).
+    config = load_config(
+        _write(tmp_path, "workspaces:\n" + WORKSPACE_BLOCK.format(id="w" * 28) + TAIL)
+    )
+
+    assert config.workspaces[0].id == "w" * 28
+
+
 def test_empty_document_is_rejected(tmp_path: Path) -> None:
     with pytest.raises(ConfigError):
         load_config(_write(tmp_path, ""))

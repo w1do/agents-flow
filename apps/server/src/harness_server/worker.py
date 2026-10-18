@@ -1,9 +1,24 @@
-"""Worker: цикл диспетчера. Пока очереди нет, цикл только ждёт и проверяет остановку."""
+"""Worker: цикл диспетчера. Пока очереди нет, цикл только ждёт и проверяет остановку.
+
+При старте дообрабатывает апдейты Telegram и досылает карточки, брошенные до рестарта (D-27).
+Ошибка восстановления логируется и не мешает запуску цикла.
+"""
 
 import asyncio
 import contextlib
 import logging
 import signal
+
+from harness_server.config import HarnessConfig
+from harness_server.db.session import create_engine, create_session_factory
+from harness_server.services.intake import recover_pending
+from harness_server.settings import Settings
+from harness_server.wiring import (
+    BotAdapters,
+    build_adapters,
+    build_bot_context,
+    build_http_client,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +33,39 @@ async def run_worker(poll_interval_sec: float, stop: asyncio.Event) -> None:
     logger.info("worker stopped")
 
 
-async def serve_worker(poll_interval_sec: float) -> None:
+async def start_worker(
+    settings: Settings,
+    config: HarnessConfig,
+    stop: asyncio.Event,
+    *,
+    adapters: BotAdapters | None = None,
+) -> None:
+    """Восстанавливает брошенные апдейты, затем крутит цикл до stop. Ресурсы закрываются при выходе.
+
+    adapters — фейки в тестах; без него строятся реальные адаптеры из настроек.
+    """
+    engine = create_engine(settings.database_url.get_secret_value())
+    factory = create_session_factory(engine)
+    http = build_http_client()
+    try:
+        bot = build_bot_context(
+            settings,
+            config,
+            factory,
+            adapters if adapters is not None else build_adapters(settings, http),
+        )
+        try:
+            await recover_pending(bot)
+        except Exception as exc:
+            # В тексте исключения может быть строка подключения: в лог уходит только класс.
+            logger.warning("telegram recovery failed: %s", type(exc).__name__)
+        await run_worker(settings.worker_poll_interval_sec, stop)
+    finally:
+        await http.aclose()
+        await engine.dispose()
+
+
+async def serve_worker(settings: Settings, config: HarnessConfig) -> None:
     """Запускает worker и переводит SIGTERM/SIGINT в остановку цикла.
 
     Docker останавливает контейнер сигналом SIGTERM; без обработчика процесс убивался бы на
@@ -28,4 +75,4 @@ async def serve_worker(poll_interval_sec: float) -> None:
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, stop.set)
-    await run_worker(poll_interval_sec, stop)
+    await start_worker(settings, config, stop)

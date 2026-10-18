@@ -1,0 +1,15 @@
+{
+  "update_id": 10003,
+  "callback_query": {
+    "id": "4242000000000000001",
+    "from": {"id": 424242, "is_bot": false, "first_name": "Owner"},
+    "chat_instance": "-100500",
+    "message": {
+      "message_id": 100,
+      "chat": {"id": 424242, "type": "private"},
+      "date": 1760000001,
+      "text": "добавь экспорт в CSV"
+    },
+    "data": "ws:00000000000000000000000000000000:demo"
+  }
+}

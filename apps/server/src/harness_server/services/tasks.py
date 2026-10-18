@@ -145,6 +145,43 @@ async def change_status(
     return task
 
 
+async def select_workspace(
+    session: AsyncSession,
+    task_id: UUID,
+    workspace_id: str,
+    *,
+    known_workspace_ids: Collection[str],
+    source: TaskEventSource,
+    text: str | None = None,
+) -> Task:
+    """Назначает workspace и переводит задачу choosing → planning одной транзакцией.
+
+    Бросает UnknownWorkspace, NotFound, InvalidTransition (задача уже не в choosing) — до записи.
+    Строка блокируется FOR UPDATE: два одновременных нажатия кнопки не назначат два workspace.
+    """
+    if workspace_id not in known_workspace_ids:
+        raise UnknownWorkspace(workspace_id)
+    # populate_existing: статус читается после блокировки, а не из кэша сессии.
+    result = await session.execute(
+        select(Task)
+        .where(Task.id == task_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    task = result.scalar_one_or_none()
+    if task is None:
+        raise NotFound("task", task_id)
+    ensure_transition(task.kind, task.status, TaskStatus.PLANNING)
+
+    task.workspace_id = workspace_id
+    task.status = TaskStatus.PLANNING
+    event = TaskEvent(task_id=task.id, status=TaskStatus.PLANNING, text=text, source=source)
+    session.add(event)
+    await _commit(session, task, event)
+    logger.info("task workspace selected id=%s workspace=%s", task.id, workspace_id)
+    return task
+
+
 async def add_event(
     session: AsyncSession, task_id: UUID, *, text: str, source: TaskEventSource
 ) -> TaskEvent:

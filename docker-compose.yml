@@ -32,6 +32,7 @@ x-harness-common: &harness-common
     ADMIN_EMAIL: ${ADMIN_EMAIL:-}
     ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     WORKER_POLL_INTERVAL_SEC: ${WORKER_POLL_INTERVAL_SEC:-}
+    VOICE_MAX_BYTES: ${VOICE_MAX_BYTES:-}
   # File Mount Dokploy: config/harness.yaml из раздела Files стека попадает в ../files/.
   volumes:
     - ../files/harness.yaml:/app/config/harness.yaml:ro

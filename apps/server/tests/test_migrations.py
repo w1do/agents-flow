@@ -7,6 +7,9 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
+from sqlalchemy import inspect
+from sqlalchemy.dialects import postgresql
+from sqlalchemy.ext.asyncio import create_async_engine
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -34,6 +37,23 @@ def test_downgrade_and_upgrade_roundtrip(
     command.upgrade(config, "head")
 
     command.check(config)
+
+
+@pytest.mark.asyncio
+async def test_telegram_updates_payload_column(migrated_database_url: str) -> None:
+    # Ревизия 0002: nullable JSONB, без неё до обработки нечего дообрабатывать после рестарта.
+    engine = create_async_engine(migrated_database_url)
+    try:
+        async with engine.connect() as connection:
+            columns = await connection.run_sync(
+                lambda sync_conn: inspect(sync_conn).get_columns("telegram_updates")
+            )
+    finally:
+        await engine.dispose()
+
+    payload = next(column for column in columns if column["name"] == "payload")
+    assert payload["nullable"] is True
+    assert isinstance(payload["type"], postgresql.JSONB)
 
 
 def test_migrate_keeps_application_loggers_enabled(

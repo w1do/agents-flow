@@ -1,13 +1,19 @@
 """Общие фикстуры: изоляция ENV, пример harness.yaml, Postgres (TEST_DATABASE_URL или контейнер)."""
 
+import json
 import os
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 import pytest_asyncio
 from alembic import command as alembic_command
 from alembic.config import Config as AlembicConfig
+from harness_server.adapters.stt import SpeechToText
+from harness_server.adapters.telegram import FakeTelegramClient
+from harness_server.config import WorkspaceConfig
+from harness_server.services.context import BotContext
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -18,6 +24,7 @@ from sqlalchemy.ext.asyncio import (
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 EXAMPLE_CONFIG = REPO_ROOT / "config" / "harness.example.yaml"
+TELEGRAM_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "telegram"
 
 # Все переменные из Settings. Тесты очищают их, чтобы окружение разработчика не влияло на результат.
 ALL_ENV_NAMES = (
@@ -47,9 +54,12 @@ ALL_ENV_NAMES = (
     "ADMIN_EMAIL",
     "ADMIN_PASSWORD",
     "WORKER_POLL_INTERVAL_SEC",
+    "VOICE_MAX_BYTES",
 )
 
 VALID_SECRET_KEY = "test-secret-key-0123456789abcdef0123"
+# Минимум 32 символа (как у TELEGRAM_WEBHOOK_SECRET в settings.py); значение тестовое.
+VALID_WEBHOOK_SECRET = "test-webhook-secret-0123456789abcdef"
 
 # Адрес, на котором никто не слушает: подключение падает сразу, без ожидания таймаута.
 UNREACHABLE_DATABASE_URL = "postgresql+asyncpg://u:p@127.0.0.1:1/x"
@@ -72,11 +82,24 @@ def valid_env(monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
         "HARNESS_SECRET_KEY": VALID_SECRET_KEY,
         "TELEGRAM_BOT_TOKEN": "123:test-bot-token",
         "TELEGRAM_CHAT_ID": "424242",
-        "TELEGRAM_WEBHOOK_SECRET": "test-webhook-secret",
+        "TELEGRAM_WEBHOOK_SECRET": VALID_WEBHOOK_SECRET,
     }
     for name, value in values.items():
         monkeypatch.setenv(name, value)
     return values
+
+
+@pytest.fixture
+def telegram_update() -> Callable[[str], dict[str, Any]]:
+    """Записанный апдейт Telegram по имени файла без расширения; каждый вызов даёт новый dict."""
+
+    def load(name: str) -> dict[str, Any]:
+        loaded: dict[str, Any] = json.loads(
+            (TELEGRAM_FIXTURES / f"{name}.json").read_text(encoding="utf-8")
+        )
+        return loaded
+
+    return load
 
 
 @pytest.fixture(scope="session")
@@ -146,3 +169,41 @@ async def committed_session_factory(
     yield async_sessionmaker(db_engine, expire_on_commit=False)
     async with db_engine.begin() as connection:
         await connection.execute(text(TRUNCATE_ALL))
+
+
+DEFAULT_VOICE_MAX_BYTES = 20 * 1024 * 1024
+OWNER_CHAT_ID = 424242
+
+
+@pytest.fixture
+def make_bot_context() -> Callable[..., BotContext]:
+    """Собирает BotContext с фейками: владелец 424242, два workspace «demo» и «shop»."""
+
+    def build(
+        factory: async_sessionmaker[AsyncSession],
+        *,
+        telegram: FakeTelegramClient,
+        stt: SpeechToText | None = None,
+        workspaces: tuple[WorkspaceConfig, ...] | None = None,
+        voice_max_bytes: int = DEFAULT_VOICE_MAX_BYTES,
+    ) -> BotContext:
+        if workspaces is None:
+            workspaces = (
+                WorkspaceConfig(
+                    id="demo", name="Демо-проект", voice_aliases=[], gitlab_project="group/demo"
+                ),
+                WorkspaceConfig(
+                    id="shop", name="Магазин", voice_aliases=[], gitlab_project="group/shop"
+                ),
+            )
+        return BotContext(
+            session_factory=factory,
+            telegram=telegram,
+            stt=stt,
+            workspaces=workspaces,
+            owner_chat_id=OWNER_CHAT_ID,
+            secret_values=(VALID_WEBHOOK_SECRET,),
+            voice_max_bytes=voice_max_bytes,
+        )
+
+    return build
