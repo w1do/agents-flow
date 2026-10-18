@@ -43,7 +43,8 @@ class WorkspaceConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: str = Field(min_length=1)
+    # id входит в callback_data `ws:<task hex>:<id>` ≤ 64 байт (D-28): до 28 символов, без «:».
+    id: str = Field(min_length=1, max_length=28, pattern=r"^[A-Za-z0-9_-]+$")
     name: str = Field(min_length=1)
     voice_aliases: list[str]
     gitlab_project: str = Field(min_length=1)

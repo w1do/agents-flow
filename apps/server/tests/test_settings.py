@@ -108,11 +108,117 @@ def test_invalid_webhook_secret_rejected_without_value(
 def test_webhook_secret_accepts_telegram_alphabet(
     valid_env: dict[str, str], monkeypatch: MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("TELEGRAM_WEBHOOK_SECRET", "Abc_123-xyz")
+    # 33 символа: алфавит Telegram и минимум 32 символа одновременно.
+    secret = "Abc_123-xyz" * 3
+    monkeypatch.setenv("TELEGRAM_WEBHOOK_SECRET", secret)
 
     settings = load_settings()
 
-    assert settings.telegram_webhook_secret.get_secret_value() == "Abc_123-xyz"
+    assert settings.telegram_webhook_secret.get_secret_value() == secret
+
+
+def test_webhook_secret_too_short_rejected(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch
+) -> None:
+    # Один символ, но допустимый алфавит: отклоняет именно минимальная длина.
+    monkeypatch.setenv("TELEGRAM_WEBHOOK_SECRET", "Q")
+
+    with pytest.raises(SettingsError) as info:
+        load_settings()
+
+    assert "TELEGRAM_WEBHOOK_SECRET" in str(info.value)
+
+
+def test_webhook_secret_32_chars_accepted(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TELEGRAM_WEBHOOK_SECRET", "w" * 32)
+
+    settings = load_settings()
+
+    assert len(settings.telegram_webhook_secret.get_secret_value()) == 32
+
+
+def test_chat_id_must_be_numeric(valid_env: dict[str, str], monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "abc")
+
+    with pytest.raises(SettingsError) as info:
+        load_settings()
+
+    assert "TELEGRAM_CHAT_ID" in str(info.value)
+
+
+@pytest.mark.parametrize("value", ["-1001234567890", "0"])
+def test_group_or_zero_chat_id_rejected(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch, value: str
+) -> None:
+    # Группы не поддерживаются (D-30): владелец — личный чат с положительным id.
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", value)
+
+    with pytest.raises(SettingsError) as info:
+        load_settings()
+
+    message = str(info.value)
+    assert "TELEGRAM_CHAT_ID" in message
+    # Значение id в тексте не выводится. Для «0» проверка бессмысленна: «0» есть в «D-30».
+    if value != "0":
+        assert value not in message
+
+
+def test_positive_chat_id_accepted(valid_env: dict[str, str], monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "123456789")
+
+    settings = load_settings()
+
+    assert settings.telegram_chat_id == "123456789"
+
+
+def test_stt_api_url_must_be_https(valid_env: dict[str, str], monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("STT_PROVIDER", "openai")
+    monkeypatch.setenv("STT_API_URL", "http://stt.example.com/v1")
+
+    with pytest.raises(SettingsError) as info:
+        load_settings()
+
+    message = str(info.value)
+    assert "STT_API_URL" in message
+    assert "stt.example.com" not in message
+
+
+def test_stt_api_url_https_accepted(valid_env: dict[str, str], monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("STT_PROVIDER", "openai")
+    monkeypatch.setenv("STT_API_URL", "https://stt.example.com/v1")
+
+    settings = load_settings()
+
+    assert settings.stt_api_url == "https://stt.example.com/v1"
+
+
+def test_stt_provider_unknown_rejected(valid_env: dict[str, str], monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("STT_PROVIDER", "whisper-local")
+
+    with pytest.raises(SettingsError) as info:
+        load_settings()
+
+    assert "STT_PROVIDER" in str(info.value)
+
+
+def test_voice_max_bytes_default(valid_env: dict[str, str]) -> None:
+    settings = load_settings()
+
+    assert settings.voice_max_bytes == 20 * 1024 * 1024
+
+
+def test_voice_max_bytes_over_limit_rejected(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch
+) -> None:
+    # Один байт сверх лимита getFile Telegram (20 МиБ).
+    monkeypatch.setenv("VOICE_MAX_BYTES", str(20 * 1024 * 1024 + 1))
+
+    with pytest.raises(SettingsError) as info:
+        load_settings()
+
+    assert "VOICE_MAX_BYTES" in str(info.value)
 
 
 def test_admin_token_too_short_rejected(

@@ -40,6 +40,9 @@ Job `deploy:dokploy` не добавляет `curl -v` и `--trace`: при ош
 ## Первый запуск
 
 1. Задеплоить стек БД, затем стек харнесса с ENV из ARCHITECTURE.md §9.
-2. `harness-server telegram set-webhook` — регистрирует `${HARNESS_PUBLIC_URL}/telegram/webhook` с секретом.
+2. `harness-server telegram set-webhook` — регистрирует `${HARNESS_PUBLIC_URL}/telegram/webhook` с секретом
+   `TELEGRAM_WEBHOOK_SECRET`. Запускается в контейнере `server` после деплоя и при каждой смене `HARNESS_PUBLIC_URL`
+   или секрета. `HARNESS_PUBLIC_URL` должен быть https без учётных данных, иначе команда завершится с кодом 1 и
+   понятным сообщением. Вывод команды токен и секрет не содержат.
 3. Создать песочницу в Novita вручную, выполнить в ней `deploy/sandbox/bootstrap.sh`, записать id в `harness.yaml`.
 4. `harness-server sandbox pause` — песочница уходит в простой до первой задачи.

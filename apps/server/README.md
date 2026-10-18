@@ -10,8 +10,9 @@
 | `harness-server --help` | Справка по командам |
 | `harness-server check-config` | Проверяет ENV и `harness.yaml`, печатает список workspace |
 | `harness-server serve --host 127.0.0.1 --port 8000` | HTTP-сервер: `GET /health`, `GET /health/ready`. По умолчанию слушает localhost; в контейнере `--host 0.0.0.0` |
-| `harness-server worker` | Цикл опроса очереди (пока без задач), остановка по SIGTERM |
+| `harness-server worker` | Цикл опроса очереди задач. При старте восстанавливает апдейты Telegram: необработанные старше 1 мин обрабатываются заново, старше 24 ч списываются без обработки (payload очищается), недостающие карточки досылаются. Остановка по SIGTERM |
 | `harness-server migrate` | `alembic upgrade head`, нужен `DATABASE_URL` |
+| `harness-server telegram set-webhook` | Регистрирует webhook в Telegram: адрес `HARNESS_PUBLIC_URL` + `/telegram/webhook` (только https), секрет из `TELEGRAM_WEBHOOK_SECRET`. Выполняется после деплоя и при смене адреса; ошибки — код 1 без токена и секрета в выводе |
 
 ## HTTP-эндпоинты задач
 
@@ -65,6 +66,29 @@ uv run pytest                         # только тесты
 через testcontainers (нужен Docker). Тесты с маркером `live` (реальные внешние сервисы) по
 умолчанию не запускаются.
 
+### Живая проверка Telegram (`-m live`)
+
+Тест `tests/test_telegram_live.py` отправляет и правит сообщение настоящим ботом. Нужны переменные
+`LIVE_TELEGRAM_BOT_TOKEN` (токен бота) и `LIVE_TELEGRAM_CHAT_ID` (чат владельца). Без них тест пропускается.
+
+```bash
+uv run pytest -m live apps/server/tests/test_telegram_live.py
+```
+
+Ручной сценарий (задача 4.3 в OpenSpec `mvp-04-telegram-intake`, выполняет владелец проекта):
+
+1. Сервер и worker запущены с настройками из `.env`, миграции применены (`harness-server migrate`).
+2. `harness-server telegram set-webhook`: команда печатает `webhook установлен: https://…/telegram/webhook`.
+3. Текстом из чата владельца отправить «добавь экспорт в CSV»: бот присылает карточку задачи с кнопками
+   по всем workspace и строкой `Задача [добавь экспорт в CSV] (выберите проект)`.
+4. Голосовым сообщением (до 20 МиБ, OGG) создать задачу: карточка содержит расшифровку. Если STT
+   не настроен или провайдер отклонил файл, бот отвечает «не удалось распознать, пришлите текстом»
+   и задачи не создаёт.
+5. Нажать кнопку workspace: строка карточки меняется на `(проект «…», планирование)`, клавиатура
+   исчезает. Повторное нажатие на другую кнопку отвечает «проект уже выбран».
+
+Результат прогона записать в PR. Чекбокс 4.3 закрывает владелец проекта после проверки.
+
 ## Структура
 
 ```
@@ -72,14 +96,25 @@ src/harness_server/
 ├── settings.py     # Settings: ENV, секреты как SecretStr
 ├── config.py       # HarnessConfig: harness.yaml, запрет секретов в файле
 ├── app.py          # create_app(settings, config): FastAPI и lifespan с engine БД
+├── wiring.py       # композиционный корень бота: httpx-клиент, BotAdapters, BotContext (D-29)
 ├── api/health.py   # /health и /health/ready
 ├── api/tasks.py    # POST /tasks, GET /tasks/{id}
-├── api/deps.py     # сессия БД, конфиг, проверка HARNESS_ADMIN_TOKEN
-├── services/tasks.py  # создание, смена статуса, лента, очередь claim_next_task
+├── api/telegram_webhook.py  # POST /telegram/webhook: секрет, фильтр чата, запись апдейта, фон
+├── api/deps.py     # сессия БД, конфиг, HARNESS_ADMIN_TOKEN, секрет webhook, BotContext
+├── services/tasks.py  # создание, смена статуса, выбор workspace, лента, очередь claim_next_task
+├── services/intake.py # приём и обработка апдейтов, STT, выбор проекта, recover_pending при старте worker
+├── services/notify.py # одно обновляемое сообщение задачи, reply
+├── services/webhook.py  # webhook_url, register_webhook (set-webhook)
+├── services/context.py  # BotContext: фабрика сессий, адаптеры, workspace, владелец
+├── telegram/parse.py    # update → IncomingText | IncomingVoice | ButtonPress, dedup_key (без I/O)
+├── telegram/render.py   # тексты, карточка задачи, callback_data, клавиатура (без I/O)
+├── adapters/telegram/   # Protocol TelegramClient, HttpxTelegramClient, FakeTelegramClient, ошибки без URL и токена
+├── adapters/stt/        # Protocol SpeechToText, OpenAiCompatibleStt, FakeSpeechToText
+├── security/redaction.py  # redact(): шаблоны токенов и точные значения секретов
 ├── domain/         # statuses.py (таблица переходов), errors.py (DomainError)
-├── db/             # base, ids (uuid7), session, models/ (ORM 9 таблиц)
-├── worker.py       # цикл worker и обработка SIGTERM
-└── cli.py          # команды harness-server (typer)
+├── db/             # base, ids (uuid7), session, models/ (ORM 9 таблиц), migrations/ (0001, 0002)
+├── worker.py       # start_worker (восстановление апдейтов, BotContext), цикл и обработка SIGTERM
+└── cli.py          # команды harness-server (typer), telegram set-webhook
 ```
 
 Модели ответов, видимые снаружи, лежат в `shared/` (пакет `harness_shared`).

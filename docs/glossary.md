@@ -21,7 +21,9 @@
 | Роль агента | `AgentRole` | Роль токена задачи: `planner`, `implementer` |
 | Токен задачи | `TaskToken` | Bearer для MCP, действует до конца задачи |
 | Операторский токен | `OperatorToken` | Bearer со скоупами `read`/`operate`/`admin` (после MVP) |
-| Сообщение задачи | `TaskMessage` | Одно сообщение в Telegram, этапы дописываются |
+| Сообщение задачи | `TaskMessage` | Одно сообщение в Telegram (карточка задачи), этапы дописываются |
+| Апдейт | `TelegramUpdate` | Входящее событие Telegram, записанное до обработки; нормализованное тело — в `payload` (`IncomingText`, `IncomingVoice`, `ButtonPress`) |
+| Восстановление апдейтов | `recover_pending` | При старте worker: обработка необработанных апдейтов старше 1 мин и досылка карточек; апдейты старше 24 ч списываются |
 | Чекпоинт | `Checkpoint` | summary, файлы, diff (замазанный), следующий шаг |
 | Handoff | `Handoff` | Передача работы между сессиями агента (после MVP) |
 | Снимок | `Snapshot` | WIP-коммит `harness-snap` раз в минуту (после MVP) |

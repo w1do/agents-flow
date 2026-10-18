@@ -10,7 +10,7 @@
 |---|---|
 | Окружение Alembic (async engine, URL из `DATABASE_URL`) | `db/migrations/env.py` |
 | Шаблон ревизии | `db/migrations/script.py.mako` |
-| Ревизии | `db/migrations/versions/`: `0001_initial` (9 таблиц MVP) |
+| Ревизии | `db/migrations/versions/`: `0001_initial` (9 таблиц MVP), `0002` (`telegram_updates.payload`) |
 | Конфиг | `alembic.ini` в корне |
 
 Применить миграции до head:
@@ -37,6 +37,13 @@ uv run alembic check
 Перечисления хранятся как `VARCHAR(16)` с CHECK `ck_<таблица>_<колонка>` (D-22); нативный `ENUM`
 Postgres не используется. Тесты БД (`apps/server/tests/conftest.py`) поднимают Postgres через
 testcontainers или берут `TEST_DATABASE_URL` и применяют миграции до head один раз за сессию.
+
+## Ревизия 0002 (mvp-04)
+
+Миграция `20261018_0002_telegram_update_payload.py`, ручная, без импорта кода приложения. Добавляет nullable-колонку
+`telegram_updates.payload` (JSONB): нормализованный апдейт владельца до обработки. После обработки значение
+обнуляется, строка получает `processed_at` (D-27). Откат: `uv run alembic downgrade 0001` удаляет колонку и
+тела необработанных апдейтов, поэтому перед откатом дождитесь `processed_at` у всех строк.
 
 ## Локальный Postgres
 

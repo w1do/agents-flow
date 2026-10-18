@@ -9,11 +9,14 @@ from sqlalchemy.ext.asyncio import (
 
 
 def create_engine(database_url: str) -> AsyncEngine:
-    """Async engine приложения; pool_pre_ping — обрыв соединения после рестарта Postgres.
+    """Async engine приложения.
 
-    Без проверки первый запрос после рестарта БД падает, а готовность продолжает показываться.
+    pool_pre_ping: обрыв соединения после рестарта Postgres. Без проверки первый запрос после
+    рестарта БД падает, а готовность продолжает показываться.
+    hide_parameters: в трассировках и логах SQLAlchemy не выводятся параметры запроса, в которых
+    может быть текст задачи или апдейта Telegram (S3).
     """
-    return create_async_engine(database_url, pool_pre_ping=True)
+    return create_async_engine(database_url, pool_pre_ping=True, hide_parameters=True)
 
 
 def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:

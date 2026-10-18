@@ -1,21 +1,113 @@
 """CLI harness-server через CliRunner: help, check-config, отказ при неполных ENV."""
 
 import inspect
+import logging
 
 import pytest
-from harness_server.cli import app
+from harness_server import wiring
+from harness_server.adapters.telegram import FakeTelegramClient, TelegramError
+from harness_server.cli import _configure_logging, app
+from harness_server.wiring import BotAdapters
 from typer.testing import CliRunner
 
 MonkeyPatch = pytest.MonkeyPatch
 runner = CliRunner()
 
 
+def test_configure_logging_silences_httpx() -> None:
+    # Токен Telegram находится в URL запросов httpx: на INFO он попадает в лог.
+    _configure_logging()
+
+    for name in ("httpx", "httpcore"):
+        assert logging.getLogger(name).getEffectiveLevel() >= logging.WARNING
+
+
 def test_help_lists_commands() -> None:
     result = runner.invoke(app, ["--help"])
 
     assert result.exit_code == 0
-    for command in ("serve", "worker", "migrate", "check-config"):
+    for command in ("serve", "worker", "migrate", "check-config", "telegram"):
         assert command in result.output
+
+
+def _use_fake_telegram(monkeypatch: MonkeyPatch) -> FakeTelegramClient:
+    """Подменяет сборку адаптеров: set-webhook не должен ходить в сеть."""
+    fake = FakeTelegramClient()
+
+    def build_adapters(settings: object, http: object) -> BotAdapters:
+        return BotAdapters(telegram=fake, stt=None)
+
+    monkeypatch.setattr(wiring, "build_adapters", build_adapters)
+    return fake
+
+
+def test_telegram_set_webhook_uses_public_url(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch
+) -> None:
+    fake = _use_fake_telegram(monkeypatch)
+    monkeypatch.setenv("HARNESS_PUBLIC_URL", "https://harness.example.com/")
+
+    result = runner.invoke(app, ["telegram", "set-webhook"])
+
+    assert result.exit_code == 0, result.output
+    assert fake.webhooks == [
+        (
+            "https://harness.example.com/telegram/webhook",
+            valid_env["TELEGRAM_WEBHOOK_SECRET"],
+            ("message", "callback_query"),
+        )
+    ]
+    assert "https://harness.example.com/telegram/webhook" in result.output
+    assert valid_env["TELEGRAM_WEBHOOK_SECRET"] not in result.output
+    assert valid_env["TELEGRAM_BOT_TOKEN"] not in result.output
+
+
+@pytest.mark.parametrize(
+    "public_url", [None, "", "http://harness.example.com", "https://u:p@x.example"]
+)
+def test_set_webhook_requires_public_url(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch, public_url: str | None
+) -> None:
+    fake = _use_fake_telegram(monkeypatch)
+    if public_url is None:
+        monkeypatch.delenv("HARNESS_PUBLIC_URL", raising=False)
+    else:
+        monkeypatch.setenv("HARNESS_PUBLIC_URL", public_url)
+
+    result = runner.invoke(app, ["telegram", "set-webhook"])
+
+    assert result.exit_code == 1
+    assert "HARNESS_PUBLIC_URL" in result.output
+    assert fake.webhooks == []
+    assert valid_env["TELEGRAM_BOT_TOKEN"] not in result.output
+
+
+def test_set_webhook_without_secret_exits_nonzero(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch
+) -> None:
+    fake = _use_fake_telegram(monkeypatch)
+    monkeypatch.setenv("HARNESS_PUBLIC_URL", "https://harness.example.com")
+    monkeypatch.delenv("TELEGRAM_WEBHOOK_SECRET")
+
+    result = runner.invoke(app, ["telegram", "set-webhook"])
+
+    assert result.exit_code != 0
+    assert "TELEGRAM_WEBHOOK_SECRET" in result.output
+    assert fake.webhooks == []
+
+
+def test_set_webhook_reports_telegram_error(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch
+) -> None:
+    fake = _use_fake_telegram(monkeypatch)
+    fake.fail_with = TelegramError("setWebhook", 401, "Unauthorized")
+    monkeypatch.setenv("HARNESS_PUBLIC_URL", "https://harness.example.com")
+
+    result = runner.invoke(app, ["telegram", "set-webhook"])
+
+    assert result.exit_code == 1
+    assert "Ошибка Telegram" in result.output
+    assert valid_env["TELEGRAM_BOT_TOKEN"] not in result.output
 
 
 def test_check_config_prints_workspaces(valid_env: dict[str, str]) -> None:

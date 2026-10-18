@@ -17,6 +17,7 @@ from harness_server.services.tasks import (
     get_task,
     list_task_events,
     list_tasks,
+    select_workspace,
 )
 from harness_shared.tasks import TaskEventSource, TaskKind, TaskSource, TaskStatus
 from sqlalchemy import text
@@ -195,3 +196,88 @@ async def test_retry_after_error(db_session: AsyncSession) -> None:
 
     await db_session.refresh(task)
     assert task.status == TaskStatus.BACKLOG
+
+
+async def _choosing_task(session: AsyncSession) -> Task:
+    """Задача plan в choosing: состояние после приёма сообщения владельца."""
+    task = await create_task(
+        session,
+        kind=TaskKind.PLAN,
+        text="добавь экспорт",
+        source=TaskSource.TELEGRAM,
+        known_workspace_ids=KNOWN,
+    )
+    return await change_status(
+        session, task.id, TaskStatus.CHOOSING, source=TaskEventSource.TELEGRAM
+    )
+
+
+async def test_select_workspace_moves_to_planning(db_session: AsyncSession) -> None:
+    task = await _choosing_task(db_session)
+
+    selected = await select_workspace(
+        db_session,
+        task.id,
+        "ws-1",
+        known_workspace_ids=["ws-1", "ws-2"],
+        source=TaskEventSource.TELEGRAM,
+    )
+
+    assert selected.status == TaskStatus.PLANNING
+    assert selected.workspace_id == "ws-1"
+    events = await list_task_events(db_session, task.id)
+    assert events[-1].status == TaskStatus.PLANNING
+    assert events[-1].source == TaskEventSource.TELEGRAM
+
+
+async def test_select_workspace_twice_rejected(db_session: AsyncSession) -> None:
+    task = await _choosing_task(db_session)
+    await select_workspace(
+        db_session,
+        task.id,
+        "ws-1",
+        known_workspace_ids=["ws-1", "ws-2"],
+        source=TaskEventSource.TELEGRAM,
+    )
+
+    with pytest.raises(InvalidTransition):
+        await select_workspace(
+            db_session,
+            task.id,
+            "ws-2",
+            known_workspace_ids=["ws-1", "ws-2"],
+            source=TaskEventSource.TELEGRAM,
+        )
+
+    stored = await get_task(db_session, task.id)
+    assert stored.workspace_id == "ws-1"
+    events = await list_task_events(db_session, task.id)
+    assert [event.status for event in events].count(TaskStatus.PLANNING) == 1
+
+
+async def test_select_workspace_unknown_workspace(db_session: AsyncSession) -> None:
+    task = await _choosing_task(db_session)
+
+    with pytest.raises(UnknownWorkspace):
+        await select_workspace(
+            db_session,
+            task.id,
+            "nope",
+            known_workspace_ids=["ws-1"],
+            source=TaskEventSource.TELEGRAM,
+        )
+
+    stored = await get_task(db_session, task.id)
+    assert stored.status == TaskStatus.CHOOSING
+    assert stored.workspace_id is None
+
+
+async def test_select_workspace_missing_task(db_session: AsyncSession) -> None:
+    with pytest.raises(NotFound):
+        await select_workspace(
+            db_session,
+            uuid7(),
+            "ws-1",
+            known_workspace_ids=["ws-1"],
+            source=TaskEventSource.TELEGRAM,
+        )
