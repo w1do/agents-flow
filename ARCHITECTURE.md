@@ -46,12 +46,12 @@ apps/server/src/harness_server/
 ├── cli.py             # harness-server: serve | worker | migrate | sandbox pause|resume | reset-password
 ├── settings.py        # pydantic-settings: ENV, путь к config/harness.yaml
 ├── config.py          # загрузка и валидация config/harness.yaml (workspaces, sandbox, gitlab)
-├── api/               # HTTP-входы: telegram_webhook, tasks, health. Без бизнес-логики
+├── api/               # HTTP-входы: tasks (POST /tasks, GET /tasks/{id}), deps (сессия, admin-токен), health; telegram_webhook — позже. Без бизнес-логики
 ├── mcp/               # MCP agents-flow: auth (токен задачи), tools. Без бизнес-логики
 ├── telegram/          # разбор update, рендер сообщений и кнопок, idempotency
-├── services/          # ВСЯ бизнес-логика: tasks, routing, spec, sandboxes, delivery, notify
-├── domain/            # статусы, допустимые переходы, ошибки домена (без I/O)
-├── db/                # engine, session, ORM-модели, репозитории
+├── services/          # ВСЯ бизнес-логика: tasks (mvp-03), routing, spec, sandboxes, delivery, notify
+├── domain/            # statuses.py (таблица переходов), errors.py (DomainError и коды), без I/O и sqlalchemy
+├── db/                # base.py (Base, naming convention, enum-хелперы), ids.py (uuid7), session.py, models/ (9 таблиц)
 ├── adapters/          # внешние API за интерфейсами (Protocol): telegram, stt, polza, novita, gitlab
 ├── worker/            # dispatcher loop, pipelines plan/implement, gates
 └── security/          # redaction (фильтр секретов), task tokens
@@ -70,15 +70,18 @@ apps/server/src/harness_server/
 
 | Таблица | Ключевые поля | Назначение |
 |---|---|---|
-| `tasks` | id, kind (`plan`/`implement`/`check`), workspace_id, parent_id, text, status, priority, source (`telegram`/`spec`/`mcp`), spec_item_id, branch, mr_url, result, tests_state, created_at, updated_at | Задача и канбан (представление по статусам) |
-| `task_events` | id, task_id, status, text, source, created_at | Лента этапов для Telegram и журнала |
+| `tasks` | id, kind (`plan`/`implement`/`check`), workspace_id, parent_id, text, status, priority, source (`telegram`/`spec`/`mcp`/`api`), spec_item_id, branch, mr_url, result, tests_state, created_at, updated_at | Задача и канбан (представление по статусам) |
+| `task_events` | id, task_id, status, text, source (`telegram`/`agent`/`worker`/`api`), created_at | Лента этапов для Telegram и журнала |
 | `routings` | id, task_id, command_class, options (JSON), chosen_workspace_id, raw_response, confidence | Решение Polza и выбор пользователя |
-| `spec_items` | id, workspace_id, plan_task_id, change_id, key, text, status, last_checkpoint_id | Зеркало пунктов OpenSpec |
+| `spec_items` | id, workspace_id, plan_task_id, change_id, key, text, status, last_checkpoint_id; UNIQUE (workspace_id, change_id, key) | Зеркало пунктов OpenSpec |
 | `sandboxes` | id, provider_id, agent_type, status (`paused`/`active`/`error`), current_task_id, profile_version | Песочницы Novita |
 | `checkpoints` | id, task_id, summary, files (JSON), diff_redacted, next_step, status, tokens | Чекпоинты (MVP: от сервера после агента) |
 | `telegram_messages` | task_id, chat_id, message_id, lines (JSON) | Одно обновляемое сообщение на задачу |
-| `telegram_updates` | update_id / callback_id (PK), received_at | Идемпотентность входа (A4) |
-| `task_tokens` | id, task_id, token_hash, role (`planner`/`implementer`), expires_at, revoked_at | Токены задачи для MCP (A2) |
+| `telegram_updates` | kind (`update`/`callback`) + external_id (составной PK), received_at, processed_at | Идемпотентность входа (A4) |
+| `task_tokens` | id, task_id, token_hash (только хеш), role (`planner`/`implementer`), expires_at, revoked_at | Токены задачи для MCP (A2) |
+
+Схема создаётся одной миграцией `0001` (mvp-03, `db/migrations/versions/`). Перечисления — `VARCHAR(16)` с именованным
+CHECK `ck_<таблица>_<колонка>` (D-22); первичные ключи — UUIDv7 из `db/ids.py` (D-21).
 
 Workspace и агенты в MVP берутся из `config/harness.yaml`; таблицы `workspaces`, `agents`, `skills`,
 `integrations`, `mcp_servers`, `sandbox_profiles`, `processes`, `sessions`, `operator_tokens`,
@@ -160,7 +163,9 @@ implement:  backlog → active → testing → ready (MR создан) → merge
 
 `config/harness.yaml` (путь в `HARNESS_CONFIG`, без секретов, пример — `config/harness.example.yaml`):
 workspaces (id, name, voice_aliases, gitlab_project, default_branch, test_command, agent), sandbox (provider_id),
-gitlab (base_url). Ключи с сегментами `token`, `key`, `password`, `secret`, `apikey` сервер отклоняет.
+gitlab (base_url). Ключи с сегментами `token`/`tokens`, `key`, `password`/`passwd`/`pwd`, `secret`/`secrets`, `apikey`,
+`credential`/`credentials` сервер отклоняет на любом уровне. `gitlab.base_url` с учётными данными (`user@host`) тоже
+отклоняется (D-26); токен GitLab задаётся только в ENV.
 
 Обязательные ENV (решение D-20): `DATABASE_URL`, `HARNESS_CONFIG`, `HARNESS_SECRET_KEY`, `TELEGRAM_BOT_TOKEN`,
 `TELEGRAM_CHAT_ID`, `TELEGRAM_WEBHOOK_SECRET`. Сервер и worker не стартуют, если их нет или они пустые.
@@ -173,7 +178,7 @@ gitlab (base_url). Ключи с сегментами `token`, `key`, `password`
 | `HARNESS_CONFIG` | **Обязательная.** Путь к `harness.yaml` |
 | `HARNESS_SECRET_KEY` | **Обязательная.** Соль/ключ для хешей токенов. Секрет |
 | `HARNESS_PUBLIC_URL` | Публичный HTTPS-адрес сервера, им пользуется MCP-конфиг песочницы |
-| `HARNESS_ADMIN_TOKEN` | Временный операторский bearer для `POST /tasks`, `GET /tasks/{id}` (до `operator-tokens`). Секрет |
+| `HARNESS_ADMIN_TOKEN` | Временный операторский bearer для `POST /tasks`, `GET /tasks/{id}` (до `operator-tokens`). Если задан, должен быть не короче 32 символов (`openssl rand -hex 32`), иначе сервер не стартует. Не задан — `/tasks` отвечает 401 (fail-closed, D-23). Секрет |
 | `TELEGRAM_BOT_TOKEN` | **Обязательная.** Токен бота. Секрет |
 | `TELEGRAM_CHAT_ID` | **Обязательная.** Владелец бота |
 | `TELEGRAM_WEBHOOK_SECRET` | **Обязательная.** Секрет webhook. Секрет |

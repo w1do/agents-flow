@@ -13,6 +13,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # Telegram принимает secret_token только из этих символов и длиной до 256.
 _WEBHOOK_SECRET_RE = re.compile(r"[A-Za-z0-9_-]{1,256}")
 _SECRET_KEY_MIN_LENGTH = 32
+_ADMIN_TOKEN_MIN_LENGTH = 32
 
 
 class SettingsError(Exception):
@@ -65,6 +66,22 @@ class Settings(BaseSettings):
         if len(value.get_secret_value()) < _SECRET_KEY_MIN_LENGTH:
             raise ValueError(
                 f"должна быть не короче {_SECRET_KEY_MIN_LENGTH} символов (openssl rand -hex 32)"
+            )
+        return value
+
+    @field_validator("harness_admin_token")
+    @classmethod
+    def _check_admin_token_length(cls, value: SecretStr | None) -> SecretStr | None:
+        # Токен даёт полный операторский доступ к /tasks; короткий легко подобрать (D-23).
+        # Пробелы по краям — почти всегда ошибка копирования; 32 пробела иначе прошли бы
+        # проверку длины.
+        if value is not None:
+            raw = value.get_secret_value()
+            if raw != raw.strip():
+                raise ValueError("не должна начинаться или заканчиваться пробельными символами")
+        if value is not None and len(value.get_secret_value()) < _ADMIN_TOKEN_MIN_LENGTH:
+            raise ValueError(
+                f"должна быть не короче {_ADMIN_TOKEN_MIN_LENGTH} символов (openssl rand -hex 32)"
             )
         return value
 

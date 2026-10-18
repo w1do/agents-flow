@@ -1,10 +1,20 @@
 """Общие фикстуры: изоляция ENV, пример harness.yaml, Postgres (TEST_DATABASE_URL или контейнер)."""
 
 import os
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 
 import pytest
+import pytest_asyncio
+from alembic import command as alembic_command
+from alembic.config import Config as AlembicConfig
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 EXAMPLE_CONFIG = REPO_ROOT / "config" / "harness.example.yaml"
@@ -81,3 +91,58 @@ def database_url() -> Iterator[str]:
 
     with PostgresContainer("postgres:16-alpine", driver="asyncpg") as container:
         yield container.get_connection_url()
+
+
+@pytest.fixture(scope="session")
+def migrated_database_url(database_url: str) -> Iterator[str]:
+    """Миграции до head один раз за сессию (синхронно: env.py сам вызывает asyncio.run)."""
+    previous = os.environ.get("DATABASE_URL")
+    os.environ["DATABASE_URL"] = database_url
+    try:
+        alembic_command.upgrade(AlembicConfig(str(REPO_ROOT / "alembic.ini")), "head")
+    finally:
+        if previous is None:
+            os.environ.pop("DATABASE_URL", None)
+        else:
+            os.environ["DATABASE_URL"] = previous
+    yield database_url
+
+
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
+async def db_engine(migrated_database_url: str) -> AsyncIterator[AsyncEngine]:
+    """Один engine на сессию: asyncpg привязан к циклу событий session."""
+    engine = create_async_engine(migrated_database_url)
+    yield engine
+    await engine.dispose()
+
+
+@pytest_asyncio.fixture(loop_scope="session")
+async def db_session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
+    """Сессия во внешней транзакции; commit сервиса → SAVEPOINT; в конце всё откатывается."""
+    async with db_engine.connect() as connection:
+        transaction = await connection.begin()
+        session = AsyncSession(
+            bind=connection, join_transaction_mode="create_savepoint", expire_on_commit=False
+        )
+        try:
+            yield session
+        finally:
+            await session.close()
+            await transaction.rollback()
+
+
+# Очистка после тестов с настоящими коммитами; порядок не важен, CASCADE снимает зависимости.
+TRUNCATE_ALL = (
+    "TRUNCATE TABLE telegram_updates, telegram_messages, task_tokens, sandboxes, spec_items, "
+    "checkpoints, routings, task_events, tasks CASCADE"
+)
+
+
+@pytest_asyncio.fixture(loop_scope="session")
+async def committed_session_factory(
+    db_engine: AsyncEngine,
+) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
+    """Настоящие коммиты на отдельных соединениях (SKIP LOCKED, HTTP). После теста — TRUNCATE."""
+    yield async_sessionmaker(db_engine, expire_on_commit=False)
+    async with db_engine.begin() as connection:
+        await connection.execute(text(TRUNCATE_ALL))

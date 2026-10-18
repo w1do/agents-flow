@@ -17,11 +17,11 @@
   },
   {
     "relativePath": "ARCHITECTURE.md",
-    "summary": "Архитектура harness: сервер, worker, MCP, БД, деплой. Описывает каркас mvp-02: /health и /health/ready, ENV, сервисы docker-compose.",
+    "summary": "Архитектура харнесса: слои services/adapters/api, схема БД, статусы задач, эндпоинты и ENV.",
     "role": "doc",
-    "contentHash": "ebb9c76b167dd3a146b5c07bab22884433e8dc084cf1d63f6288148483445c01",
+    "contentHash": "2f6f152ab475380012d6c3881fbde54cf2afa8826f03b145df657f111a2e1a37",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:59:48.671Z"
+    "updatedAt": "2026-10-18T11:49:57.866Z"
   },
   {
     "relativePath": "CLAUDE.md",
@@ -41,19 +41,19 @@
   },
   {
     "relativePath": "PLAN.md",
-    "summary": "Порядок и статус изменений OpenSpec: mvp-01 и mvp-02 done (archive 2026-10-18), текущий шаг mvp-03-task-store, известное ограничение CI.",
+    "summary": "План MVP по порядку; статусы OpenSpec-изменений (mvp-03-task-store и др.).",
     "role": "doc",
-    "contentHash": "63462cb12dc5d89f6bc3ab476229194796f29d3b7884daa2a24d27b70338f376",
+    "contentHash": "a0c6823311374ea0c7e477f5c011bdb19cd0197eddaf46d82fe7200e12925c7e",
     "author": "agent",
-    "updatedAt": "2026-10-18T09:36:15.201Z"
+    "updatedAt": "2026-10-18T11:49:57.875Z"
   },
   {
     "relativePath": "apps/server/README.md",
-    "summary": "README apps/server (harness_server): запуск serve/worker/migrate/check-config, тесты pytest, эндпоинты /health и /health/ready.",
+    "summary": "README сервера: запуск, тесты и команды apps/server; эндпоинты задач и переменная HARNESS_ADMIN_TOKEN.",
     "role": "doc",
-    "contentHash": "33da4bd4cc87367ecd0cb3563203b51ea4725a7b55cb0c5ecdfa74d66d73e845",
+    "contentHash": "fc1440592f109d565a461be8e2d62efad3c3e0d92dff433b183bc4198fb40767",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:59:48.764Z"
+    "updatedAt": "2026-10-18T11:49:57.885Z"
   },
   {
     "relativePath": "apps/server/pyproject.toml",
@@ -80,6 +80,14 @@
     "updatedAt": "2026-10-18T08:59:48.791Z"
   },
   {
+    "relativePath": "apps/server/src/harness_server/api/deps.py",
+    "summary": "FastAPI-зависимости: сессия БД и проверка bearer HARNESS_ADMIN_TOKEN (fail-closed, 401 при отсутствии или несовпадении).",
+    "role": "module",
+    "contentHash": "ae961af90b4db11b862743235ca754c9538b0423107d1a464623021ac23f25dd",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:49:57.705Z"
+  },
+  {
     "relativePath": "apps/server/src/harness_server/api/health.py",
     "summary": "Роутер health: /health (liveness) и /health/ready (SELECT 1 с таймаутом, при ошибке 503). Вызывает БД через engine из app.",
     "role": "module",
@@ -88,12 +96,20 @@
     "updatedAt": "2026-10-18T08:59:48.800Z"
   },
   {
-    "relativePath": "apps/server/src/harness_server/app.py",
-    "summary": "Фабрика create_app(settings, config): lifespan с async engine, подключение health-роутера, docs отключены.",
+    "relativePath": "apps/server/src/harness_server/api/tasks.py",
+    "summary": "FastAPI-роутер задач: POST /tasks и GET /tasks/{id} под bearer HARNESS_ADMIN_TOKEN; тонкий вход, вызывает services/tasks.",
     "role": "module",
-    "contentHash": "2272d34e579aff6b3bbf412f094cfe366c17fc4d7bcf59f2b59a103fa26c6149",
+    "contentHash": "ecb34b158795bcda7828fc4d05ddad844f7063d00cc4009c362f80641a432814",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:59:48.809Z"
+    "updatedAt": "2026-10-18T11:49:57.695Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/app.py",
+    "summary": "create_app(settings, config): FastAPI без docs/openapi; lifespan создаёт engine и session_factory в app.state; роутеры health и tasks. MCP пока не смонтирован (mvp-07).",
+    "role": "entry",
+    "contentHash": "67343e5df49b370abe1876292146ad94013c4e02cd024fdf12b227ca53c39569",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:50:52.857Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/cli.py",
@@ -105,19 +121,131 @@
   },
   {
     "relativePath": "apps/server/src/harness_server/config.py",
-    "summary": "Загрузка HarnessConfig из YAML: WorkspaceConfig, SandboxConfig, GitLabConfig, ConfigError; запрет секретных ключей, уникальность id.",
-    "role": "module",
-    "contentHash": "af3d50c846591cc03225d9ce4f83c7ee270381b5a1f794d3b4b497f9182e2b87",
+    "summary": "Конфиг сервера: загрузка config/harness.yaml со ссылками на секреты (значения из ENV); сегменты секретов и userinfo в gitlab.base_url проверяются здесь.",
+    "role": "config",
+    "contentHash": "ea1ade9449d03a84565dbe433b17de39af4c216efdce02a5154dc726ac1a937a",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:59:48.830Z"
+    "updatedAt": "2026-10-18T11:49:57.722Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/db/__init__.py",
+    "summary": "Пакет db: ORM-база, сессии, UUIDv7 и модели схемы (db/models).",
+    "role": "module",
+    "contentHash": "44a51991cd4fdfd8d8edaa85551526318903ee1cb9d80b1c80f87110b2bc1044",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:49:57.687Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/db/base.py",
+    "summary": "ORM-база: Base(DeclarativeBase) с NAMING_CONVENTION, enum_type (sa.Enum native_enum=False), enum_check (CHECK ck_<table>_<column>, D-22), TimestampMixin created_at/updated_at.",
+    "role": "module",
+    "contentHash": "bee70d39a2a7c59bfef2eefded35122289f2a133258f849d1e4d9e3fa8564072",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:51:26.252Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/db/ids.py",
+    "summary": "uuid7(): собственный генератор UUIDv7 по RFC 9562 с монотонным 12-битным счётчиком (_SEQ_MAX) для PK; без зависимостей, т.к. Python 3.12 и Postgres 16 (D-21).",
+    "role": "module",
+    "contentHash": "2c2c3e559f796c09244616275f92235a30cda1ca7c4af36e47a5d93ad38e10fb",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:51:26.265Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/db/models/__init__.py",
+    "summary": "Пакет ORM-моделей схемы БД задач (tasks, sandboxes, planning, telegram); регистрирует модели для Alembic.",
+    "role": "module",
+    "contentHash": "f9b2d7b9204c80370ab243826620cfcc7a6e20f96b38bd62241eb3002001f04f",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:49:57.652Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/db/models/planning.py",
+    "summary": "ORM Routing, Checkpoint (JSONB списки по умолчанию []), SpecItem с UNIQUE uq_spec_items_workspace_change_key и FK на tasks и checkpoints.",
+    "role": "module",
+    "contentHash": "bc52a71713b0e05d6fb86f7d9f8ad17cc06a51950d0547fad7d9d792716e98c3",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:49:57.634Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/db/models/sandboxes.py",
+    "summary": "ORM Sandbox (status CHECK, UNIQUE provider_id) и TaskToken (хранит только token_hash, role CHECK, UNIQUE uq_task_tokens_token_hash).",
+    "role": "module",
+    "contentHash": "92bcf1324cacbc057f50bdd9bbc1ba7cb7c99de8b29c86937c5d9c848ea179e6",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:49:57.624Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/db/models/tasks.py",
+    "summary": "ORM Task и TaskEvent: enum-колонки, CHECK через enum_check, индексы ix_tasks_queue и ix_task_events_task_id_created_at; spec_item_id FK use_alter.",
+    "role": "module",
+    "contentHash": "3b7552dec21885e02874448309a11b322661265eef3bfaba753609818fe5b7a0",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:49:57.615Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/db/models/telegram.py",
+    "summary": "ORM TelegramMessage (PK task_id) и TelegramUpdate (составной PK kind+external_id, CHECK kind IN update/callback, processed_at).",
+    "role": "module",
+    "contentHash": "6f1cea00afe761a94af1afb050a69f8c990d0d644d8ee65595108e4905ec25ce",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:49:57.643Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/db/session.py",
+    "summary": "Async SQLAlchemy engine и фабрика сессий (asyncpg) для сервера и worker.",
+    "role": "module",
+    "contentHash": "71c81fbba75af218e1c85c4c220b6ab35e3eb16b1052bb0089eee2a4510121f7",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:49:57.669Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/domain/__init__.py",
+    "summary": "Пакет domain: статусы задач, переходы и доменные ошибки; без I/O и без ORM.",
+    "role": "module",
+    "contentHash": "b2998898cc7e6d654b4be39e7a5d75600e6d46338818467227a5254d457e8f5a",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:49:57.606Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/domain/errors.py",
+    "summary": "Доменные исключения харнесса (ошибки перехода статуса и т.п.); API и MCP переводят их в ответы.",
+    "role": "module",
+    "contentHash": "b719b4cece7ef147b8f0f732da18c593b4ee34b17c7672a117be3cc8e54844bc",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:49:57.597Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/domain/statuses.py",
+    "summary": "Статусы задачи по ТЗ v5 (new, choosing, planning, backlog, active, testing, ready, merged, error, stalled, paused, trash) и единственная таблица допустимых переходов между ними.",
+    "role": "module",
+    "contentHash": "7328d9796da1f588a26200cb1a53b151833fb0457b4581bc5a0e0f2d2f4c2cee",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:49:57.588Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/services/__init__.py",
+    "summary": "Пакет services: сервисный слой харнесса, бизнес-логика только здесь (сейчас сервис задач).",
+    "role": "module",
+    "contentHash": "cadb4e79c7482f146a8501ec3627e588ade348a1cc468303289697025f400630",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:49:57.578Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/services/tasks.py",
+    "summary": "Сервис задач: create, change_status (переходы через domain/statuses), get, list, add_event, claim_next_task с FOR UPDATE SKIP LOCKED. Бизнес-логика задач, вызывается API и MCP.",
+    "role": "module",
+    "contentHash": "9b716a1edcae4f14c725e7009dbe5ed41ef1159c8bfde911ab651b2d4dbe1a02",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:49:57.567Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/settings.py",
-    "summary": "Settings на pydantic-settings: DATABASE_URL, HARNESS_CONFIG, HARNESS_SECRET_KEY (≥32), TELEGRAM_*; значения SecretStr, ошибки без значений.",
-    "role": "module",
-    "contentHash": "681cd8fe7859d61adc5af5f0626832c95472fb666513d47233a5326145dcaab7",
+    "summary": "Pydantic-настройки из ENV (включая HARNESS_ADMIN_TOKEN, длина ≥32, без пробелов по краям); значения секретов не логируются.",
+    "role": "config",
+    "contentHash": "c16a6166118a3b5216051cc33a462d48e7191cf7577d68da2f4ffcb63a5686d2",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:59:48.841Z"
+    "updatedAt": "2026-10-18T11:49:57.731Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/worker.py",
@@ -129,11 +257,11 @@
   },
   {
     "relativePath": "apps/server/tests/conftest.py",
-    "summary": "Общие фикстуры pytest для apps/server (тесты health, config, settings, CLI, worker).",
+    "summary": "Общие pytest-фикстуры сервера: Postgres для тестов, сессии БД, тестовый клиент FastAPI.",
     "role": "test",
-    "contentHash": "e8559b326b067e4d0b28f373dcb139e06c27511a123158ac6d72c876fd7e8e5a",
+    "contentHash": "33b07632164117caf8d58fe6fc9f8f658c1dc550154c84aed58eb7196da55f27",
     "author": "agent",
-    "updatedAt": "2026-10-18T09:00:01.938Z"
+    "updatedAt": "2026-10-18T11:49:57.857Z"
   },
   {
     "relativePath": "apps/server/tests/test_cli.py",
@@ -145,11 +273,11 @@
   },
   {
     "relativePath": "apps/server/tests/test_config.py",
-    "summary": "Тесты config.py: разбор harness.yaml, отказ при секретных ключах (включая camelCase), уникальность id, ConfigError.",
+    "summary": "Тесты конфига: загрузка harness.yaml, ссылки на секреты, отказ при userinfo в gitlab.base_url.",
     "role": "test",
-    "contentHash": "a5e4feb5ac429ea590f3428b84237e6c1e9f97438b9c0f7a5cb92c4e253a5c1a",
+    "contentHash": "86155a2ac15554c05d097d9392686f771b5585f8ae2f37a93b0def05f017d85d",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:59:48.877Z"
+    "updatedAt": "2026-10-18T11:49:57.848Z"
   },
   {
     "relativePath": "apps/server/tests/test_health.py",
@@ -160,6 +288,14 @@
     "updatedAt": "2026-10-18T08:59:48.886Z"
   },
   {
+    "relativePath": "apps/server/tests/test_ids.py",
+    "summary": "Тесты UUIDv7 из db/ids.py: формат и монотонность идентификаторов.",
+    "role": "test",
+    "contentHash": "9e984d568f4e575550f7cba16501f544b518f94a50a79574114fa71392e89d09",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:49:57.830Z"
+  },
+  {
     "relativePath": "apps/server/tests/test_migrate.py",
     "summary": "Тесты команды migrate: запуск Alembic upgrade head на Postgres для проверки async env миграций.",
     "role": "test",
@@ -168,12 +304,52 @@
     "updatedAt": "2026-10-18T08:59:48.896Z"
   },
   {
-    "relativePath": "apps/server/tests/test_settings.py",
-    "summary": "Тесты Settings: обязательные ENV, минимальная длина HARNESS_SECRET_KEY, SecretStr и отсутствие значений в ошибках.",
+    "relativePath": "apps/server/tests/test_migrations.py",
+    "summary": "Тесты миграций Alembic: upgrade head, downgrade, проверка схемы относительно моделей (alembic check).",
     "role": "test",
-    "contentHash": "5134e8d527d7b2af42cce6ba2b39c1ea8229f0d3fbb6b88d5cf62f99db58df7f",
+    "contentHash": "2197e34d34ce37cc51ed77741008ba4ccedf43297ac043e83e73716651942d2b",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:59:48.906Z"
+    "updatedAt": "2026-10-18T11:49:57.820Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_settings.py",
+    "summary": "Тесты настроек из ENV: валидация HARNESS_ADMIN_TOKEN (≥32 символа, без пробелов по краям).",
+    "role": "test",
+    "contentHash": "13af733ece3e03c2ec7e4e6e36b1a0fe7ce19afbc7b1738ab72a03c9e6506a5a",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:49:57.839Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_statuses.py",
+    "summary": "Тесты domain/statuses: набор статусов ТЗ v5 и допустимые переходы; недопустимые переходы отклоняются.",
+    "role": "test",
+    "contentHash": "828d4eedd33e97f4633cc8ac09bb1dfaa732bef8b9947e1762398df70865550b",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:49:57.811Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_task_queue.py",
+    "summary": "Тесты claim_next_task: захват задачи с FOR UPDATE SKIP LOCKED, параллельные claim не получают одну задачу.",
+    "role": "test",
+    "contentHash": "6a5e71905df475a91b755026015d6a924a52b06e8d08f423a9458d1dc448282c",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:49:57.793Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_task_service.py",
+    "summary": "Тесты сервиса задач на реальном Postgres: create, переходы статусов, события, list, get.",
+    "role": "test",
+    "contentHash": "10d2c5021163828514b6a4e2790aa731f8f93bcaa7f9a732dec6c7957cb08f9a",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:49:57.777Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_tasks_api.py",
+    "summary": "Тесты API задач: POST /tasks, GET /tasks/{id}, 401 без или с неверным bearer HARNESS_ADMIN_TOKEN.",
+    "role": "test",
+    "contentHash": "e46692a82a028538c3cc4cac6d4610fd54c31102eef1a74188f026a535cd37c2",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:49:57.802Z"
   },
   {
     "relativePath": "apps/server/tests/test_worker.py",
@@ -193,19 +369,27 @@
   },
   {
     "relativePath": "db/README.md",
-    "summary": "README каталога db: Alembic-миграции в db/migrations, запуск alembic upgrade head через ./tools/harness migrate.",
+    "summary": "README части db: миграции Alembic, команды migrate и upgrade/downgrade/check.",
     "role": "doc",
-    "contentHash": "2c73fa094b82a51c17b01202c0e2dccd440cdafd64bafad9b45f0ce2885b8fb1",
+    "contentHash": "7aa37b91a0f355bb404c91265e437ba650f69525d62052e0df2d149319f9e4e4",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:59:48.935Z"
+    "updatedAt": "2026-10-18T11:49:57.894Z"
   },
   {
     "relativePath": "db/migrations/env.py",
-    "summary": "Alembic env на async engine: DATABASE_URL из os.environ (не Settings), NullPool, asyncio.run в run_migrations_online, target_metadata=None до моделей mvp-03; offline-режим --sql.",
+    "summary": "Alembic env: async-подключение к Postgres, метаданные ORM; логгеры Alembic настроены (хвост mvp-02).",
     "role": "config",
-    "contentHash": "e4e6c582ba515c0b3c2267e340efbdfcbbfbdc8e8787e0ac3e066a29bef8c265",
+    "contentHash": "ace7f0daae26284a75239f458445850beeb275860356b1f4228a1fafd524d202",
     "author": "agent",
-    "updatedAt": "2026-10-18T09:00:39.181Z"
+    "updatedAt": "2026-10-18T11:49:57.740Z"
+  },
+  {
+    "relativePath": "db/migrations/versions/20261018_0001_initial.py",
+    "summary": "Ручная миграция 0001: tasks, task_events, routings, checkpoints, spec_items, sandboxes, task_tokens, telegram_messages, telegram_updates; enum как VARCHAR+CHECK (D-22); downgrade сносит всё.",
+    "role": "module",
+    "contentHash": "c4c5ec70b3105b76426a2a8140eccce8ca86515243c32a52fd5228808cfeff81",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:50:55.775Z"
   },
   {
     "relativePath": "deploy/db/docker-compose.yml",
@@ -233,11 +417,11 @@
   },
   {
     "relativePath": "docs/decisions.md",
-    "summary": "Журнал решений D-NN поверх ТЗ. D-20: обязательные ENV каркаса (DATABASE_URL, HARNESS_CONFIG, HARNESS_SECRET_KEY, TELEGRAM_*).",
+    "summary": "ADR-лог D-01..D-26: GitLab, статусы ТЗ v5, worker, MCP, Novita, ENV (D-20), UUIDv7 (D-21), VARCHAR+CHECK (D-22), admin token (D-23), транзакции сервисов (D-24)",
     "role": "doc",
-    "contentHash": "d6c1cdf5c955d94fa139d60a5fba4b265a3066ff88dbce01fc57c9437b03043b",
+    "contentHash": "75a4ee14a04f3f31a41e2da178972dbd07d62f22f94a6a13991f3e3658db2802",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:59:48.696Z"
+    "updatedAt": "2026-10-18T11:32:21.158Z"
   },
   {
     "relativePath": "docs/deployment.md",
@@ -257,11 +441,11 @@
   },
   {
     "relativePath": "docs/glossary.md",
-    "summary": "Словарь имён: workspace, Task, planner, implementer, CommandClass, Sandbox, Gate, SpecItem, TaskToken, Checkpoint, Handoff",
+    "summary": "Глоссарий проекта: словарь имён сущностей (задача, статус, событие, песочница и др.) для кода и документов.",
     "role": "doc",
-    "contentHash": "1f1784c125b80915e2e4f365b9a0197327ba2e0b0d80abcc5f36574470f4e92a",
+    "contentHash": "dc2b432acf5cdda9e6e5e277dc55eccbd140f19e930226cccaa69cc3d99b2184",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:26.988Z"
+    "updatedAt": "2026-10-18T11:49:57.902Z"
   },
   {
     "relativePath": "docs/mcp-agents-flow.md",
@@ -585,11 +769,11 @@
   },
   {
     "relativePath": "openspec/changes/console-auth/tasks.md",
-    "summary": "Чек-лист console-auth: каркас консоли, вход администратора, reset-password, Compose; раздел 4 — минимальная длина ADMIN_PASSWORD и HARNESS_ADMIN_TOKEN.",
+    "summary": "Tasks console-auth: каркас apps/console, shared-types, вход администратора, reset-password; хвост 4.1 — длина ADMIN_PASSWORD (HARNESS_ADMIN_TOKEN уже в mvp-03, D-23)",
     "role": "doc",
-    "contentHash": "babff57d2cfb5333e88405ac3dd608a88ffe1c70401f65fa9e5b5cda555d6e4b",
+    "contentHash": "2a0827a595c9492f1a2878fe7fc15159347510af25abef8b7256d461feed7bc1",
     "author": "agent",
-    "updatedAt": "2026-10-18T09:36:15.261Z"
+    "updatedAt": "2026-10-18T11:32:21.147Z"
   },
   {
     "relativePath": "openspec/changes/console-observability/.openspec.yaml",
@@ -953,35 +1137,43 @@
   },
   {
     "relativePath": "openspec/changes/mvp-03-task-store/design.md",
-    "summary": "Design mvp-03-task-store: технические решения, альтернативы и риски",
+    "summary": "OpenSpec mvp-03-task-store, design: схема БД, статусы, сервис задач, захват FOR UPDATE SKIP LOCKED, решения D-21…D-26.",
     "role": "doc",
-    "contentHash": "fdd2502b48cd81b9259f3eeb4c65ec23f2b44da3890392f092eca634aed805bf",
+    "contentHash": "11010bdc75f8a6e47ebe61b2fa09255a33fd188b3cba03e074ac1e72f75d15d0",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.456Z"
+    "updatedAt": "2026-10-18T11:49:57.911Z"
   },
   {
     "relativePath": "openspec/changes/mvp-03-task-store/proposal.md",
-    "summary": "MVP proposal mvp-03-task-store: Схема БД, машина статусов ТЗ v5, task_events, очередь SKIP LOCKED, POST/GET /tasks",
+    "summary": "Proposal mvp-03-task-store: task-lifecycle, схема 9 таблиц, services.tasks, POST/GET /tasks под HARNESS_ADMIN_TOKEN, хвосты mvp-02; не входит: worker, check, stalled/paused. D-21..D-26",
     "role": "doc",
-    "contentHash": "733d182d6337d8516925f3351f2e3d52231c98f26e5efff2f78b71bce093f3e1",
+    "contentHash": "f748592f76c76774e09f7a8f03417c866765d61c4ae4107cbbd98738087da098",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.459Z"
+    "updatedAt": "2026-10-18T11:32:21.093Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-03-task-store/specs/platform-config/spec.md",
+    "summary": "Delta platform-config (mvp-03): расширенные сегменты секретов harness.yaml, запрет userinfo в gitlab.base_url, HARNESS_ADMIN_TOKEN ≥32, логгеры после миграций",
+    "role": "doc",
+    "contentHash": "03797181166768d64e7d8f3d99af57aa2632255ab32d51c0e61874356f6abf25",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:32:21.135Z"
   },
   {
     "relativePath": "openspec/changes/mvp-03-task-store/specs/task-lifecycle/spec.md",
-    "summary": "Delta-спека task-lifecycle (mvp-03-task-store): требования и сценарии WHEN/THEN",
+    "summary": "Delta task-lifecycle: статусы ТЗ v5, начальный статус, переходы plan/implement, лента task_events, очередь SKIP LOCKED, POST/GET /tasks с 401/404/422",
     "role": "doc",
-    "contentHash": "f9b9fe908262f3e946a755a9b9bbe0048eaaafb1c700bd9f8e95140d10164afc",
+    "contentHash": "10c442fd497b51bd4a5fc17f6315ba918cec89e68c212d57ea58e1c0b06d046a",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.463Z"
+    "updatedAt": "2026-10-18T11:32:21.124Z"
   },
   {
     "relativePath": "openspec/changes/mvp-03-task-store/tasks.md",
-    "summary": "Чек-лист mvp-03-task-store: домен статусов, схема БД, сервис задач, HTTP /tasks; раздел 6 — хвосты ревью mvp-02 (logger в env.py, секретные сегменты и userinfo в config.py).",
+    "summary": "OpenSpec mvp-03-task-store, список задач и критериев с чекбоксами; статус выполнения по пунктам (7.1 закрыт memory-sync).",
     "role": "doc",
-    "contentHash": "d2b863720154279e8955f3e613e7b7cf8b05b09e7cd08d9e9aa19a23106c280d",
+    "contentHash": "c68c4bbb39a41bbb37f11250581a9845f1d63980dbc34c131087b9045f5e49ad",
     "author": "agent",
-    "updatedAt": "2026-10-18T09:36:15.236Z"
+    "updatedAt": "2026-10-18T11:50:12.691Z"
   },
   {
     "relativePath": "openspec/changes/mvp-04-telegram-intake/.openspec.yaml",
@@ -1897,11 +2089,11 @@
   },
   {
     "relativePath": "shared/README.md",
-    "summary": "README пакета shared (harness_shared): назначение общего пакета и его место в uv workspace.",
+    "summary": "README части shared: общие Pydantic-модели (задачи, песочницы) для сервера и консоли.",
     "role": "doc",
-    "contentHash": "51a1b67c26c0b9a0b5b78071435956f3166c17c70ce929835b10efad082e2bc5",
+    "contentHash": "231903e17a77c7af8a1f6853e36d1700611e3980b8cce5285dfe93d3639aa026",
     "author": "agent",
-    "updatedAt": "2026-10-18T09:00:01.928Z"
+    "updatedAt": "2026-10-18T11:49:57.929Z"
   },
   {
     "relativePath": "shared/pyproject.toml",
@@ -1926,6 +2118,22 @@
     "contentHash": "1febf78b4a10221a747117bed7e3eda8ffd938123289440f793d423ccf809eb6",
     "author": "agent",
     "updatedAt": "2026-10-18T09:00:01.875Z"
+  },
+  {
+    "relativePath": "shared/src/harness_shared/sandboxes.py",
+    "summary": "Pydantic-модели песочниц для внешнего мира (shared/), общие с API и консолью.",
+    "role": "module",
+    "contentHash": "0ffe52c0e495605e5c4ea978344936683804b47366722886d9a4ae3ff446840d",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:49:57.766Z"
+  },
+  {
+    "relativePath": "shared/src/harness_shared/tasks.py",
+    "summary": "Pydantic-модели задач для внешнего мира (API, MCP, консоль) в shared/; единый источник типов, без дублирования.",
+    "role": "module",
+    "contentHash": "5829b963f0d0663eca50a95458db64ca32aefc4805a7c5206e256520a052d6f1",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:49:57.757Z"
   },
   {
     "relativePath": "tools/spikes/novita_check.py",

@@ -1,22 +1,38 @@
 """Загрузка и проверка config/harness.yaml: несекретные настройки workspace, sandbox, gitlab.
 
-Секреты в YAML запрещены: ключи с сегментами token/key/password/secret/apikey отклоняются
-до валидации Pydantic. Ошибки называют путь к полю (workspaces[0].gitlab_token), но не значение.
+Секреты в YAML запрещены: ключи с сегментами token/tokens/key/password/passwd/pwd/secret/secrets/
+apikey/credential/credentials отклоняются до валидации Pydantic (D-20, D-26). Ошибки называют путь к
+полю (workspaces[0].gitlab_token), но не значение.
 """
 
 import re
 from pathlib import Path
 from typing import Any, Self
+from urllib.parse import urlsplit
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 
 class ConfigError(Exception):
     """Ошибка harness.yaml. Сообщение содержит путь к полю, но не значения."""
 
 
-_SECRET_SEGMENTS = frozenset({"token", "key", "password", "secret", "apikey"})
+_SECRET_SEGMENTS = frozenset(
+    {
+        "token",
+        "tokens",
+        "key",
+        "password",
+        "passwd",
+        "pwd",
+        "secret",
+        "secrets",
+        "apikey",
+        "credential",
+        "credentials",
+    }
+)
 _SEGMENT_SPLIT = re.compile(r"[_-]")
 # Граница camelCase: accessToken → access_Token, чтобы сегмент token не терялся внутри слова.
 _CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
@@ -50,6 +66,23 @@ class GitLabConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     base_url: str = Field(min_length=1)
+
+    @field_validator("base_url")
+    @classmethod
+    def _reject_userinfo(cls, value: str) -> str:
+        # Учётные данные в адресе попали бы в конфиг, логи и ответы; токен задаётся только в ENV.
+        # Текст ошибки не содержит значения: pydantic выводит его без input (см. _format_errors).
+        parts = urlsplit(value)
+        # Требуем схему http(s) и непустой netloc: без них urlsplit даёт netloc='' для строк
+        # вида user:pw@host или https:/user:pw@host, и userinfo проскакивает проверку.
+        if parts.scheme not in {"http", "https"} or not parts.netloc:
+            raise ValueError("адрес должен начинаться с http:// или https:// и содержать хост")
+        if "@" in parts.netloc or parts.username is not None or parts.password is not None:
+            raise ValueError(
+                "адрес не должен содержать учётные данные перед символом @; "
+                "токен задаётся в ENV GITLAB_TOKEN"
+            )
+        return value
 
 
 class HarnessConfig(BaseModel):

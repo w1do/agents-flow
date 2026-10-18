@@ -4,10 +4,11 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from sqlalchemy.ext.asyncio import create_async_engine
 
 from harness_server.api.health import router as health_router
+from harness_server.api.tasks import router as tasks_router
 from harness_server.config import HarnessConfig
+from harness_server.db.session import create_engine, create_session_factory
 from harness_server.settings import Settings
 
 
@@ -19,10 +20,9 @@ def create_app(settings: Settings, config: HarnessConfig) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        # pool_pre_ping: соединение, оборванное перезапуском Postgres, проверяется до запроса.
-        # Без этого первый запрос после рестарта БД падает, а готовность продолжает показываться.
-        engine = create_async_engine(settings.database_url.get_secret_value(), pool_pre_ping=True)
+        engine = create_engine(settings.database_url.get_secret_value())
         app.state.engine = engine
+        app.state.session_factory = create_session_factory(engine)
         app.state.settings = settings
         app.state.config = config
         try:
@@ -39,4 +39,5 @@ def create_app(settings: Settings, config: HarnessConfig) -> FastAPI:
         openapi_url=None,
     )
     app.include_router(health_router)
+    app.include_router(tasks_router)
     return app
