@@ -233,11 +233,11 @@
   },
   {
     "relativePath": "docs/decisions.md",
-    "summary": "Журнал решений D-NN поверх ТЗ. D-20: обязательные ENV каркаса (DATABASE_URL, HARNESS_CONFIG, HARNESS_SECRET_KEY, TELEGRAM_*).",
+    "summary": "ADR-лог D-01..D-26: GitLab, статусы ТЗ v5, worker, MCP, Novita, ENV (D-20), UUIDv7 (D-21), VARCHAR+CHECK (D-22), admin token (D-23), транзакции сервисов (D-24)",
     "role": "doc",
-    "contentHash": "d6c1cdf5c955d94fa139d60a5fba4b265a3066ff88dbce01fc57c9437b03043b",
+    "contentHash": "75a4ee14a04f3f31a41e2da178972dbd07d62f22f94a6a13991f3e3658db2802",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:59:48.696Z"
+    "updatedAt": "2026-10-18T11:32:21.158Z"
   },
   {
     "relativePath": "docs/deployment.md",
@@ -585,11 +585,11 @@
   },
   {
     "relativePath": "openspec/changes/console-auth/tasks.md",
-    "summary": "Чек-лист console-auth: каркас консоли, вход администратора, reset-password, Compose; раздел 4 — минимальная длина ADMIN_PASSWORD и HARNESS_ADMIN_TOKEN.",
+    "summary": "Tasks console-auth: каркас apps/console, shared-types, вход администратора, reset-password; хвост 4.1 — длина ADMIN_PASSWORD (HARNESS_ADMIN_TOKEN уже в mvp-03, D-23)",
     "role": "doc",
-    "contentHash": "babff57d2cfb5333e88405ac3dd608a88ffe1c70401f65fa9e5b5cda555d6e4b",
+    "contentHash": "2a0827a595c9492f1a2878fe7fc15159347510af25abef8b7256d461feed7bc1",
     "author": "agent",
-    "updatedAt": "2026-10-18T09:36:15.261Z"
+    "updatedAt": "2026-10-18T11:32:21.147Z"
   },
   {
     "relativePath": "openspec/changes/console-observability/.openspec.yaml",
@@ -953,35 +953,43 @@
   },
   {
     "relativePath": "openspec/changes/mvp-03-task-store/design.md",
-    "summary": "Design mvp-03-task-store: технические решения, альтернативы и риски",
+    "summary": "Design mvp-03: сигнатуры domain/statuses, errors, db/ids uuid7, base enum_check, схема таблиц, миграция 0001, services.tasks, api/deps require_admin_token, фикстуры и имена тестов",
     "role": "doc",
-    "contentHash": "fdd2502b48cd81b9259f3eeb4c65ec23f2b44da3890392f092eca634aed805bf",
+    "contentHash": "86079f1a4cba498ae8bbc35fa41b8d1f177e2818d776bb890534396a6c097af4",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.456Z"
+    "updatedAt": "2026-10-18T11:32:21.104Z"
   },
   {
     "relativePath": "openspec/changes/mvp-03-task-store/proposal.md",
-    "summary": "MVP proposal mvp-03-task-store: Схема БД, машина статусов ТЗ v5, task_events, очередь SKIP LOCKED, POST/GET /tasks",
+    "summary": "Proposal mvp-03-task-store: task-lifecycle, схема 9 таблиц, services.tasks, POST/GET /tasks под HARNESS_ADMIN_TOKEN, хвосты mvp-02; не входит: worker, check, stalled/paused. D-21..D-26",
     "role": "doc",
-    "contentHash": "733d182d6337d8516925f3351f2e3d52231c98f26e5efff2f78b71bce093f3e1",
+    "contentHash": "f748592f76c76774e09f7a8f03417c866765d61c4ae4107cbbd98738087da098",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.459Z"
+    "updatedAt": "2026-10-18T11:32:21.093Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-03-task-store/specs/platform-config/spec.md",
+    "summary": "Delta platform-config (mvp-03): расширенные сегменты секретов harness.yaml, запрет userinfo в gitlab.base_url, HARNESS_ADMIN_TOKEN ≥32, логгеры после миграций",
+    "role": "doc",
+    "contentHash": "03797181166768d64e7d8f3d99af57aa2632255ab32d51c0e61874356f6abf25",
+    "author": "agent",
+    "updatedAt": "2026-10-18T11:32:21.135Z"
   },
   {
     "relativePath": "openspec/changes/mvp-03-task-store/specs/task-lifecycle/spec.md",
-    "summary": "Delta-спека task-lifecycle (mvp-03-task-store): требования и сценарии WHEN/THEN",
+    "summary": "Delta task-lifecycle: статусы ТЗ v5, начальный статус, переходы plan/implement, лента task_events, очередь SKIP LOCKED, POST/GET /tasks с 401/404/422",
     "role": "doc",
-    "contentHash": "f9b9fe908262f3e946a755a9b9bbe0048eaaafb1c700bd9f8e95140d10164afc",
+    "contentHash": "10c442fd497b51bd4a5fc17f6315ba918cec89e68c212d57ea58e1c0b06d046a",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.463Z"
+    "updatedAt": "2026-10-18T11:32:21.124Z"
   },
   {
     "relativePath": "openspec/changes/mvp-03-task-store/tasks.md",
-    "summary": "Чек-лист mvp-03-task-store: домен статусов, схема БД, сервис задач, HTTP /tasks; раздел 6 — хвосты ревью mvp-02 (logger в env.py, секретные сегменты и userinfo в config.py).",
+    "summary": "Tasks mvp-03-task-store: 7 групп — домен, схема БД и миграция, сервис задач и очередь, HTTP и settings, хвосты mvp-02 (env.py, config), документация, memory sync",
     "role": "doc",
-    "contentHash": "d2b863720154279e8955f3e613e7b7cf8b05b09e7cd08d9e9aa19a23106c280d",
+    "contentHash": "28418ea1408bb392afcedca56f160bca5503d6c537d9b09be3d81082a0409a0b",
     "author": "agent",
-    "updatedAt": "2026-10-18T09:36:15.236Z"
+    "updatedAt": "2026-10-18T11:32:21.114Z"
   },
   {
     "relativePath": "openspec/changes/mvp-04-telegram-intake/.openspec.yaml",
