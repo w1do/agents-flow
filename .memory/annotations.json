@@ -137,19 +137,19 @@
   },
   {
     "relativePath": "apps/server/src/harness_server/db/base.py",
-    "summary": "Декларативная база SQLAlchemy 2 (DeclarativeBase) для ORM-моделей схемы БД харнесса.",
+    "summary": "ORM-база: Base(DeclarativeBase) с NAMING_CONVENTION, enum_type (sa.Enum native_enum=False), enum_check (CHECK ck_<table>_<column>, D-22), TimestampMixin created_at/updated_at.",
     "role": "module",
     "contentHash": "bee70d39a2a7c59bfef2eefded35122289f2a133258f849d1e4d9e3fa8564072",
     "author": "agent",
-    "updatedAt": "2026-10-18T11:49:57.678Z"
+    "updatedAt": "2026-10-18T11:51:26.252Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/db/ids.py",
-    "summary": "Генерация UUIDv7 (uuid7) для первичных ключей ORM-моделей.",
+    "summary": "uuid7(): собственный генератор UUIDv7 по RFC 9562 с монотонным 12-битным счётчиком (_SEQ_MAX) для PK; без зависимостей, т.к. Python 3.12 и Postgres 16 (D-21).",
     "role": "module",
     "contentHash": "2c2c3e559f796c09244616275f92235a30cda1ca7c4af36e47a5d93ad38e10fb",
     "author": "agent",
-    "updatedAt": "2026-10-18T11:49:57.661Z"
+    "updatedAt": "2026-10-18T11:51:26.265Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/db/models/__init__.py",
