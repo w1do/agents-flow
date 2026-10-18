@@ -9,10 +9,10 @@
 ## Текущее состояние (2026-10-18)
 
 - Готово: ТЗ v5 сохранено, CLAUDE.md, ARCHITECTURE.md, docs/, OpenSpec-изменения для MVP (9) и после MVP (40).
-- Готово и заархивировано: `mvp-01-novita-spike` (спайк Novita и Claude Code), `mvp-02-foundation` (каркас, конфиг, health, worker, Compose, GitLab CI). Спека `platform-config` синхронизирована в `openspec/specs/`.
+- Готово и заархивировано: `mvp-01-novita-spike` (спайк Novita и Claude Code), `mvp-02-foundation` (каркас, конфиг, health, worker, Compose, GitLab CI), `mvp-03-task-store` (схема БД, статусы, очередь, /tasks), `mvp-04-telegram-intake` (webhook, STT, кнопки проекта; live-проверка 4.3 принята владельцем). Спеки `platform-config`, `task-lifecycle`, `telegram-bot`, `speech-to-text` синхронизированы в `openspec/specs/`.
 - Блокеров нет: вопрос 3 закрыт (GitLab, D-01).
 - Известное ограничение: пайплайн GitLab на реальном MR не запускался (remote репозитория — GitHub). Проверить при первом MR в GitLab; см. [docs/deployment.md](docs/deployment.md).
-- На ревью: `mvp-03-task-store` и `mvp-04-telegram-intake` (код реализован, проверки зелёные). Задача 4.3 `mvp-04` — ручная live-проверка владельца, её чекбокс открыт до подтверждения. Дальше по порядку MVP: `mvp-05-command-routing` после принятия mvp-04.
+- В работе: `mvp-05-command-routing` (ветка `mvp-05-command-routing`).
 
 ## MVP — сквозной срез (ТЗ §16.0)
 
@@ -23,15 +23,15 @@ MR создан → сообщение в Telegram.
 |---|---|---|---|---|---|
 | 1 | [`mvp-01-novita-spike`](openspec/changes/archive/2026-10-18-mvp-01-novita-spike/) | Проверка Novita и Claude Code в песочнице (A1, A2) | — | — | done |
 | 2 | [`mvp-02-foundation`](openspec/changes/archive/2026-10-18-mvp-02-foundation/) | Каркас монорепо, конфиг, health, Compose, CI | platform-config | — | done |
-| 3 | [`mvp-03-task-store`](openspec/changes/mvp-03-task-store/) | Схема БД, статусы, очередь, POST/GET /tasks | task-lifecycle | mvp-02 | review |
-| 4 | [`mvp-04-telegram-intake`](openspec/changes/mvp-04-telegram-intake/) | Webhook, голос→текст, кнопки проекта, одно сообщение | telegram-bot, speech-to-text | mvp-03 | review |
-| 5 | [`mvp-05-command-routing`](openspec/changes/mvp-05-command-routing/) | Polza: классы work/status, кандидаты, запасной путь | command-routing | mvp-04 | todo |
+| 3 | [`mvp-03-task-store`](openspec/changes/archive/2026-10-18-mvp-03-task-store/) | Схема БД, статусы, очередь, POST/GET /tasks | task-lifecycle | mvp-02 | done |
+| 4 | [`mvp-04-telegram-intake`](openspec/changes/archive/2026-10-18-mvp-04-telegram-intake/) | Webhook, голос→текст, кнопки проекта, одно сообщение | telegram-bot, speech-to-text | mvp-03 | done |
+| 5 | [`mvp-05-command-routing`](openspec/changes/mvp-05-command-routing/) | Polza: классы work/status, кандидаты, запасной путь | command-routing | mvp-04 | wip |
 | 6 | [`mvp-06-sandbox-runtime`](openspec/changes/mvp-06-sandbox-runtime/) | Адаптер Novita, bootstrap, запуск агента, очистка, пауза | sandbox-runtime | mvp-01, mvp-03 | todo |
 | 7 | [`mvp-07-agents-flow-mcp`](openspec/changes/mvp-07-agents-flow-mcp/) | MCP: токен задачи, report_task, sync_spec, create_task | agents-flow-mcp | mvp-03, mvp-06 | todo |
 | 8 | [`mvp-08-spec-planning`](openspec/changes/mvp-08-spec-planning/) | Планировщик OpenSpec → задачи в backlog | spec-planning | mvp-05, mvp-06, mvp-07 | todo |
 | 9 | [`mvp-09-delivery-mr`](openspec/changes/mvp-09-delivery-mr/) | Исполнитель, гейты, MR в GitLab, итог в Telegram | delivery-gates | mvp-08 | todo |
 
-`mvp-01` и `mvp-02` выполнены. Дальше строго по номеру.
+`mvp-01`…`mvp-04` выполнены. Дальше строго по номеру.
 
 ## После MVP — мелкие изменения по волнам
 
