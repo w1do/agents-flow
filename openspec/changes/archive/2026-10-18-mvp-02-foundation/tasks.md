@@ -23,7 +23,7 @@
 
 - [x] 4.1 `Dockerfile` (multi-stage, uv, non-root) — проверка: `docker build` и `docker run … harness-server --help`
 - [x] 4.2 `docker-compose.yml` (`migrate` → `server`, `worker`; `dokploy-network` external; только `expose`) и `deploy/db/docker-compose.yml` — проверка: `docker compose config` валиден
-- [x] 4.3 `.gitlab-ci.yml`: check (ruff, mypy, pytest c Postgres service, `openspec validate --all`), build (registry cache, теги `:$CI_COMMIT_SHORT_SHA`, `:main`), deploy (curl webhook) — проверка: пайплайн зелёный на MR
+- [ ] 4.3 `.gitlab-ci.yml`: check (ruff, mypy, pytest c Postgres service, `openspec validate --all`), build (registry cache, теги `:$CI_COMMIT_SHORT_SHA`, `:main`), deploy (curl webhook) — проверка: пайплайн зелёный на MR. Не подтверждено: пайплайн на реальном MR GitLab не запускался (remote — GitHub); YAML и команды `check:python` проверены локально. Открыто до первого MR в GitLab
 - [x] 4.4 README в `apps/server`, `shared`, `db`; ARCHITECTURE.md §9–10 сверить с фактическими ENV и сервисами; PLAN.md статус — проверка: команды из README выполняются как написано
 
 ## 5. Память проекта

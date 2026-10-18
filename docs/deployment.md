@@ -26,11 +26,16 @@ deploy:dokploy  (main):      curl -fsS -X POST "$DOKPLOY_WEBHOOK_URL"
 
 В переменных GitLab только `DOKPLOY_WEBHOOK_URL` и встроенные `CI_REGISTRY_*`. Цель — push → выкат до 10 минут.
 
+`DOKPLOY_WEBHOOK_URL` задаётся в GitLab как **masked** и **protected**: URL содержит токен вызова Dokploy.
+Job `deploy:dokploy` не добавляет `curl -v` и `--trace`: при ошибке curl может напечатать URL в вывод job,
+а masked-переменная скрывает значение только в выводе, где GitLab его распознаёт.
+
 `alembic check` в CI пока не запускается: без моделей `target_metadata` пустой, и команда падает.
 Шаг добавляется в `check:python` вместе с моделями (mvp-03).
 
-Пайплайн GitLab не проверен на MR: remote репозитория — GitHub. Проверены структура YAML и
-команды job `check:python` локально.
+Известное ограничение: пайплайн GitLab на реальном MR не запускался — remote репозитория GitHub.
+Проверены структура YAML и команды job `check:python` локально. Пайплайн нужно проверить при первом MR в GitLab
+(`check:python`, `check:openspec`, `build:image`, `deploy:dokploy`).
 
 ## Первый запуск
 

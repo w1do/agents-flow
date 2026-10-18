@@ -27,3 +27,7 @@
 ## 5. Память проекта
 
 - [ ] 5.1 `memory_update` по изменённым путям, `memory_annotate` для каждого нового файла, `memory_status` без устаревших файлов
+
+## 6. Хвосты ревью mvp-02
+
+- [ ] 6.1 `settings.py::_check_webhook_secret_format`: минимальная длина `TELEGRAM_WEBHOOK_SECRET` ≥ 32 (как `HARNESS_SECRET_KEY`); Telegram допускает секрет 1–256 символов из `A-Za-z0-9_-` — проверка: тест, секрет из 1 символа отклоняется, секрет из 32 символов принимается

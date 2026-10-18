@@ -26,3 +26,8 @@
 ## 5. Память проекта
 
 - [ ] 5.1 `memory_update` по изменённым путям, `memory_annotate` для каждого нового файла (модели, сервис, миграция), `memory_status` без устаревших файлов
+
+## 6. Хвосты ревью mvp-02
+
+- [ ] 6.1 `db/migrations/env.py`: `fileConfig(..., disable_existing_loggers=False)`, чтобы `migrate` в одном процессе не глушил логгеры приложения — проверка: тест, что логгер приложения остаётся активным после вызова миграций
+- [ ] 6.2 `config.py::_reject_secret_fields`: добавить сегменты `tokens, secrets, passwd, pwd, credential, credentials`; при валидации `gitlab.base_url` отклонять userinfo (`user:pass@host`) — проверка: тест на каждый новый сегмент и на `gitlab.base_url` с userinfo

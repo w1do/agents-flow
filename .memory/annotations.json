@@ -1,5 +1,13 @@
 [
   {
+    "relativePath": ".gitlab-ci.yml",
+    "summary": "GitLab CI: джобы check:python, check:openspec, build:image, deploy:dokploy. Пайплайн на MR не проверен (remote GitHub).",
+    "role": "config",
+    "contentHash": "629fc2f0d1c7d3e9224df550cfc1881766b4c36d2a3c71de243703c7a545b9cc",
+    "author": "agent",
+    "updatedAt": "2026-10-18T08:59:48.745Z"
+  },
+  {
     "relativePath": "AGENTS.md",
     "summary": "Правила для Codex и других агентов: ссылка на CLAUDE.md и краткая выжимка обязательных правил репозитория",
     "role": "doc",
@@ -9,11 +17,11 @@
   },
   {
     "relativePath": "ARCHITECTURE.md",
-    "summary": "Архитектура agents-flow: сервер FastAPI/MCP, worker, адаптеры песочницы Novita и Telegram, статусы задач, связи с ТЗ и решениями D-NN, ссылки на спайк mvp-01.",
+    "summary": "Архитектура harness: сервер, worker, MCP, БД, деплой. Описывает каркас mvp-02: /health и /health/ready, ENV, сервисы docker-compose.",
     "role": "doc",
-    "contentHash": "21ccf35a3957fca7aa0b59b4f52a5d0b1f9011fb1f26b456320a79da36a9e38d",
+    "contentHash": "ebb9c76b167dd3a146b5c07bab22884433e8dc084cf1d63f6288148483445c01",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:27:10.123Z"
+    "updatedAt": "2026-10-18T08:59:48.671Z"
   },
   {
     "relativePath": "CLAUDE.md",
@@ -24,12 +32,196 @@
     "updatedAt": "2026-10-18T07:40:26.920Z"
   },
   {
-    "relativePath": "PLAN.md",
-    "summary": "План MVP по порядку: статусы изменений OpenSpec (mvp-01-novita-spike в статусе review до openspec archive, mvp-06-sandbox-runtime), критерии приёмки и открытые пункты.",
-    "role": "doc",
-    "contentHash": "fa97cc98814d45ee081b9afbe8cc93bdaabddaacd79a667759057582802adc40",
+    "relativePath": "Dockerfile",
+    "summary": "Multi-stage образ сервера: сборка uv 0.13.1, Python 3.12, запуск non-root пользователем. Общий образ для server, worker и migrate.",
+    "role": "config",
+    "contentHash": "0e93011db73f0f34b6ad26f369d195dff7664cc6ab8c0b522cdc711451c48095",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:27:10.133Z"
+    "updatedAt": "2026-10-18T08:59:48.754Z"
+  },
+  {
+    "relativePath": "PLAN.md",
+    "summary": "Порядок и статус изменений OpenSpec: mvp-01 и mvp-02 done (archive 2026-10-18), текущий шаг mvp-03-task-store, известное ограничение CI.",
+    "role": "doc",
+    "contentHash": "63462cb12dc5d89f6bc3ab476229194796f29d3b7884daa2a24d27b70338f376",
+    "author": "agent",
+    "updatedAt": "2026-10-18T09:36:15.201Z"
+  },
+  {
+    "relativePath": "apps/server/README.md",
+    "summary": "README apps/server (harness_server): запуск serve/worker/migrate/check-config, тесты pytest, эндпоинты /health и /health/ready.",
+    "role": "doc",
+    "contentHash": "33da4bd4cc87367ecd0cb3563203b51ea4725a7b55cb0c5ecdfa74d66d73e845",
+    "author": "agent",
+    "updatedAt": "2026-10-18T08:59:48.764Z"
+  },
+  {
+    "relativePath": "apps/server/pyproject.toml",
+    "summary": "Пакет harness_server: зависимости FastAPI, SQLAlchemy async, pydantic-settings, typer, харнесс shared; точка CLI harness_server.",
+    "role": "config",
+    "contentHash": "6e3ab7cc2635f11ff1d5214d1d89a6e1c09a54f2e02b088d87f2a93ca78e6b87",
+    "author": "agent",
+    "updatedAt": "2026-10-18T08:59:48.773Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/__init__.py",
+    "summary": "Инициализация пакета harness_server (apps/server); точка импорта серверного кода, без бизнес-логики.",
+    "role": "module",
+    "contentHash": "15eba8e6ca96f28e8b52a45b0f74bdcb8c9f337e4c5f0641aeb4b4d349298d88",
+    "author": "agent",
+    "updatedAt": "2026-10-18T09:00:01.894Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/api/__init__.py",
+    "summary": "Пакет api harness_server: тонкий HTTP-слой, пакет роутеров; бизнес-логики нет.",
+    "role": "module",
+    "contentHash": "c8826ed541631b9a6514f85ed8b6f84fb7b530c49e417feadbe6af948975dbe3",
+    "author": "agent",
+    "updatedAt": "2026-10-18T08:59:48.791Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/api/health.py",
+    "summary": "Роутер health: /health (liveness) и /health/ready (SELECT 1 с таймаутом, при ошибке 503). Вызывает БД через engine из app.",
+    "role": "module",
+    "contentHash": "7e2079d2cfad7862809b456be9227cef5b1f528ff96ef5bd1ce7cce1cc4539b5",
+    "author": "agent",
+    "updatedAt": "2026-10-18T08:59:48.800Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/app.py",
+    "summary": "Фабрика create_app(settings, config): lifespan с async engine, подключение health-роутера, docs отключены.",
+    "role": "module",
+    "contentHash": "2272d34e579aff6b3bbf412f094cfe366c17fc4d7bcf59f2b59a103fa26c6149",
+    "author": "agent",
+    "updatedAt": "2026-10-18T08:59:48.809Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/cli.py",
+    "summary": "CLI harness_server на typer: команды serve, worker, migrate, check-config. Тонкий вход, без доменной логики.",
+    "role": "entry",
+    "contentHash": "e5625d2740673e6264444ff456abb056d2b1d84e4a4450823c766a92369b8328",
+    "author": "agent",
+    "updatedAt": "2026-10-18T08:59:48.817Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/config.py",
+    "summary": "Загрузка HarnessConfig из YAML: WorkspaceConfig, SandboxConfig, GitLabConfig, ConfigError; запрет секретных ключей, уникальность id.",
+    "role": "module",
+    "contentHash": "af3d50c846591cc03225d9ce4f83c7ee270381b5a1f794d3b4b497f9182e2b87",
+    "author": "agent",
+    "updatedAt": "2026-10-18T08:59:48.830Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/settings.py",
+    "summary": "Settings на pydantic-settings: DATABASE_URL, HARNESS_CONFIG, HARNESS_SECRET_KEY (≥32), TELEGRAM_*; значения SecretStr, ошибки без значений.",
+    "role": "module",
+    "contentHash": "681cd8fe7859d61adc5af5f0626832c95472fb666513d47233a5326145dcaab7",
+    "author": "agent",
+    "updatedAt": "2026-10-18T08:59:48.841Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/worker.py",
+    "summary": "Worker-диспетчер: run_worker (цикл опроса с poll_interval_sec, asyncio.Event stop), serve_worker (обработчики SIGTERM/SIGINT → корректная остановка). Очередь задач появится с mvp-03.",
+    "role": "entry",
+    "contentHash": "588f18f33cce2506f3b83eedcd961c4a7c805945b0b9561a64b458e5788c8d7b",
+    "author": "agent",
+    "updatedAt": "2026-10-18T09:00:39.203Z"
+  },
+  {
+    "relativePath": "apps/server/tests/conftest.py",
+    "summary": "Общие фикстуры pytest для apps/server (тесты health, config, settings, CLI, worker).",
+    "role": "test",
+    "contentHash": "e8559b326b067e4d0b28f373dcb139e06c27511a123158ac6d72c876fd7e8e5a",
+    "author": "agent",
+    "updatedAt": "2026-10-18T09:00:01.938Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_cli.py",
+    "summary": "Тесты CLI harness_server: serve, worker, migrate, check-config (typer CliRunner).",
+    "role": "test",
+    "contentHash": "4b9c6b9f96ba2c129971789860ef054f40805cc254550af15043baf399d326bd",
+    "author": "agent",
+    "updatedAt": "2026-10-18T08:59:48.868Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_config.py",
+    "summary": "Тесты config.py: разбор harness.yaml, отказ при секретных ключах (включая camelCase), уникальность id, ConfigError.",
+    "role": "test",
+    "contentHash": "a5e4feb5ac429ea590f3428b84237e6c1e9f97438b9c0f7a5cb92c4e253a5c1a",
+    "author": "agent",
+    "updatedAt": "2026-10-18T08:59:48.877Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_health.py",
+    "summary": "Тесты /health и /health/ready: 200 при доступной БД, 503 при ошибке или таймауте SELECT 1.",
+    "role": "test",
+    "contentHash": "811ebf7af2bdb92d0c015215eceab46f6bc7f46a5eb8401037c35cc46c0921f0",
+    "author": "agent",
+    "updatedAt": "2026-10-18T08:59:48.886Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_migrate.py",
+    "summary": "Тесты команды migrate: запуск Alembic upgrade head на Postgres для проверки async env миграций.",
+    "role": "test",
+    "contentHash": "37a5e5fe4adce839aefb2893884141e2b2174bf9a268cb83290b58c16dce3bba",
+    "author": "agent",
+    "updatedAt": "2026-10-18T08:59:48.896Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_settings.py",
+    "summary": "Тесты Settings: обязательные ENV, минимальная длина HARNESS_SECRET_KEY, SecretStr и отсутствие значений в ошибках.",
+    "role": "test",
+    "contentHash": "5134e8d527d7b2af42cce6ba2b39c1ea8229f0d3fbb6b88d5cf62f99db58df7f",
+    "author": "agent",
+    "updatedAt": "2026-10-18T08:59:48.906Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_worker.py",
+    "summary": "Тесты worker: цикл опроса с WORKER_POLL_INTERVAL_SEC и остановка по SIGTERM.",
+    "role": "test",
+    "contentHash": "4a67b858274907491f07b40ae113fc25536c55c8f26b57d2556433a37add6bec",
+    "author": "agent",
+    "updatedAt": "2026-10-18T08:59:48.916Z"
+  },
+  {
+    "relativePath": "config/harness.example.yaml",
+    "summary": "Пример harness.yaml: workspace, sandbox, gitlab со ссылками на ENV-переменные, без значений секретов. Образец для HARNESS_CONFIG.",
+    "role": "config",
+    "contentHash": "2552b7f1a013eea122f6fdcd01fed568a669a177bfea362fca1aa7506649b3c0",
+    "author": "agent",
+    "updatedAt": "2026-10-18T08:59:48.925Z"
+  },
+  {
+    "relativePath": "db/README.md",
+    "summary": "README каталога db: Alembic-миграции в db/migrations, запуск alembic upgrade head через ./tools/harness migrate.",
+    "role": "doc",
+    "contentHash": "2c73fa094b82a51c17b01202c0e2dccd440cdafd64bafad9b45f0ce2885b8fb1",
+    "author": "agent",
+    "updatedAt": "2026-10-18T08:59:48.935Z"
+  },
+  {
+    "relativePath": "db/migrations/env.py",
+    "summary": "Alembic env на async engine: DATABASE_URL из os.environ (не Settings), NullPool, asyncio.run в run_migrations_online, target_metadata=None до моделей mvp-03; offline-режим --sql.",
+    "role": "config",
+    "contentHash": "e4e6c582ba515c0b3c2267e340efbdfcbbfbdc8e8787e0ac3e066a29bef8c265",
+    "author": "agent",
+    "updatedAt": "2026-10-18T09:00:39.181Z"
+  },
+  {
+    "relativePath": "deploy/db/docker-compose.yml",
+    "summary": "Compose сервиса Postgres для окружения деплоя; учётные данные передаются через ENV, значения в файле не хранятся.",
+    "role": "config",
+    "contentHash": "b86463a4325957b4b4f43c7728ed0a83b5242a833be9800deabc59d59ed6c1d6",
+    "author": "agent",
+    "updatedAt": "2026-10-18T09:00:01.918Z"
+  },
+  {
+    "relativePath": "docker-compose.yml",
+    "summary": "Compose приложения: сервис migrate, затем server и worker; сеть dokploy-network, expose без публикации портов.",
+    "role": "config",
+    "contentHash": "8de77175b83aba453a4427ccf25e50a5e03a25ad769a60b30434b5fe6035a0b5",
+    "author": "agent",
+    "updatedAt": "2026-10-18T08:59:48.963Z"
   },
   {
     "relativePath": "docs/README.md",
@@ -41,27 +233,27 @@
   },
   {
     "relativePath": "docs/decisions.md",
-    "summary": "Журнал решений поверх ТЗ: D-18 Claude Code подпиской через CLAUDE_CODE_OAUTH_TOKEN без --bare; D-19 таймаут по умолчанию уничтожает песочницу, set_timeout от вызова; связи с спайком mvp-01.",
+    "summary": "Журнал решений D-NN поверх ТЗ. D-20: обязательные ENV каркаса (DATABASE_URL, HARNESS_CONFIG, HARNESS_SECRET_KEY, TELEGRAM_*).",
     "role": "doc",
-    "contentHash": "8a6d7fd8b19327b74725074773a3a5837ee2bea78ef89ffb325eeac1833b1ca4",
+    "contentHash": "d6c1cdf5c955d94fa139d60a5fba4b265a3066ff88dbce01fc57c9437b03043b",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:27:10.150Z"
+    "updatedAt": "2026-10-18T08:59:48.696Z"
   },
   {
     "relativePath": "docs/deployment.md",
-    "summary": "Деплой: два Compose-стека Dokploy (БД и harness: migrate, server, worker), сеть dokploy-network, GitLab CI check/build/deploy, первый запуск",
+    "summary": "Деплой: стеки Compose, CI (check/build/deploy), masked DOKPLOY_WEBHOOK_URL, известное ограничение CI (не проверен на MR GitLab), первый запуск.",
     "role": "doc",
-    "contentHash": "b845328866b596f401a42ef14e8f4eba5477b92d0d760d68224791e85b7559f4",
+    "contentHash": "9174dfd5fcb9351b000326303144c1fbab548cc2e6a0b8078ff6d5c6ae2825e0",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:26.965Z"
+    "updatedAt": "2026-10-18T09:36:15.175Z"
   },
   {
     "relativePath": "docs/development.md",
-    "summary": "Процесс разработки по OpenSpec, локальный запуск через uv и ./tools/harness, уровни тестов, стиль кода",
+    "summary": "Локальная разработка: uv workspace, ./tools/harness check/fmt/dev/migrate, запуск server и worker, тесты и линт Python 3.12.",
     "role": "doc",
-    "contentHash": "fdd1d855c1a9b414531eaec195e979279609958843119105d8a7bbd1fa37b87b",
+    "contentHash": "68b7d2defe5703b7612b1c128d50e9e2c864ee9b1f04e1f112660d6ff9e5c457",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:26.976Z"
+    "updatedAt": "2026-10-18T08:59:48.715Z"
   },
   {
     "relativePath": "docs/glossary.md",
@@ -81,19 +273,19 @@
   },
   {
     "relativePath": "docs/novita.md",
-    "summary": "Отчёт спайка Novita: pause сохраняет файлы и процессы, set_timeout от вызова, таймаут убивает, CommandExitException, лимит 10 vCPU, CLAUDE_CODE_OAUTH_TOKEN без --bare, stream-json --verbose.",
+    "summary": "Итоги спайка Novita и Claude Code: возможности, лимиты, таблица; блок вывода запуска 4 помечен как text.",
     "role": "doc",
-    "contentHash": "98c18d05ab9afba21644bda29200367e2242f0bab1e5801a13c880cb53adb5b2",
+    "contentHash": "8df17acbd040ee44f5bfaf1b7ab7c356be89fa44a144b9e7a7ec8cf99c4968aa",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:27:14.096Z"
+    "updatedAt": "2026-10-18T09:36:15.161Z"
   },
   {
     "relativePath": "docs/open-questions.md",
-    "summary": "Открытые вопросы проекта: вопросы 5–7 после спайка Novita (цена паузы, кастомные шаблоны песочницы, многоходовая сверка usage, перенесённая в mvp-06).",
+    "summary": "Открытые вопросы ТЗ §17 (1–16) и раздел рисков: Postgres в общей dokploy-network с expose 5432, решение не принято.",
     "role": "doc",
-    "contentHash": "d726abd3ed3a9306c114c24bfa6cdf30d09f16fb49e8191e42c1dd9fa1fcd372",
+    "contentHash": "4f4d4113efdd6576939a88863e65db99f799395339af9d5f1adf6fcb4b80b3f6",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:27:10.159Z"
+    "updatedAt": "2026-10-18T09:36:15.188Z"
   },
   {
     "relativePath": "docs/tz/tz-v5.md",
@@ -166,6 +358,14 @@
     "contentHash": "c3907346ae5b334b29d0eacd0728d3b0a018c2e63158d54b3a85c6e8cedb89d7",
     "author": "agent",
     "updatedAt": "2026-10-18T07:40:37.172Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-18-mvp-02-foundation/tasks.md",
+    "summary": "Архив mvp-02-foundation: 14/15 задач; пункт 4.3 (пайплайн GitLab на MR) открыт, не проверен — remote GitHub.",
+    "role": "doc",
+    "contentHash": "9461f7e10a6c7409b508b17dda7779848c0eb0d852e1293b6f56f45933449f1d",
+    "author": "agent",
+    "updatedAt": "2026-10-18T09:36:15.272Z"
   },
   {
     "relativePath": "openspec/changes/budget-usage/.openspec.yaml",
@@ -385,11 +585,11 @@
   },
   {
     "relativePath": "openspec/changes/console-auth/tasks.md",
-    "summary": "Чек-лист задач console-auth: Консоль: каркас и вход администратора; реализация, документация, синхронизация памяти",
+    "summary": "Чек-лист console-auth: каркас консоли, вход администратора, reset-password, Compose; раздел 4 — минимальная длина ADMIN_PASSWORD и HARNESS_ADMIN_TOKEN.",
     "role": "doc",
-    "contentHash": "9faf4396aee02f28ec2803c08676a497addd986ea13340a21b162374cbd1d78e",
+    "contentHash": "babff57d2cfb5333e88405ac3dd608a88ffe1c70401f65fa9e5b5cda555d6e4b",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.269Z"
+    "updatedAt": "2026-10-18T09:36:15.261Z"
   },
   {
     "relativePath": "openspec/changes/console-observability/.openspec.yaml",
@@ -744,70 +944,6 @@
     "updatedAt": "2026-10-18T07:40:37.423Z"
   },
   {
-    "relativePath": "openspec/changes/mvp-01-novita-spike/.openspec.yaml",
-    "summary": "Метаданные OpenSpec-изменения mvp-01-novita-spike",
-    "role": "config",
-    "contentHash": "fbeccb8e6385e25552f368fd6265fb9ae44bc41667c902cfb823162523f04f0b",
-    "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.427Z"
-  },
-  {
-    "relativePath": "openspec/changes/mvp-01-novita-spike/proposal.md",
-    "summary": "MVP proposal mvp-01-novita-spike: Спайк: проверка Novita exec/files/pause/resume/timeout и claude CLI stream-json в песочнице, отчёт docs/novita.md",
-    "role": "doc",
-    "contentHash": "743d3d79d3170cd2f73051656e11aee1ada2d0ee69637f2420cc25643517e7f5",
-    "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.430Z"
-  },
-  {
-    "relativePath": "openspec/changes/mvp-01-novita-spike/tasks.md",
-    "summary": "Чек-лист mvp-01-novita-spike: 13/13 выполнено (Novita exec/pause/timeout, Claude Code stream-json, итоги в docs/novita.md, D-18/D-19, память). Ждёт openspec archive.",
-    "role": "doc",
-    "contentHash": "522e52d480dea3b7a439926bbc1fcabf52eb2640cba8ad4e1d8898751c42e3e4",
-    "author": "agent",
-    "updatedAt": "2026-10-18T08:27:50.400Z"
-  },
-  {
-    "relativePath": "openspec/changes/mvp-02-foundation/.openspec.yaml",
-    "summary": "Метаданные OpenSpec-изменения mvp-02-foundation",
-    "role": "config",
-    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
-    "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.437Z"
-  },
-  {
-    "relativePath": "openspec/changes/mvp-02-foundation/design.md",
-    "summary": "Design mvp-02-foundation: технические решения, альтернативы и риски",
-    "role": "doc",
-    "contentHash": "3bed41ff39ad8ed169566f01904d9cc36fb072050a4e2ea5ec8ca993550d8b35",
-    "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.440Z"
-  },
-  {
-    "relativePath": "openspec/changes/mvp-02-foundation/proposal.md",
-    "summary": "MVP proposal mvp-02-foundation: Каркас: uv workspace, settings/config harness.yaml, /health, CLI harness-server, ./tools/harness, Compose, GitLab CI",
-    "role": "doc",
-    "contentHash": "1e58816fb03d52ce8c76ef923499cc2d678fe816a897d4487a36a70091970fda",
-    "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.443Z"
-  },
-  {
-    "relativePath": "openspec/changes/mvp-02-foundation/specs/platform-config/spec.md",
-    "summary": "Delta-спека platform-config (mvp-02-foundation): требования и сценарии WHEN/THEN",
-    "role": "doc",
-    "contentHash": "46b262db482965888ce2eef96a05d864bdd17a5484a81dcc177509e577a211c4",
-    "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.446Z"
-  },
-  {
-    "relativePath": "openspec/changes/mvp-02-foundation/tasks.md",
-    "summary": "Чек-лист задач mvp-02-foundation с проверками, документацией и синхронизацией памяти",
-    "role": "doc",
-    "contentHash": "3f930af0aad53710615c66a2ec4b40c85123ae5940e3fb003c3c2c8d71f98786",
-    "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.450Z"
-  },
-  {
     "relativePath": "openspec/changes/mvp-03-task-store/.openspec.yaml",
     "summary": "Метаданные OpenSpec-изменения mvp-03-task-store",
     "role": "config",
@@ -841,11 +977,11 @@
   },
   {
     "relativePath": "openspec/changes/mvp-03-task-store/tasks.md",
-    "summary": "Чек-лист задач mvp-03-task-store с проверками, документацией и синхронизацией памяти",
+    "summary": "Чек-лист mvp-03-task-store: домен статусов, схема БД, сервис задач, HTTP /tasks; раздел 6 — хвосты ревью mvp-02 (logger в env.py, секретные сегменты и userinfo в config.py).",
     "role": "doc",
-    "contentHash": "b11e98c688eb3221d0d5ffc01464b7ec457e83588b33ff5c15dfd3ff5e46f871",
+    "contentHash": "d2b863720154279e8955f3e613e7b7cf8b05b09e7cd08d9e9aa19a23106c280d",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.466Z"
+    "updatedAt": "2026-10-18T09:36:15.236Z"
   },
   {
     "relativePath": "openspec/changes/mvp-04-telegram-intake/.openspec.yaml",
@@ -889,11 +1025,11 @@
   },
   {
     "relativePath": "openspec/changes/mvp-04-telegram-intake/tasks.md",
-    "summary": "Чек-лист задач mvp-04-telegram-intake с проверками, документацией и синхронизацией памяти",
+    "summary": "Чек-лист mvp-04-telegram-intake: адаптеры Telegram и STT, webhook, сервисы intake/notify; раздел 6 — минимальная длина TELEGRAM_WEBHOOK_SECRET ≥ 32.",
     "role": "doc",
-    "contentHash": "7d6459266d3eb668b7d02fb7e92d086d4051ce5f67d922bcf37aabce221602bc",
+    "contentHash": "a40c2e611c15882bbdea91e66ac60135ec76ef3ef89b45f70349f8da50eef23b",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.483Z"
+    "updatedAt": "2026-10-18T09:36:15.247Z"
   },
   {
     "relativePath": "openspec/changes/mvp-05-command-routing/.openspec.yaml",
@@ -1742,6 +1878,54 @@
     "contentHash": "8c7b4c2157dcbf6ec99822aeee54077f7ffbab444fc14fa26500bad0d350eeba",
     "author": "agent",
     "updatedAt": "2026-10-18T07:40:37.841Z"
+  },
+  {
+    "relativePath": "openspec/specs/platform-config/spec.md",
+    "summary": "Спека platform-config (из mvp-02): проверка ENV и harness.yaml при старте сервера и worker, отказ при невалидной конфигурации, без значений секретов в ошибках.",
+    "role": "doc",
+    "contentHash": "f2c67977d1142323f6201fd8cf7a4f108840eca2df478545318fcabf683198ca",
+    "author": "agent",
+    "updatedAt": "2026-10-18T09:36:15.225Z"
+  },
+  {
+    "relativePath": "pyproject.toml",
+    "summary": "Корень uv workspace: members apps/server и shared, Python 3.12; общие настройки инструментов проверки проекта.",
+    "role": "config",
+    "contentHash": "0be939fcde0b98c08f6eefc5ea5321d802516ab06b5f3f588257ad17f44488e3",
+    "author": "agent",
+    "updatedAt": "2026-10-18T09:00:01.904Z"
+  },
+  {
+    "relativePath": "shared/README.md",
+    "summary": "README пакета shared (harness_shared): назначение общего пакета и его место в uv workspace.",
+    "role": "doc",
+    "contentHash": "51a1b67c26c0b9a0b5b78071435956f3166c17c70ce929835b10efad082e2bc5",
+    "author": "agent",
+    "updatedAt": "2026-10-18T09:00:01.928Z"
+  },
+  {
+    "relativePath": "shared/pyproject.toml",
+    "summary": "Пакет harness_shared (член uv workspace): общие модули для server и будущих входов, Python 3.12, Pydantic v2 в числе зависимостей.",
+    "role": "config",
+    "contentHash": "d7461d695f170b84a587e1dfece7af92c9c959b3dc02cafcc5ce49d326f263e9",
+    "author": "agent",
+    "updatedAt": "2026-10-18T09:00:01.864Z"
+  },
+  {
+    "relativePath": "shared/src/harness_shared/__init__.py",
+    "summary": "Инициализация пакета harness_shared: точка импорта общих типов, которые видят MCP, API и консоль.",
+    "role": "module",
+    "contentHash": "93c22990f563c54a5514d590ad8cfed4f39159c84cf171d650c4cedb28353f6f",
+    "author": "agent",
+    "updatedAt": "2026-10-18T09:00:01.885Z"
+  },
+  {
+    "relativePath": "shared/src/harness_shared/health.py",
+    "summary": "Общие модули health пакета harness_shared, переиспользуемые server; описание ответа health для внешних входов.",
+    "role": "module",
+    "contentHash": "1febf78b4a10221a747117bed7e3eda8ffd938123289440f793d423ccf809eb6",
+    "author": "agent",
+    "updatedAt": "2026-10-18T09:00:01.875Z"
   },
   {
     "relativePath": "tools/spikes/novita_check.py",
