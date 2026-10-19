@@ -92,6 +92,8 @@ uv run pytest -m live apps/server/tests/test_telegram_live.py
 
 Результат прогона записать в PR. Чекбокс 4.3 закрывает владелец проекта после проверки.
 
+Пошаговая работа с харнессом без UI, включая проверку через Telegram и CLI: [docs/operating-without-ui.md](../../docs/operating-without-ui.md).
+
 ### Живая проверка песочницы (`-m live`)
 
 Тесты `tests/test_novita_live.py` работают с настоящей песочницей Novita и запускаются владельцем вручную.

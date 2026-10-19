@@ -197,3 +197,10 @@ Allowlist: `.gitignore` (только добавить строку), `db/migrat
 - [x] 6.11 Проверки: `./tools/harness check` (ruff check, ruff format --check, mypy --strict, pytest) зелёный;
   `openspec validate mvp-06-sandbox-runtime --strict` — valid; отметить 6.1–6.11 `[x]`. Вернуть оркестратору список
   изменённых и новых путей для memory-sync (Phase 5)
+- [x] 6.12 Live-тест рантайма агента (`-m live`, те же `LIVE_*`, пропуск без них): на настоящей песочнице сервисный путь
+  `activate` → `run_agent` → `wait_agent` → `cleanup_task` с реальным Postgres. Репозиторий workspace — локальный git
+  в песочнице, созданный тестом (без GitLab). Короткая задача, `max_turns` небольшой. Проверить: команда запуска
+  отдаёт pid (`agent_pid` и `agent_started_at` в БД), prompt доходит через stdin, `_is_alive` (`kill -0` по группе)
+  видит живого агента во время работы, итог `FINISHED`, после `cleanup_task` токены отозваны, worktree и каталог
+  задачи удалены, ветка `task/<id>` удалена. Второй сценарий: агент убит до завершения (kill группы), без
+  `status.json` → `wait_agent` даёт `DIED`, повторного запуска нет — проверка: `pytest -m live` зелёный у владельца

@@ -17,11 +17,11 @@
   },
   {
     "relativePath": "ARCHITECTURE.md",
-    "summary": "Архитектура harness: слои, статусы задач, маршрутизация команд через Polza (mvp-05), эндпоинты, таблицы, ENV, сервисы intake, routing, status_report.",
+    "summary": "Архитектура agents-flow: модули, статусы задач, эндпоинты, ENV, таблица sandboxes с agent_started_at и agent_pid, семантика sandbox resume.",
     "role": "doc",
-    "contentHash": "cbc5d30cd539a17c41c6cef264faa647a3392e05c510a66568bc85e2990c1558",
+    "contentHash": "2a77f3bf1faa0d34a3fc86eb08f6cd08bda5868b25b99e98e0adb2fddc2ad984",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.521Z"
+    "updatedAt": "2026-10-19T07:53:10.230Z"
   },
   {
     "relativePath": "CLAUDE.md",
@@ -41,19 +41,19 @@
   },
   {
     "relativePath": "PLAN.md",
-    "summary": "План MVP: 10 изменений; mvp-05 на ревью (5.2 у владельца), mvp-06 в работе (ветка от mvp-05), mvp-10-operator-console — веб-панель в MVP (D-39); волны после MVP.",
+    "summary": "План MVP: порядок и статусы изменений OpenSpec; mvp-05 и mvp-06 в статусе review, mvp-06b ждёт приёмки mvp-06.",
     "role": "doc",
-    "contentHash": "30474827b37ef52723971a25d55018e8f175c475417f941d35c1a3d799c33a2d",
+    "contentHash": "2474b10580170cd7d3759610410b9777e4809d7a36d9b96d94b1dd6ad1f5a8cb",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:01:10.864Z"
+    "updatedAt": "2026-10-19T04:04:43.941Z"
   },
   {
     "relativePath": "apps/server/README.md",
-    "summary": "README сервера: запуск, тесты, команды; маршрутизация команд Polza, кнопки уточнения rt, отчёт status, порог ROUTING_MIN_CONFIDENCE.",
+    "summary": "README сервера: запуск, тесты, команды sandbox (resume сбрасывает error, если задача не закреплена), структура worker/, live-тест песочницы, маршрутизация mvp-05.",
     "role": "doc",
-    "contentHash": "d09bd03a877a190e081e8803e97af99cb69de53fa3e485afb7ab4bb931c5a5af",
+    "contentHash": "3a66166210e7fcb62bd0df1b6c9362ad5f8ca644cf25ac0ec32c6a1db8b3bccf",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.543Z"
+    "updatedAt": "2026-10-19T04:05:59.641Z"
   },
   {
     "relativePath": "apps/server/pyproject.toml",
@@ -78,6 +78,38 @@
     "contentHash": "e594c76c7b33bd2f3df674404569ada12b768a6c1caf71c90c4077001da9cafc",
     "author": "agent",
     "updatedAt": "2026-10-18T13:43:02.638Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/adapters/novita/__init__.py",
+    "summary": "Пакет адаптера Novita: реэкспорт SandboxProvider, ExecResult и SandboxError; сервисы импортируют пакет, а не SDK novita_sandbox напрямую.",
+    "role": "module",
+    "contentHash": "d913588ace8bb5b00bdf68aa923d4506b0bbe79cd11391b1939a2b3951a63f40",
+    "author": "agent",
+    "updatedAt": "2026-10-19T03:50:34.110Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/adapters/novita/client.py",
+    "summary": "NovitaSandboxProvider: реализация SandboxProvider поверх SDK novita_sandbox (connect, exec, файлы, pause, extend_timeout); ключ берётся из ENV, не из кода.",
+    "role": "module",
+    "contentHash": "ca189f489450471542149bb4f2265b884f3c69bb6d9ae6948634122a4204ed09",
+    "author": "agent",
+    "updatedAt": "2026-10-19T03:50:34.144Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/adapters/novita/errors.py",
+    "summary": "Ошибки адаптера Novita: SandboxError (базовая), SandboxNotFound и SandboxUnavailable; сервисы переводят их в состояния песочницы.",
+    "role": "module",
+    "contentHash": "35f989559722893295f5345d1a7edd068cf5bd1303fbb061a0974df7dc469f74",
+    "author": "agent",
+    "updatedAt": "2026-10-19T03:50:34.127Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/adapters/novita/protocol.py",
+    "summary": "Protocol SandboxProvider: connect, exec, write_file, read_file, pause, extend_timeout; сервисы, worker и CLI зависят только от этого Protocol.",
+    "role": "module",
+    "contentHash": "f9656c44a68190ba56c310f45f1f8f81e93a849d733e7d2701f9f2fa014eea8f",
+    "author": "agent",
+    "updatedAt": "2026-10-19T03:50:34.162Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/polza/__init__.py",
@@ -233,11 +265,11 @@
   },
   {
     "relativePath": "apps/server/src/harness_server/cli.py",
-    "summary": "CLI harness-server: команды worker, migrate-проверки и telegram set-webhook (URL из HARNESS_PUBLIC_URL, только https); логгеры httpx/httpcore переводятся в WARNING.",
+    "summary": "CLI harness-server: группа sandbox (status, pause, resume, bootstrap) с ensure_sandbox перед действием и отказом bootstrap на занятой песочнице; логика в services.",
     "role": "entry",
-    "contentHash": "261af465cd7f32527f54a1b086e22df0c5cb62dbeee100d31d6bbb671e546516",
+    "contentHash": "af336ebf09c6ebc39ee80024b9e437abb738f28849e87a84fb421c60cbc2e7fa",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:42:29.279Z"
+    "updatedAt": "2026-10-19T04:04:43.882Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/config.py",
@@ -289,11 +321,11 @@
   },
   {
     "relativePath": "apps/server/src/harness_server/db/models/sandboxes.py",
-    "summary": "ORM Sandbox (status CHECK, UNIQUE provider_id) и TaskToken (хранит только token_hash, role CHECK, UNIQUE uq_task_tokens_token_hash).",
+    "summary": "ORM Sandbox (status CHECK, UNIQUE provider_id, agent_started_at, agent_pid) и TaskToken (только token_hash, role CHECK, UNIQUE uq_task_tokens_token_hash).",
     "role": "module",
-    "contentHash": "92bcf1324cacbc057f50bdd9bbc1ba7cb7c99de8b29c86937c5d9c848ea179e6",
+    "contentHash": "fa3d171dda4222b6f12bdd69cf47ec4c782cf0cec6983eef2510195dbdb43c43",
     "author": "agent",
-    "updatedAt": "2026-10-18T11:49:57.624Z"
+    "updatedAt": "2026-10-19T07:53:10.043Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/db/models/tasks.py",
@@ -353,11 +385,19 @@
   },
   {
     "relativePath": "apps/server/src/harness_server/security/redaction.py",
-    "summary": "redact(text, extra_values): маскирует Telegram-токен, glpat-, sk-ant-, Bearer и переданные значения секретов; применяется до БД, логов и Telegram.",
+    "summary": "Redaction текста из песочницы перед БД, Telegram и git: _PATTERNS (Bearer, ключи, токен задачи aft_…) и явные значения секретов; заменяет на [REDACTED].",
     "role": "module",
-    "contentHash": "fce5bc17324956396d6bc6574b391c264aa31140b6844a3ee76e7fb6ce2dd2b0",
+    "contentHash": "dfade777c20de4d5e229a703ff261222d04e37ddaf4a54f464323ec309399fdd",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:02.657Z"
+    "updatedAt": "2026-10-19T07:53:10.089Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/security/tokens.py",
+    "summary": "Токен задачи: generate = TOKEN_PREFIX aft_ + secrets.token_urlsafe(32), hash_token (HMAC-SHA256 с HARNESS_SECRET_KEY) от значения целиком; в БД только хэш (D-42).",
+    "role": "module",
+    "contentHash": "2e6b86c52648c5820feea7f2476359cace90df8eff040878f8601005a96daab2",
+    "author": "agent",
+    "updatedAt": "2026-10-19T07:53:10.072Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/__init__.py",
@@ -366,6 +406,14 @@
     "contentHash": "cadb4e79c7482f146a8501ec3627e588ade348a1cc468303289697025f400630",
     "author": "agent",
     "updatedAt": "2026-10-18T11:49:57.578Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/services/agent_result.py",
+    "summary": "Разбор итога агента: parse_pid (ASCII-цифры, 2…LINUX_PID_MAX=2**22), parse_exit_code, status.json как подсказка; завершение определяется живостью группы процессов.",
+    "role": "module",
+    "contentHash": "9cc3c89be68baee26935c22847501b6f5782b8ad713561f94c780a87976c59cd",
+    "author": "agent",
+    "updatedAt": "2026-10-19T07:59:33.326Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/context.py",
@@ -414,6 +462,14 @@
     "contentHash": "9d1fdeaf20bbdb1d9388e0120b660e78d303f41992b0ce087dc2a29a3c5f7049",
     "author": "agent",
     "updatedAt": "2026-10-19T03:47:45.407Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/services/sandboxes.py",
+    "summary": "Жизненный цикл песочницы: reserve, activate, run_agent (agent_started_at и pid в БД, DIED), wait_agent, cleanup (отзыв токенов, kill живой группы, rm каталога), resume по статусу.",
+    "role": "module",
+    "contentHash": "49b5021409a702526dd81eabc8c6154167e21a891bf3d57f46753074e6c90d36",
+    "author": "agent",
+    "updatedAt": "2026-10-19T07:59:33.344Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/status_report.py",
@@ -488,6 +544,22 @@
     "updatedAt": "2026-10-18T13:42:29.332Z"
   },
   {
+    "relativePath": "apps/server/src/harness_server/worker/__init__.py",
+    "summary": "Точка входа worker: запускает dispatch_once через build_dispatch_context в цикле опроса очереди задач; не блокирует webhook и MCP.",
+    "role": "entry",
+    "contentHash": "295163af63ca98b00e297d25d9f193153c23d94bceaa8f4578a02c50e12629da",
+    "author": "agent",
+    "updatedAt": "2026-10-19T03:50:34.227Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/worker/dispatcher.py",
+    "summary": "Диспетчер задач: _recover по серверной записи запуска, reserve → activate → pipeline.run; при отмене токен не отзывается (D-41), отзыв в cleanup; ошибки в error.",
+    "role": "module",
+    "contentHash": "4f0f5caa151a61bed1d8c0edb5b02b15cd83945468ba47f64416753e24dd5d01",
+    "author": "agent",
+    "updatedAt": "2026-10-19T07:53:10.137Z"
+  },
+  {
     "relativePath": "apps/server/tests/conftest.py",
     "summary": "Общие фикстуры тестов сервера: реальный Postgres, фейковые адаптеры, включая FakeRouter для тестов маршрутизации.",
     "role": "test",
@@ -497,11 +569,11 @@
   },
   {
     "relativePath": "apps/server/tests/test_cli.py",
-    "summary": "Тесты CLI harness-server: help со списком telegram, set-webhook (HARNESS_PUBLIC_URL, ошибка Telegram), отказ при неполных ENV, логгеры httpx в WARNING.",
+    "summary": "Тесты CLI: справка, отказ без конфига, пауза занятой песочницы, регистрация песочницы в pause/resume, отказ bootstrap на занятой песочнице; настоящий Postgres.",
     "role": "test",
-    "contentHash": "88c1f8062470077bc5a9ea69f5ad23b332d7cd24202e375adb382fa485e324e5",
+    "contentHash": "5a3f50c9e630bfb3b134f1a4226dfe0cda2d591b389cc00839526050c3be3543",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:29.393Z"
+    "updatedAt": "2026-10-19T04:04:43.897Z"
   },
   {
     "relativePath": "apps/server/tests/test_config.py",
@@ -510,6 +582,14 @@
     "contentHash": "4ca511397fc52673869c62a4a3a05bd579fb4aae5b99803d2eb9b274af2f62c0",
     "author": "agent",
     "updatedAt": "2026-10-18T13:43:29.403Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_dispatcher.py",
+    "summary": "Тесты диспетчера: восстановление после рестарта (живой и мёртвый агент), токен при отмене и отзыв при очистке, resume из paused без вызова провайдера, секрет не в событиях.",
+    "role": "test",
+    "contentHash": "27f0d4f1de250c40f7e64fc2ffc032cb4eb0e17747ff82a929fb52ce33e206f1",
+    "author": "agent",
+    "updatedAt": "2026-10-19T07:59:33.385Z"
   },
   {
     "relativePath": "apps/server/tests/test_health.py",
@@ -553,11 +633,11 @@
   },
   {
     "relativePath": "apps/server/tests/test_migrations.py",
-    "summary": "Тесты миграций Alembic, включая миграцию 0003 routing_decision: nullable task_id, поля routings и CHECK.",
+    "summary": "Тесты миграций Alembic: upgrade/downgrade roundtrip, alembic check без расхождений с моделями, колонки agent_* после ревизии 0004.",
     "role": "test",
-    "contentHash": "95242c3cf4babfc1f64e589fcafde5bf0a4701fe0d11f11fc26585aed9f8b6ad",
+    "contentHash": "4bfb89eaff6466645e3bda43bc51d795d911f1797dfdcefed5bf28f39a97e0fb",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.666Z"
+    "updatedAt": "2026-10-19T07:53:10.152Z"
   },
   {
     "relativePath": "apps/server/tests/test_notify_service.py",
@@ -593,11 +673,11 @@
   },
   {
     "relativePath": "apps/server/tests/test_redaction.py",
-    "summary": "Тесты фильтра секретов: шаблоны Telegram, glpat-, sk-ant-, Bearer и точные значения из настроек; тестовые значения не настоящие.",
+    "summary": "Тесты redaction: Bearer, ключи, токен задачи aft_ без явных значений, короткое слово aft_ не заменяется.",
     "role": "test",
-    "contentHash": "27398d9ae5847a46613b37da724cfa09ebd68e3a9ec122b0b3d4c487d8a2f93e",
+    "contentHash": "e9ee834151fb44060e32a64a9288e79a3abd2783aa0180a583e94691be5e5968",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:29.480Z"
+    "updatedAt": "2026-10-19T07:53:10.184Z"
   },
   {
     "relativePath": "apps/server/tests/test_routing_models.py",
@@ -614,6 +694,14 @@
     "contentHash": "2a5d1e9adc09504808ece397b853718ed117dfae8c7209ba9cf2b36ba3e0abc9",
     "author": "agent",
     "updatedAt": "2026-10-19T02:30:15.800Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_sandbox_service.py",
+    "summary": "Тесты сервиса песочниц: reserve/release, run_agent (started_at, pid, DIED), parse_pid в диапазоне Linux, wait_agent, cleanup с kill живой группы, resume из error/paused/active.",
+    "role": "test",
+    "contentHash": "b990b02aa1ab03831d037239d965cf9e3df16c35392923c49e6035471bb74677",
+    "author": "agent",
+    "updatedAt": "2026-10-19T07:59:33.366Z"
   },
   {
     "relativePath": "apps/server/tests/test_settings.py",
@@ -712,6 +800,14 @@
     "updatedAt": "2026-10-18T13:43:29.533Z"
   },
   {
+    "relativePath": "apps/server/tests/test_tokens.py",
+    "summary": "Тесты токена задачи: префикс aft_, HMAC-хэш с HARNESS_SECRET_KEY, значение не хранится.",
+    "role": "test",
+    "contentHash": "b100776200e855ed4b005fc64fae134be53202bcf9e75facc0f1df37687b364a",
+    "author": "agent",
+    "updatedAt": "2026-10-19T07:53:10.168Z"
+  },
+  {
     "relativePath": "apps/server/tests/test_webhook_service.py",
     "summary": "Тесты регистрации webhook: адрес https без query, fragment и учётных данных; список ALLOWED_UPDATES для setWebhook.",
     "role": "test",
@@ -737,19 +833,19 @@
   },
   {
     "relativePath": "config/harness.example.yaml",
-    "summary": "Пример harness.yaml: workspace, sandbox, gitlab со ссылками на ENV-переменные, без значений секретов. Образец для HARNESS_CONFIG.",
+    "summary": "Несекретный пример harness.yaml: workspaces, sandbox (provider_id), gitlab; токены и ключи сюда не пишутся, задаются в ENV.",
     "role": "config",
-    "contentHash": "2552b7f1a013eea122f6fdcd01fed568a669a177bfea362fca1aa7506649b3c0",
+    "contentHash": "73b449c520ae10eb8cbe5f84c9d7ec2a2f6331396daf2aef8db35e1602532433",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:59:48.925Z"
+    "updatedAt": "2026-10-19T03:50:34.306Z"
   },
   {
     "relativePath": "db/README.md",
-    "summary": "README БД: миграции Alembic, таблица routings (decision, error, source_text, resolved_at, CHECK), миграция 0003 routing_decision, task_id nullable.",
+    "summary": "README БД: миграции Alembic, ревизии 0001–0004 (routings в 0003, колонки агента sandboxes в 0004), стек deploy/db в Dokploy.",
     "role": "doc",
-    "contentHash": "16039a13642945e0214f37c7ef253b03c6973a23b6435bfe478c234eb5a40f25",
+    "contentHash": "6bcf1e91c8beceb79484d96cb1b6dba38c5438118d2225df1e1ccde6002270f4",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.552Z"
+    "updatedAt": "2026-10-19T07:53:10.245Z"
   },
   {
     "relativePath": "db/migrations/env.py",
@@ -784,12 +880,28 @@
     "updatedAt": "2026-10-19T03:47:45.463Z"
   },
   {
+    "relativePath": "db/migrations/versions/20261019_0004_sandbox_agent_run.py",
+    "summary": "Миграция ревизии 0004 (после 0003): колонки sandboxes.agent_started_at (TIMESTAMPTZ NULL) и agent_pid (INTEGER NULL) для серверного учёта запуска агента (D-41).",
+    "role": "module",
+    "contentHash": "64802df5f547f78208ef64e7a20644fe0ccc37e978c8c4d3606b4b51134c66bd",
+    "author": "agent",
+    "updatedAt": "2026-10-19T07:53:10.024Z"
+  },
+  {
     "relativePath": "deploy/db/docker-compose.yml",
     "summary": "Compose сервиса Postgres для окружения деплоя; учётные данные передаются через ENV, значения в файле не хранятся.",
     "role": "config",
     "contentHash": "b86463a4325957b4b4f43c7728ed0a83b5242a833be9800deabc59d59ed6c1d6",
     "author": "agent",
     "updatedAt": "2026-10-18T09:00:01.918Z"
+  },
+  {
+    "relativePath": "deploy/sandbox/bootstrap.sh",
+    "summary": "Идемпотентный bootstrap песочницы: pinned claude и openspec, клон репозиториев workspace, ~/.harness, .mcp.json с плейсхолдерами ${AGENTS_FLOW_*}; секреты в файлы не пишутся.",
+    "role": "config",
+    "contentHash": "a1334fe65c0481be8725d43d36ac14ea943ce6ecf464824da328eec27692ac46",
+    "author": "agent",
+    "updatedAt": "2026-10-19T03:50:34.275Z"
   },
   {
     "relativePath": "docker-compose.yml",
@@ -809,19 +921,19 @@
   },
   {
     "relativePath": "docs/decisions.md",
-    "summary": "Журнал решений D-NN проекта; новые записи по песочнице и провайдеру VPS (D-35…D-38, D-40) и уточнения D-16, D-17, D-31 по Polza и Novita.",
+    "summary": "Журнал решений D-NN: Polza и Novita (D-16, D-17, D-31), песочница (D-35…D-38), VPS (D-40), серверный учёт запуска агента (D-41), префикс токена aft_ (D-42).",
     "role": "doc",
-    "contentHash": "2e2694350f6049e8aca64cfd4274ba0eb344c5a1e41d7ffd2a74883a606c4c31",
+    "contentHash": "220d45bc30db29f45d2a5cea123dd8dbe4e5412041f6e6a249197ca8a6d00fac",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:48:17.046Z"
+    "updatedAt": "2026-10-19T07:38:06.070Z"
   },
   {
     "relativePath": "docs/deployment.md",
-    "summary": "Деплой на Dokploy и GitLab CI: порядок стеков, миграции, шаг harness-server telegram set-webhook после деплоя, требования к HARNESS_PUBLIC_URL и секретам (значения только в ENV).",
+    "summary": "Деплой: bootstrap песочницы, токены задачи, ротация и allowlist, ручной разбор песочницы в error с закреплённой задачей; Postgres отдельным стеком Dokploy.",
     "role": "doc",
-    "contentHash": "8e0c8c2f79a1c04f14363c798861f4a9dbe8e32d161d04e7abaf91ae476b32b3",
+    "contentHash": "61ec54dba05168c0506bf5d2038b85a070c806fcd496829d6188a6b088d098a8",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:42:29.201Z"
+    "updatedAt": "2026-10-19T04:05:59.661Z"
   },
   {
     "relativePath": "docs/development.md",
@@ -1753,11 +1865,11 @@
   },
   {
     "relativePath": "openspec/changes/mvp-06-sandbox-runtime/design.md",
-    "summary": "Design mvp-06-sandbox-runtime: одна песочница из config, диспетчер reserve/activate, реестр PIPELINES (пуст в mvp-06), токены задачи, решения 1–17, D-35…D-38.",
+    "summary": "Design mvp-06: reserve/activate, prompt через stdin, agent_started_at и agent_pid в БД, принятый риск запасного pid-файла (п.18), токен aft_, resume по статусу, идемпотентная очистка.",
     "role": "doc",
-    "contentHash": "eb442645055fa386a669607c0955ee574a9128236d72cbaf486989d9dce42bbd",
+    "contentHash": "8facbebe8b60311b24c802118e33be492f7b454cd7c99d830728daf871f5eaad",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:46:40.239Z"
+    "updatedAt": "2026-10-19T07:54:23.222Z"
   },
   {
     "relativePath": "openspec/changes/mvp-06-sandbox-runtime/proposal.md",
@@ -1769,19 +1881,19 @@
   },
   {
     "relativePath": "openspec/changes/mvp-06-sandbox-runtime/specs/sandbox-runtime/spec.md",
-    "summary": "Спецификация sandbox-runtime mvp-06: активация песочницы под задачу, занятость, ошибка песочницы, повторный bootstrap, очистка токенов и паузы.",
+    "summary": "Спека sandbox-runtime mvp-06: активация, занятость, завершение агента по живости группы, рестарт worker, токен после рестарта, очистка каталога задачи, resume из error и paused.",
     "role": "doc",
-    "contentHash": "5dea9278f1ad4aabccfe5d77b2c9079eed11823ca0ff6c11178af764a9d8aa15",
+    "contentHash": "276480b120ea1659119ff6fd1a2b43dce278c7c34df09bdaa75c2f5c9b631f15",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:46:40.253Z"
+    "updatedAt": "2026-10-19T07:38:06.050Z"
   },
   {
     "relativePath": "openspec/changes/mvp-06-sandbox-runtime/tasks.md",
-    "summary": "Задачи OpenSpec mvp-06-sandbox-runtime: реализация рантайма песочницы; пункты по итогам спайка mvp-01 (pause, set_timeout, usage Claude Code) перенесены сюда.",
+    "summary": "Чек-лист mvp-06-sandbox-runtime: выполнены все пункты, включая раздел 6 (исправления после ревью); открыты только live-проверки 1.4 и 2.1.",
     "role": "doc",
-    "contentHash": "6886da887fcb3c05dc4bc50297f9616e10c7be62b709863d4b2eddd05bf8c6e3",
+    "contentHash": "a025b1b45c348e7c7a121a3814548ecd82065ebdab7a68ccb85632bdffbb27c2",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:27:10.195Z"
+    "updatedAt": "2026-10-19T07:53:10.260Z"
   },
   {
     "relativePath": "openspec/changes/mvp-06b-vps-provider/design.md",
@@ -2697,11 +2809,11 @@
   },
   {
     "relativePath": "shared/src/harness_shared/sandboxes.py",
-    "summary": "Pydantic-модели песочниц для внешнего мира (shared/), общие с API и консолью.",
+    "summary": "Общие модели песочниц: SandboxStatus (paused, active, error), AgentRole (planner, implementer и др.); Pydantic-модели, которые видят MCP, API и консоль.",
     "role": "module",
     "contentHash": "0ffe52c0e495605e5c4ea978344936683804b47366722886d9a4ae3ff446840d",
     "author": "agent",
-    "updatedAt": "2026-10-18T11:49:57.766Z"
+    "updatedAt": "2026-10-19T03:50:34.291Z"
   },
   {
     "relativePath": "shared/src/harness_shared/tasks.py",
