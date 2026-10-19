@@ -10,11 +10,14 @@
 
 - Готово: ТЗ v5 сохранено, CLAUDE.md, ARCHITECTURE.md, docs/, OpenSpec-изменения для MVP (9) и после MVP (40).
 - Готово и заархивировано: `mvp-01-novita-spike`, `mvp-02-foundation`, `mvp-03-task-store`, `mvp-04-telegram-intake`,
-  `mvp-05-command-routing` (модель `anthropic/claude-haiku-5.5`, live 10/10, D-55; проверка голосом через бота — после
-  деплоя), `mvp-06-sandbox-runtime` (live Novita 6/6, рантайм агента 2/2, демо «Контакты в README»; ложный «успех» при
+  `mvp-05-command-routing` (модель `anthropic/claude-haiku-5.5`, live 10/10, D-55; голос через бота проверен на проде
+  2026-10-19), `mvp-06-sandbox-runtime` (live Novita 6/6, рантайм агента 2/2, демо «Контакты в README»; ложный «успех» при
   исчерпанном лимите Claude исправлен, D-54), `sandbox-profile` (6c: ключи из vault, Node 22, Docker, memory-agent по sha,
   авторизация git заголовком; live 7/7, D-50…D-53). Спеки `platform-config`, `task-lifecycle`, `telegram-bot`,
   `speech-to-text`, `command-routing`, `sandbox-runtime`, `sandbox-profile` синхронизированы в `openspec/specs/`.
+- Прод (2026-10-19): `https://flow.w1do.ru` в Dokploy (D-59), секреты в vault `agents-flow/harness/*`; Telegram в обе стороны
+  через Cloudflare Worker владельца (D-61: `TELEGRAM_API_URL`, `TELEGRAM_WEBHOOK_URL`). Бот принимает текст и голос,
+  ставит задачи и отвечает о статусе; worker задачи пока не выполняет — `PIPELINES` пуст до `mvp-08`/`mvp-09`.
 - Блокеров нет: вопрос 3 закрыт (GitLab, D-01); репозитории workspace — GitHub или GitLab по выбору workspace (D-60).
 - Известное ограничение: пайплайн GitLab на реальном MR не запускался (remote репозитория — GitHub). Проверить при первом MR в GitLab; см. [docs/deployment.md](docs/deployment.md).
 - Следующее: `git-providers` (6e, D-60: workspace на GitHub или GitLab, первым `w1do/chistotyumen`), затем
