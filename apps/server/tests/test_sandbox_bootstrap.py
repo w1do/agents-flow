@@ -12,9 +12,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from harness_server.adapters.novita import ExecResult, FakeSandbox
+from harness_server.adapters.novita import ExecResult, FakeSandbox, SandboxUnavailable
 from harness_server.config import load_config
-from harness_server.services.sandboxes import BOOTSTRAP_SCRIPT_PATH, bootstrap
+from harness_server.services.sandboxes import BOOTSTRAP_SCRIPT_PREFIX, bootstrap
 from pydantic import SecretStr
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -27,10 +27,57 @@ GITLAB_TOKEN = "glpat-test-token-0123456789abcdef"
 MEMORY_REF = "0123456789abcdef0123456789abcdef01234567"
 MEMORY_REPO = "w1do/memory-agent"
 
-EXPECTED_COMMAND = (
-    f"bash {BOOTSTRAP_SCRIPT_PATH} --claude-version 2.1.292 --openspec-version 1.14.3 "
+EXPECTED_ARGS = (
+    "--claude-version 2.1.292 --openspec-version 1.14.3 "
     "--gitlab-url https://gitlab.com demo=https://gitlab.com/group/demo.git"
 )
+SCRIPT_PATH_RE = re.compile(r"/tmp/harness-bootstrap-[0-9a-f]{32}\.sh")
+
+
+def _written_script_paths(sandbox: FakeSandbox) -> list[str]:
+    """Пути, по которым bootstrap записал скрипт (уникальные на каждый запуск, D-52)."""
+    return [e.cmd for e in sandbox.journal if e.method == "write_file" and e.cmd is not None]
+
+
+def _script_path(sandbox: FakeSandbox) -> str:
+    paths = _written_script_paths(sandbox)
+    assert len(paths) == 1
+    assert SCRIPT_PATH_RE.fullmatch(paths[0]) is not None
+    return paths[0]
+
+
+class _FailingBashSandbox(FakeSandbox):
+    """Команда bootstrap падает SDK-ошибкой; очистка (rm) проходит. Журнал пишет FakeSandbox."""
+
+    async def exec(
+        self,
+        sandbox_id: str,
+        cmd: str,
+        *,
+        envs: dict[str, str] | None = None,
+        cwd: str | None = None,
+        timeout_s: float = 60,
+    ) -> ExecResult:
+        if cmd.startswith("bash "):
+            raise SandboxUnavailable("sdk_error")
+        return await super().exec(sandbox_id, cmd, envs=envs, cwd=cwd, timeout_s=timeout_s)
+
+
+class _FailingRmSandbox(FakeSandbox):
+    """rm падает: ошибка очистки не должна менять исход bootstrap."""
+
+    async def exec(
+        self,
+        sandbox_id: str,
+        cmd: str,
+        *,
+        envs: dict[str, str] | None = None,
+        cwd: str | None = None,
+        timeout_s: float = 60,
+    ) -> ExecResult:
+        if cmd.startswith("rm -f "):
+            raise SandboxUnavailable("sdk_error")
+        return await super().exec(sandbox_id, cmd, envs=envs, cwd=cwd, timeout_s=timeout_s)
 
 
 async def test_bootstrap_writes_script_and_runs_it_with_config_arguments() -> None:
@@ -46,11 +93,11 @@ async def test_bootstrap_writes_script_and_runs_it_with_config_arguments() -> No
     )
 
     assert result == ExecResult(exit_code=0, stdout="", stderr="")
-    # Скрипт записан по абсолютному пути: в журнале есть запись write_file с этим путём.
-    assert [e.cmd for e in sandbox.journal if e.method == "write_file"] == [BOOTSTRAP_SCRIPT_PATH]
-    assert sandbox.files_containing("echo ok") == [BOOTSTRAP_SCRIPT_PATH]
-    execs = [entry for entry in sandbox.journal if entry.method == "exec"]
-    assert [entry.cmd for entry in execs] == [EXPECTED_COMMAND]
+    # Скрипт записан по уникальному абсолютному пути и запущен с ним же (D-52, ревью).
+    path = _script_path(sandbox)
+    assert sandbox.files_containing("echo ok") == [path]
+    execs = [entry for entry in sandbox.journal if entry.method == "exec" and entry.cmd]
+    assert execs[0].cmd == f"bash {path} {EXPECTED_ARGS}"
     assert execs[0].env_keys == ("GITLAB_TOKEN", "GIT_TERMINAL_PROMPT", "HARNESS_SANDBOX_BOOTSTRAP")
 
 
@@ -84,7 +131,8 @@ async def test_bootstrap_connects_before_writing() -> None:
     )
 
     assert sandbox.paused is False
-    assert [entry.method for entry in sandbox.journal] == ["connect", "write_file", "exec"]
+    # После запуска скрипт удаляется отдельной командой rm (D-52, ревью).
+    assert [entry.method for entry in sandbox.journal] == ["connect", "write_file", "exec", "exec"]
 
 
 def test_repo_bootstrap_script_is_executable_and_has_no_secret_values() -> None:
@@ -113,9 +161,10 @@ async def test_memory_ref_goes_to_script_args_and_key_only_to_env() -> None:
         embedding_key=SecretStr(embedding),
     )
 
-    execs = [entry for entry in sandbox.journal if entry.method == "exec"]
+    path = _script_path(sandbox)
+    execs = [entry for entry in sandbox.journal if entry.method == "exec" and entry.cmd]
     assert execs[0].cmd == (
-        f"bash {BOOTSTRAP_SCRIPT_PATH} --claude-version 2.1.292 --openspec-version 1.14.3 "
+        f"bash {path} --claude-version 2.1.292 --openspec-version 1.14.3 "
         "--gitlab-url https://gitlab.com "
         f"--memory-ref {MEMORY_REF} --memory-repo {MEMORY_REPO} demo=https://gitlab.com/group/demo.git"
     )
@@ -164,7 +213,8 @@ async def test_memory_bootstrap_uses_longer_timeout() -> None:
         memory_repo=MEMORY_REPO,
     )
 
-    assert sandbox.exec_timeouts == [1800]
+    # Первая команда — bootstrap с длинным таймаутом; следом идёт короткий rm очистки скрипта.
+    assert sandbox.exec_timeouts[0] == 1800
 
 
 def test_script_does_not_embed_embedding_key_literal() -> None:
@@ -531,3 +581,58 @@ def test_apt_update_precedes_apt_install_in_every_function() -> None:
         ordered = update is not None and update.start() < install.start()
         assert ordered, f"apt_install без apt_update раньше в функции: {first_line}"
     assert checked >= 3  # ensure_node, ensure_acl, ensure_docker (и их ветки)
+
+
+async def test_consecutive_bootstraps_use_different_script_paths() -> None:
+    """Повторный bootstrap не пишет в тот же файл: fs.protected_regular=2 в sticky /tmp (D-52)."""
+    config = load_config(EXAMPLE_CONFIG)
+    sandbox = FakeSandbox(sandbox_id=SANDBOX_ID)
+
+    for _ in range(2):
+        await bootstrap(
+            sandbox, SANDBOX_ID, config, script="echo ok\n", gitlab_token=SecretStr(GITLAB_TOKEN)
+        )
+
+    paths = _written_script_paths(sandbox)
+    assert len(paths) == 2
+    assert paths[0] != paths[1]
+    assert all(SCRIPT_PATH_RE.fullmatch(p) for p in paths)
+    assert all(p.startswith(BOOTSTRAP_SCRIPT_PREFIX) for p in paths)
+
+
+async def test_script_is_removed_after_successful_bootstrap() -> None:
+    config = load_config(EXAMPLE_CONFIG)
+    sandbox = FakeSandbox(sandbox_id=SANDBOX_ID)
+
+    await bootstrap(
+        sandbox, SANDBOX_ID, config, script="echo ok\n", gitlab_token=SecretStr(GITLAB_TOKEN)
+    )
+
+    path = _script_path(sandbox)
+    rm_cmds = [e.cmd for e in sandbox.journal if e.method == "exec" and e.cmd and "rm -f" in e.cmd]
+    assert rm_cmds == [f"rm -f {path}"]
+
+
+async def test_script_is_removed_when_bootstrap_command_fails() -> None:
+    config = load_config(EXAMPLE_CONFIG)
+    sandbox = _FailingBashSandbox(sandbox_id=SANDBOX_ID)
+
+    with pytest.raises(SandboxUnavailable):
+        await bootstrap(
+            sandbox, SANDBOX_ID, config, script="echo ok\n", gitlab_token=SecretStr(GITLAB_TOKEN)
+        )
+
+    path = _script_path(sandbox)
+    rm_cmds = [e.cmd for e in sandbox.journal if e.method == "exec" and e.cmd and "rm -f" in e.cmd]
+    assert rm_cmds == [f"rm -f {path}"]
+
+
+async def test_failed_script_cleanup_does_not_change_bootstrap_result() -> None:
+    config = load_config(EXAMPLE_CONFIG)
+    sandbox = _FailingRmSandbox(sandbox_id=SANDBOX_ID)
+
+    result = await bootstrap(
+        sandbox, SANDBOX_ID, config, script="echo ok\n", gitlab_token=SecretStr(GITLAB_TOKEN)
+    )
+
+    assert result.exit_code == 0

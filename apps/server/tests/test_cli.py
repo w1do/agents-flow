@@ -433,7 +433,7 @@ def test_sandbox_bootstrap_redacts_vault_value_in_failure_output(
     fake = FakeSandbox(
         sandbox_id=load_config(Path(valid_env["HARNESS_CONFIG"])).sandbox.provider_id
     )
-    fake.respond("bash /tmp/harness-bootstrap.sh", exit_code=1, stderr=f"ошибка {VAULT_GITLAB}")
+    fake.respond("bash /tmp/harness-bootstrap-", exit_code=1, stderr=f"ошибка {VAULT_GITLAB}")
     vault = FakeVault({VaultRef("demo", "gitlab", "main"): VAULT_GITLAB})
     monkeypatch.setattr(wiring, "build_sandbox_provider", lambda settings: fake)
     monkeypatch.setattr(wiring, "build_vault", lambda settings: vault)
@@ -463,7 +463,7 @@ def test_sandbox_bootstrap_redacts_auth_header_in_failure_output(
         sandbox_id=load_config(Path(valid_env["HARNESS_CONFIG"])).sandbox.provider_id
     )
     header = sandboxes.git_auth_header(VAULT_GITLAB)
-    fake.respond("bash /tmp/harness-bootstrap.sh", exit_code=1, stderr=f"эхо {header}")
+    fake.respond("bash /tmp/harness-bootstrap-", exit_code=1, stderr=f"эхо {header}")
     vault = FakeVault({VaultRef("demo", "gitlab", "main"): VAULT_GITLAB})
     monkeypatch.setattr(wiring, "build_sandbox_provider", lambda settings: fake)
     monkeypatch.setattr(wiring, "build_vault", lambda settings: vault)
@@ -493,7 +493,7 @@ def test_sandbox_bootstrap_redacts_bare_base64_in_failure_output(
         sandbox_id=load_config(Path(valid_env["HARNESS_CONFIG"])).sandbox.provider_id
     )
     _, bare = sandboxes.git_auth_secret_values(VAULT_GITLAB)
-    fake.respond("bash /tmp/harness-bootstrap.sh", exit_code=1, stderr=f"эхо {bare}")
+    fake.respond("bash /tmp/harness-bootstrap-", exit_code=1, stderr=f"эхо {bare}")
     vault = FakeVault({VaultRef("demo", "gitlab", "main"): VAULT_GITLAB})
     monkeypatch.setattr(wiring, "build_sandbox_provider", lambda settings: fake)
     monkeypatch.setattr(wiring, "build_vault", lambda settings: vault)

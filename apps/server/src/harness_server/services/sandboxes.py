@@ -10,6 +10,7 @@ import base64
 import json
 import logging
 import shlex
+import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -44,8 +45,9 @@ logger = logging.getLogger(__name__)
 
 # Запас сверх лимита агента: токен не должен истечь раньше, чем агент отработает весь лимит (D-37).
 TOKEN_EXPIRY_MARGIN: Final = timedelta(minutes=10)
-# Скрипт кладётся в /tmp: путь абсолютный, поэтому не зависит от домашнего каталога песочницы.
-BOOTSTRAP_SCRIPT_PATH: Final = "/tmp/harness-bootstrap.sh"
+# Скрипт кладётся в /tmp с уникальным именем на каждый запуск (D-52, ревью): envd пишет от root,
+# а fs.protected_regular=2 не даёт открыть на запись существующий файл другого uid в sticky /tmp.
+BOOTSTRAP_SCRIPT_PREFIX: Final = "/tmp/harness-bootstrap-"
 # Клон и npm-установка медленные, но не должны висеть бесконечно: 15 минут.
 BOOTSTRAP_TIMEOUT_SEC: Final = 900
 # С памятью первый memory init индексирует проекты: без запаса по времени он оборвётся (D-47).
@@ -145,6 +147,14 @@ def git_auth_secret_values(token: str) -> tuple[str, str]:
     return header, header.removeprefix("Authorization: Basic ")
 
 
+async def _remove_bootstrap_script(provider: SandboxProvider, sandbox_id: str, path: str) -> None:
+    """Удаляет временный скрипт bootstrap. Сбой rm не меняет исход, текст не логируется."""
+    try:
+        await provider.exec(sandbox_id, f"rm -f {shlex.quote(path)}", timeout_s=SHORT_TIMEOUT_SEC)
+    except Exception as exc:
+        logger.warning("bootstrap script cleanup failed type=%s", type(exc).__name__)
+
+
 async def bootstrap(
     provider: SandboxProvider,
     sandbox_id: str,
@@ -179,7 +189,8 @@ async def bootstrap(
     if memory_ref is not None and memory_repo is not None:
         args += ["--memory-ref", memory_ref, "--memory-repo", memory_repo]
     args += [f"{ws.id}={clone_url(config, ws)}" for ws in config.workspaces]
-    command = shlex.join(["bash", BOOTSTRAP_SCRIPT_PATH, *args])
+    script_path = f"{BOOTSTRAP_SCRIPT_PREFIX}{uuid.uuid4().hex}.sh"
+    command = shlex.join(["bash", script_path, *args])
 
     # GITLAB_TOKEN нужен скрипту, чтобы собрать заголовок git; скрипт снимает его из env сразу.
     # Без токена (публичные репозитории) переменной нет: клоны идут анонимно.
@@ -193,8 +204,12 @@ async def bootstrap(
     timeout_s = BOOTSTRAP_TIMEOUT_SEC if memory_ref is None else BOOTSTRAP_MEMORY_TIMEOUT_SEC
 
     await provider.connect(sandbox_id)
-    await provider.write_file(sandbox_id, BOOTSTRAP_SCRIPT_PATH, script)
-    result = await provider.exec(sandbox_id, command, envs=envs, timeout_s=timeout_s)
+    try:
+        await provider.write_file(sandbox_id, script_path, script)
+        result = await provider.exec(sandbox_id, command, envs=envs, timeout_s=timeout_s)
+    finally:
+        # Скрипт не остаётся в песочнице и при сбое записи или запуска (ревью, D-52).
+        await _remove_bootstrap_script(provider, sandbox_id, script_path)
     logger.info("sandbox bootstrap finished sandbox=%s exit_code=%s", sandbox_id, result.exit_code)
     return result
 
