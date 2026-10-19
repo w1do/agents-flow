@@ -23,19 +23,39 @@ VAULT_TIMEOUT_SEC: Final = 30
 # Имя инструмента и поле с секретом — по решению владельца (proposal, открытый вопрос 1).
 _TOOL_NAME: Final = "get_credential"
 _SECRET_FIELD: Final = "secret"
+_CREDENTIAL_FIELD: Final = "credential"
+
+
+def _secret_from_payload(payload: object) -> str | None:
+    """Значение секрета из объекта ответа: top-level `secret` или вложенный `credential.secret`.
+
+    Пустая строка, не-строка и не-объект — None. Значение в тексте ошибки не появляется: сюда
+    возвращается только сам секрет или None.
+    """
+    if not isinstance(payload, dict):
+        return None
+    direct = payload.get(_SECRET_FIELD)
+    if isinstance(direct, str) and direct:
+        return direct
+    credential = payload.get(_CREDENTIAL_FIELD)
+    if isinstance(credential, dict):
+        nested = credential.get(_SECRET_FIELD)
+        if isinstance(nested, str) and nested:
+            return nested
+    return None
 
 
 def parse_credential(result: types.CallToolResult, label: str) -> SecretStr:
     """Значение секрета из ответа get_credential.
 
-    Сначала structuredContent (поле secret), затем первый текстовый блок как JSON-объект с полем
-    secret. Иначе — invalid_response. label (service/name) попадает только в текст ошибки.
+    Принимаются две формы: top-level `{"secret": str}` и вложенная `{"credential": {"secret": str}}`
+    (так отвечает project-vault 1.0.0, проверено 2026-10-19). Сначала structuredContent, затем
+    первый текстовый блок как JSON. Иначе — invalid_response. label (service/name) попадает только
+    в текст ошибки.
     """
-    structured = result.structured_content
-    if isinstance(structured, dict):
-        value = structured.get(_SECRET_FIELD)
-        if isinstance(value, str) and value:
-            return SecretStr(value)
+    secret = _secret_from_payload(result.structured_content)
+    if secret is not None:
+        return SecretStr(secret)
     for block in result.content:
         if not isinstance(block, types.TextContent):
             continue
@@ -43,9 +63,9 @@ def parse_credential(result: types.CallToolResult, label: str) -> SecretStr:
             payload = json.loads(block.text)
         except ValueError:
             break
-        value = payload.get(_SECRET_FIELD) if isinstance(payload, dict) else None
-        if isinstance(value, str) and value:
-            return SecretStr(value)
+        secret = _secret_from_payload(payload)
+        if secret is not None:
+            return SecretStr(secret)
         break
     raise VaultError("invalid_response", ref=label)
 

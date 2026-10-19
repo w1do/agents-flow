@@ -5,6 +5,7 @@
 """
 
 import asyncio
+import json
 from typing import Any
 
 import httpx2
@@ -240,3 +241,68 @@ def test_build_vault_needs_url_and_token(
 
     monkeypatch.setenv("VAULT_MCP_TOKEN", VAULT_TOKEN)
     assert isinstance(wiring.build_vault(load_settings()), McpSecretVault)
+
+
+REAL_SHAPE_SECRET = "cred-test-value-0123456789abcdef"
+
+
+def test_parse_credential_reads_nested_credential_in_text_block() -> None:
+    """Форма project-vault 1.0.0: текстовый блок с объектом credential (проверено 2026-10-19)."""
+    from harness_server.adapters.vault.mcp_client import parse_credential
+
+    payload = {
+        "credential": {
+            "id": "c-1",
+            "projectId": "p-1",
+            "projectName": "demo",
+            "service": "gitlab",
+            "name": "main",
+            "status": "active",
+            "createdAt": "2026-10-01T00:00:00Z",
+            "updatedAt": "2026-10-02T00:00:00Z",
+            "secret": REAL_SHAPE_SECRET,
+        }
+    }
+    result = types.CallToolResult(
+        content=[types.TextContent(type="text", text=json.dumps(payload))],
+        structured_content=None,
+    )
+
+    assert parse_credential(result, "gitlab/main").get_secret_value() == REAL_SHAPE_SECRET
+
+
+def test_parse_credential_reads_nested_credential_in_structured_content() -> None:
+    from harness_server.adapters.vault.mcp_client import parse_credential
+
+    result = types.CallToolResult(
+        content=[], structured_content={"credential": {"secret": REAL_SHAPE_SECRET}}
+    )
+
+    assert parse_credential(result, "gitlab/main").get_secret_value() == REAL_SHAPE_SECRET
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"credential": "cred-test-plain-0123456789"},  # credential не объект
+        {"credential": ["cred-test-plain-0123456789"]},
+        {"credential": {"name": "main"}},  # credential без secret
+        {"credential": {"secret": ""}},  # пустой secret
+        {"credential": {"secret": 42}},  # secret не строка
+    ],
+)
+def test_parse_credential_invalid_nested_shapes_are_invalid_response(
+    payload: dict[str, Any],
+) -> None:
+    from harness_server.adapters.vault.mcp_client import parse_credential
+
+    text_result = types.CallToolResult(
+        content=[types.TextContent(type="text", text=json.dumps(payload))]
+    )
+    structured_result = types.CallToolResult(content=[], structured_content=payload)
+
+    for result in (text_result, structured_result):
+        with pytest.raises(VaultError) as info:
+            parse_credential(result, "gitlab/main")
+        assert info.value.reason == "invalid_response"
+        assert "cred-test-plain" not in str(info.value)

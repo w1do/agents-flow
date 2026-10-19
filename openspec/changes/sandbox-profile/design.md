@@ -55,8 +55,11 @@ vault и не пишутся на диск песочницы; у агента �
     (`mcp.client.streamable_http`) с заголовком `Authorization: Bearer <token>`, `ClientSession.initialize()`,
     `call_tool("get_credential", {"project", "service", "name"})`, общий дедлайн `asyncio.timeout(timeout_s)` →
     `timeout`; сеть и протокол → `unavailable`; `isError` → `tool_error`. Значение — чистая функция
-    `parse_credential(result) -> SecretStr`: `structuredContent["secret"]`, иначе первый текстовый блок как JSON-объект с
-    ключом `secret`; иначе `invalid_response`. Импорт `mcp` — только в этом файле.
+    `parse_credential(result) -> SecretStr`. Принимаются две формы, в `structuredContent` и в первом текстовом блоке
+    (JSON-объект): top-level `{"secret": str}` и вложенная `{"credential": {"secret": str}}`. Значение — непустая строка;
+    иначе `invalid_response`. Реальный `project-vault 1.0.0` отдаёт текстовый блок
+    `{"credential": {..., "secret"}}` (проверено 2026-10-19), `structuredContent` при этом пуст. Импорт `mcp` — только в
+    этом файле.
   - `__init__.py` реэкспортирует `SecretVault`, `VaultError`, `FakeVault`, `McpSecretVault`.
 - `settings.py`: `vault_mcp_url: str | None` (валидатор: только `https://`), `vault_mcp_token: SecretStr | None`.
   `wiring.build_vault(settings) -> SecretVault | None` — `None`, если URL или токен не задан.

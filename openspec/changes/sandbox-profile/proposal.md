@@ -13,7 +13,8 @@
    `adapters/vault/mcp_client.py`. Имя поля с секретом в ответе `get_credential` (заложено `secret`).
    Ответ владельца 2026-10-19: URL `https://safe.w1do.ru/mcp` (сервер `project-vault 1.0.0`). Streamable HTTP и
    `Authorization: Bearer <VAULT_MCP_TOKEN>` подтверждены проверкой (initialize и list_tools прошли); инструмент
-   `get_credential(project, service, name)` подтверждён. Имя поля `secret` в ответе ещё не подтверждено: проверяется в live 5.x.
+   `get_credential(project, service, name)` подтверждён. Имя поля в ответе подтверждено: `credential.secret` (ответ `project-vault 1.0.0` — один текстовый блок JSON
+   `{"credential": {..., "secret": str}}`, проверено 2026-10-19). Принимается и top-level `secret` (см. design, Decision 1).
 2. **Ссылки на ключи в vault** (`<project>/<service>/<name>`): главный ключ GitLab, ключ embeddings Polza для memory-agent.
    Ответ владельца 2026-10-19: главный ключ GitLab — `vault:Workflow/Gitlab/админский` (админский токен; владелец принял
    риск, D-50); ключ embeddings — `vault:Сервисы/Polza/EmbeddingsMemory` (отдельный ключ Polza для песочницы). Эти ссылки
