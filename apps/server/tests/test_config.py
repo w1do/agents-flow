@@ -1,11 +1,14 @@
 """Сценарии platform-config 1 (секреты в YAML) и 2 (уникальность id workspace)."""
 
+import json
 from pathlib import Path
 
 import pytest
 from harness_server.config import ConfigError, load_config
 
 EXAMPLE_CONFIG = Path(__file__).resolve().parents[3] / "config" / "harness.example.yaml"
+# Фиктивный sha для тестов (D-51): настоящий закреплённый коммит — только в harness.yaml и D-51.
+MEMORY_REF = "0123456789abcdef0123456789abcdef01234567"
 
 WORKSPACE_BLOCK = """\
   - id: {id}
@@ -325,3 +328,188 @@ def test_sandbox_version_must_be_semver(tmp_path: Path, version: str) -> None:
         load_config(_write(tmp_path, body))
 
     assert "sandbox.claude_code_version" in str(info.value)
+
+
+WORKSPACE_ONLY = (
+    "workspaces:\n"
+    "  - id: demo\n"
+    "    name: Demo\n"
+    "    voice_aliases: []\n"
+    "    gitlab_project: group/demo\n"
+)
+
+
+def test_gitlab_access_ref_accepts_vault_reference(tmp_path: Path) -> None:
+    body = WORKSPACE_ONLY + TAIL + "  access_ref: vault:demo/gitlab/main\n"
+
+    config = load_config(_write(tmp_path, body))
+
+    assert config.gitlab.access_ref == "vault:demo/gitlab/main"
+
+
+def test_gitlab_access_ref_must_be_vault_reference(tmp_path: Path) -> None:
+    body = WORKSPACE_ONLY + TAIL + "  access_ref: glpat-plain\n"
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "access_ref" in str(info.value)
+    assert "glpat-plain" not in str(info.value)
+
+
+def _memory_body(memory_lines: str) -> str:
+    """Конфиг с блоком sandbox.memory; memory_lines — строки под memory (с отступом 4)."""
+    return (
+        WORKSPACE_ONLY
+        + "sandbox:\n"
+        + "  provider_id: sbx-1\n"
+        + "  memory:\n"
+        + memory_lines
+        + "gitlab:\n"
+        + "  base_url: https://gitlab.example.com\n"
+    )
+
+
+def test_memory_block_is_optional_and_parsed(tmp_path: Path) -> None:
+    plain = load_config(_write(tmp_path, WORKSPACE_ONLY + TAIL))
+    assert plain.sandbox.memory is None
+
+    body = _memory_body(f"    ref: {MEMORY_REF}\n    embedding_ref: vault:demo/polza/embeddings\n")
+    config = load_config(_write(tmp_path, body))
+
+    assert config.sandbox.memory is not None
+    assert config.sandbox.memory.ref == MEMORY_REF
+    assert config.sandbox.memory.repo == "w1do/memory-agent"
+    assert config.sandbox.memory.embedding_ref == "vault:demo/polza/embeddings"
+
+
+@pytest.mark.parametrize(
+    "ref",
+    [
+        "v1.0.0",  # тег изменяем
+        "main",  # ветка изменяема
+        "09e5e63",  # короткий sha неоднозначен
+        MEMORY_REF.upper(),  # sha в верхнем регистре
+        MEMORY_REF + "0",  # 41 символ
+    ],
+)
+def test_memory_ref_must_be_full_commit_sha(tmp_path: Path, ref: str) -> None:
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, _memory_body(f"    ref: {ref}\n")))
+
+    assert "memory.ref" in str(info.value)
+    assert ref not in str(info.value)
+
+
+def test_memory_ref_is_required(tmp_path: Path) -> None:
+    with pytest.raises(ConfigError) as info:
+        load_config(
+            _write(tmp_path, _memory_body("    embedding_ref: vault:demo/polza/embeddings\n"))
+        )
+
+    assert "memory.ref" in str(info.value)
+
+
+@pytest.mark.parametrize("repo", ["a/b/c", "w1do", "w1do/memory agent"])
+def test_memory_repo_must_be_owner_slash_name(tmp_path: Path, repo: str) -> None:
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, _memory_body(f"    repo: {repo}\n    ref: {MEMORY_REF}\n")))
+
+    assert "memory.repo" in str(info.value)
+
+
+@pytest.mark.parametrize("repo", ["../..", "./.", "-x/y", "x./y", "w1do/-agent", "w1do/agent."])
+def test_memory_repo_segments_must_start_and_end_with_alnum(tmp_path: Path, repo: str) -> None:
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, _memory_body(f"    repo: {repo}\n    ref: {MEMORY_REF}\n")))
+
+    assert "memory.repo" in str(info.value)
+
+
+def test_memory_repo_accepts_fork_name(tmp_path: Path) -> None:
+    body = _memory_body(f"    repo: other-org/memory-agent.fork\n    ref: {MEMORY_REF}\n")
+
+    config = load_config(_write(tmp_path, body))
+
+    assert config.sandbox.memory is not None
+    assert config.sandbox.memory.repo == "other-org/memory-agent.fork"
+
+
+def test_memory_version_field_is_rejected(tmp_path: Path) -> None:
+    body = _memory_body(f"    version: 1.2.3\n    ref: {MEMORY_REF}\n")
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "version" in str(info.value)
+
+
+def test_memory_embedding_ref_must_be_vault_reference(tmp_path: Path) -> None:
+    body = (
+        WORKSPACE_ONLY
+        + "sandbox:\n"
+        + "  provider_id: sbx-1\n"
+        + "  memory:\n"
+        + f"    ref: {MEMORY_REF}\n"
+        + "    embedding_ref: sk-plain-key-value\n"
+        + "gitlab:\n"
+        + "  base_url: https://gitlab.example.com\n"
+    )
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "sk-plain-key-value" not in str(info.value)
+
+
+def test_git_author_defaults_when_block_absent(tmp_path: Path) -> None:
+    config = load_config(_write(tmp_path, WORKSPACE_ONLY + TAIL))
+
+    assert config.sandbox.git_author.name == "agents-flow"
+    assert config.sandbox.git_author.email == "agents-flow@noreply.local"
+
+
+def test_git_author_custom_values_accepted(tmp_path: Path) -> None:
+    body = (
+        WORKSPACE_ONLY
+        + "sandbox:\n  provider_id: sbx-1\n  git_author:\n    name: Agent Bot\n"
+        + "    email: bot@example.com\n"
+        + "gitlab:\n  base_url: https://gitlab.example.com\n"
+    )
+
+    config = load_config(_write(tmp_path, body))
+
+    assert config.sandbox.git_author.name == "Agent Bot"
+    assert config.sandbox.git_author.email == "bot@example.com"
+
+
+@pytest.mark.parametrize("name", ["   ", "a\nb", "x" * 101])
+def test_git_author_name_rejected_when_blank_control_or_long(tmp_path: Path, name: str) -> None:
+    body = (
+        WORKSPACE_ONLY
+        + "sandbox:\n  provider_id: sbx-1\n  git_author:\n    name: "
+        + json.dumps(name)
+        + "\n"
+        + "gitlab:\n  base_url: https://gitlab.example.com\n"
+    )
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "git_author" in str(info.value)
+
+
+@pytest.mark.parametrize("email", ["no-at-sign", "a b@c.d", "a@b@c"])
+def test_git_author_email_must_be_simple_address(tmp_path: Path, email: str) -> None:
+    body = (
+        WORKSPACE_ONLY
+        + "sandbox:\n  provider_id: sbx-1\n  git_author:\n    email: "
+        + repr(email)
+        + "\n"
+        + "gitlab:\n  base_url: https://gitlab.example.com\n"
+    )
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "git_author" in str(info.value)

@@ -254,6 +254,8 @@ async def _activate(provider: SandboxProvider, sandbox_id: str, task: Task) -> N
         base_ref=DEFAULT_BRANCH,
         timeout_min=AGENT_TIMEOUT_MIN,
         gitlab_token=SecretStr(UNUSED_GITLAB_TOKEN),
+        # Локальный origin не совпадает с префиксом GitLab: заголовок не уйдёт (D-52).
+        gitlab_base_url=BASE_CONFIG.gitlab.base_url,
     )
 
 

@@ -56,6 +56,35 @@ Job `deploy:dokploy` не добавляет `curl -v` и `--trace`: при ош
 что агент в песочнице не работает, и затем вручную в БД сбрасывает `current_task_id` и статус песочницы.
 Это разовое действие владельца, не команда CLI; SQL с конкретными значениями в документацию не добавляется.
 
+## Песочница: профиль и память (sandbox-profile)
+
+- Ключи владельца лежат в vault. Серверу нужны ENV `VAULT_MCP_URL` (только `https://`) и `VAULT_MCP_TOKEN` (секрет).
+  В `harness.yaml` — ссылки `gitlab.access_ref` и `sandbox.memory.embedding_ref` вида `vault:<project>/<service>/<name>`.
+  Без `access_ref` сервер берёт `GITLAB_TOKEN` из ENV, как раньше.
+- Значения для боевого запуска (D-50): `VAULT_MCP_URL=https://safe.w1do.ru/mcp`; `VAULT_MCP_TOKEN` — значение задаёт
+  владелец и вносит только в ENV Dokploy (в репозиторий и документацию не пишется). В боевом `harness.yaml`:
+  `gitlab.access_ref: "vault:Workflow/Gitlab/админский"` и `sandbox.memory.embedding_ref: "vault:Сервисы/Polza/EmbeddingsMemory"`.
+  В `config/harness.example.yaml` эти ссылки не заносятся.
+- Первый bootstrap с памятью (после заполнения `sandbox.memory`): `harness-server sandbox bootstrap`. Команда
+  ставит Node 22, Docker, memory-agent из GitHub на коммите `sandbox.memory.ref` и индексирует клоны. Повторный запуск не
+  переустанавливает совпадающие версии и не клонирует заново.
+- Блок памяти в `harness.yaml` (закреплённый коммит memory-agent, D-51):
+  ```yaml
+  sandbox:
+    memory:
+      ref: 09e5e63ac721db75020fcfa69e33930750975139
+      embedding_ref: vault:Сервисы/Polza/EmbeddingsMemory
+  ```
+  `repo` не задан — `w1do/memory-agent`. Пакет `project-memory` из реестра npm не ставится: он чужой.
+- memory-agent собирается от пользователя песочницы по lockfile коммита; команда `memory` — симлинк `/usr/local/bin/memory`.
+- Обновление memory-agent: новый полный sha в `ref` и повторный `harness-server sandbox bootstrap`. Тег и ветка
+  в `ref` не принимаются; маркер `~/.harness/memory/installed-ref` сверяет установленный коммит.
+- Рекомендация: ключ embeddings для песочницы — отдельный ключ Polza с лимитом расходов, не основной ключ.
+  Ключ доступен процессам песочницы на время команды (см. design, Risks).
+- После паузы Novita демон Docker поднимает `~/.harness/bin/ensure-docker.sh`; активация вызывает его сама.
+- Ошибка vault при bootstrap: код 1, причина `vault`, строка песочницы не меняется. Ошибка vault при активации:
+  задача в `error` с причиной `vault`. Сбой `memory sync` при активации задачу не роняет (см. лог worker).
+
 ## Песочница: токены, изоляция и allowlist (mvp-06)
 
 - Токен подписки `CLAUDE_CODE_OAUTH_TOKEN` и `GITLAB_TOKEN` живут только в ENV Dokploy. Агент получает их

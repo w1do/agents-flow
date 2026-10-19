@@ -290,3 +290,26 @@ def test_routing_min_confidence_out_of_range_rejected(
         load_settings()
 
     assert "ROUTING_MIN_CONFIDENCE" in str(info.value)
+
+
+def test_vault_mcp_url_must_be_https(valid_env: dict[str, str], monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("VAULT_MCP_URL", "http://vault.example/mcp")
+
+    with pytest.raises(SettingsError) as info:
+        load_settings()
+
+    assert "VAULT_MCP_URL" in str(info.value)
+
+
+def test_vault_settings_optional_and_token_hidden(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch
+) -> None:
+    assert load_settings().vault_mcp_url is None
+    assert load_settings().vault_mcp_token is None
+
+    monkeypatch.setenv("VAULT_MCP_URL", "https://vault.example/mcp")
+    monkeypatch.setenv("VAULT_MCP_TOKEN", "vault-token-test-0123456789abcdef")
+    settings = load_settings()
+
+    assert settings.vault_mcp_url == "https://vault.example/mcp"
+    assert "vault-token-test" not in repr(settings)

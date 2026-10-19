@@ -6,10 +6,12 @@
 идентификаторы, роли и коды; текст из песочницы — только после redaction.
 """
 
+import base64
 import json
 import logging
 import shlex
-from collections.abc import Sequence
+import uuid
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
@@ -23,7 +25,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from harness_server.adapters.novita import ExecResult, SandboxError, SandboxProvider
-from harness_server.config import HarnessConfig, WorkspaceConfig
+from harness_server.config import GitAuthorConfig, HarnessConfig, WorkspaceConfig
 from harness_server.db.models import Sandbox, Task, TaskToken
 from harness_server.domain.errors import UnknownWorkspace, UnsupportedKind
 from harness_server.security import tokens
@@ -43,10 +45,13 @@ logger = logging.getLogger(__name__)
 
 # Запас сверх лимита агента: токен не должен истечь раньше, чем агент отработает весь лимит (D-37).
 TOKEN_EXPIRY_MARGIN: Final = timedelta(minutes=10)
-# Скрипт кладётся в /tmp: путь абсолютный, поэтому не зависит от домашнего каталога песочницы.
-BOOTSTRAP_SCRIPT_PATH: Final = "/tmp/harness-bootstrap.sh"
+# Скрипт кладётся в /tmp с уникальным именем на каждый запуск (D-52, ревью): envd пишет от root,
+# а fs.protected_regular=2 не даёт открыть на запись существующий файл другого uid в sticky /tmp.
+BOOTSTRAP_SCRIPT_PREFIX: Final = "/tmp/harness-bootstrap-"
 # Клон и npm-установка медленные, но не должны висеть бесконечно: 15 минут.
 BOOTSTRAP_TIMEOUT_SEC: Final = 900
+# С памятью первый memory init индексирует проекты: без запаса по времени он оборвётся (D-47).
+BOOTSTRAP_MEMORY_TIMEOUT_SEC: Final = 1800
 # Роль агента по типу задачи (design 7): план — planner, реализация — implementer.
 _ROLE_BY_KIND: Final = {
     TaskKind.PLAN: AgentRole.PLANNER,
@@ -111,38 +116,110 @@ def clone_url(config: HarnessConfig, workspace: WorkspaceConfig) -> str:
     return f"{config.gitlab.base_url.rstrip('/')}/{workspace.gitlab_project}.git"
 
 
+def git_auth_header(token: str) -> str:
+    """Заголовок Basic для git: oauth2:<token> в base64 (D-52). Значение — секрет."""
+    basic = base64.b64encode(f"oauth2:{token}".encode()).decode("ascii")
+    return f"Authorization: Basic {basic}"
+
+
+def git_auth_env(base_url: str, token: str) -> dict[str, str]:
+    """env git-команды: заголовок только для URL, начинающихся с base_url (D-52).
+
+    GIT_CONFIG_* передаются через env, а не argv и не файлы; git сопоставляет http.<url>.*
+    по префиксу
+    URL, поэтому другой хост заголовка не получает. Требуется git >= 2.31 (Ubuntu 24.04 — 2.43).
+    """
+    prefix = f"{base_url.rstrip('/')}/"
+    # Редиректы выключены, чтобы заголовок не ушёл на другой хост (D-52).
+    return {
+        "GIT_CONFIG_COUNT": "2",
+        "GIT_CONFIG_KEY_0": f"http.{prefix}.extraHeader",
+        "GIT_CONFIG_VALUE_0": git_auth_header(token),
+        "GIT_CONFIG_KEY_1": "http.followRedirects",
+        "GIT_CONFIG_VALUE_1": "false",
+        "GIT_TERMINAL_PROMPT": "0",
+    }
+
+
+def git_author_env(author: GitAuthorConfig) -> dict[str, str]:
+    """env агента для коммитов: автор и коммиттер из sandbox.git_author (env запуска, не файл)."""
+    return {
+        "GIT_AUTHOR_NAME": author.name,
+        "GIT_AUTHOR_EMAIL": author.email,
+        "GIT_COMMITTER_NAME": author.name,
+        "GIT_COMMITTER_EMAIL": author.email,
+    }
+
+
+def git_auth_secret_values(token: str) -> tuple[str, str]:
+    """Секреты заголовка для redaction: полная строка заголовка и bare base64 из неё (D-52)."""
+    header = git_auth_header(token)
+    return header, header.removeprefix("Authorization: Basic ")
+
+
+async def _remove_bootstrap_script(provider: SandboxProvider, sandbox_id: str, path: str) -> None:
+    """Удаляет временный скрипт bootstrap. Сбой rm не меняет исход, текст не логируется."""
+    try:
+        await provider.exec(sandbox_id, f"rm -f {shlex.quote(path)}", timeout_s=SHORT_TIMEOUT_SEC)
+    except Exception as exc:
+        logger.warning("bootstrap script cleanup failed type=%s", type(exc).__name__)
+
+
 async def bootstrap(
     provider: SandboxProvider,
     sandbox_id: str,
     config: HarnessConfig,
     *,
     script: str,
-    gitlab_token: SecretStr,
+    gitlab_token: SecretStr | None,
+    memory_ref: str | None = None,
+    memory_repo: str | None = None,
+    embedding_key: SecretStr | None = None,
 ) -> ExecResult:
-    """Подготавливает песочницу скриптом deploy/sandbox/bootstrap.sh (design 16).
+    """Подготавливает песочницу скриптом deploy/sandbox/bootstrap.sh (design 16, 3).
 
     Скрипт записывается в песочницу как есть и запускается с версиями и парами <id>=<url> из
-    конфига. Токен GitLab передаётся только в env этой команды: в скрипт и файлы он не попадает.
-    Возвращает результат команды; код ненулевой — ответственность вызывающего (CLI). Вывод команды
-    вызывающий должен пропустить через redaction, прежде чем показать.
+    конфига. memory_ref — полный sha коммита memory-agent, memory_repo — его GitHub-репозиторий
+    (D-51): задаются вместе, иначе ValueError до любого вызова провайдера. Тогда bootstrap ставит
+    Docker и memory-agent и индексирует клоны (D-47). Ключи (GitLab и embeddings) передаются только
+    в env этой команды: в скрипт и файлы они не попадают. Возвращает результат команды; код
+    ненулевой — ответственность вызывающего (CLI). Вывод команды вызывающий должен пропустить через
+    redaction, прежде чем показать.
     """
+    if (memory_ref is None) != (memory_repo is None):
+        raise ValueError("memory_ref и memory_repo задаются вместе")
     args = [
         "--claude-version",
         config.sandbox.claude_code_version,
         "--openspec-version",
         config.sandbox.openspec_version,
-        *(f"{ws.id}={clone_url(config, ws)}" for ws in config.workspaces),
     ]
-    command = shlex.join(["bash", BOOTSTRAP_SCRIPT_PATH, *args])
+    # Токен GitLab уходит только на префикс базового адреса GitLab (D-52): заголовок строит скрипт.
+    args += ["--gitlab-url", config.gitlab.base_url]
+    if memory_ref is not None and memory_repo is not None:
+        args += ["--memory-ref", memory_ref, "--memory-repo", memory_repo]
+    args += [f"{ws.id}={clone_url(config, ws)}" for ws in config.workspaces]
+    script_path = f"{BOOTSTRAP_SCRIPT_PREFIX}{uuid.uuid4().hex}.sh"
+    command = shlex.join(["bash", script_path, *args])
+
+    # GITLAB_TOKEN нужен скрипту, чтобы собрать заголовок git; скрипт снимает его из env сразу.
+    # Без токена (публичные репозитории) переменной нет: клоны идут анонимно.
+    # HARNESS_SANDBOX_BOOTSTRAP — защита скрипта от запуска вне песочницы (ревью, D-52).
+    envs = {"GIT_TERMINAL_PROMPT": "0", "HARNESS_SANDBOX_BOOTSTRAP": "1"}
+    if gitlab_token is not None:
+        envs["GITLAB_TOKEN"] = gitlab_token.get_secret_value()
+    if embedding_key is not None:
+        envs["EMBEDDING_API_KEY"] = embedding_key.get_secret_value()
+    # Память без таймаута памяти оборвёт первый memory init на большом проекте.
+    timeout_s = BOOTSTRAP_TIMEOUT_SEC if memory_ref is None else BOOTSTRAP_MEMORY_TIMEOUT_SEC
 
     await provider.connect(sandbox_id)
-    await provider.write_file(sandbox_id, BOOTSTRAP_SCRIPT_PATH, script)
-    result = await provider.exec(
-        sandbox_id,
-        command,
-        envs={"GITLAB_TOKEN": gitlab_token.get_secret_value(), "GIT_TERMINAL_PROMPT": "0"},
-        timeout_s=BOOTSTRAP_TIMEOUT_SEC,
-    )
+    try:
+        await provider.write_file(sandbox_id, script_path, script)
+        result = await provider.exec(sandbox_id, command, envs=envs, timeout_s=timeout_s)
+    finally:
+        # Скрипт не остаётся в песочнице и при сбое записи или запуска (ревью, D-52).
+        await _remove_bootstrap_script(provider, sandbox_id, script_path)
     logger.info("sandbox bootstrap finished sandbox=%s exit_code=%s", sandbox_id, result.exit_code)
     return result
 
@@ -365,8 +442,9 @@ async def reserve(session: AsyncSession, pipeline: QueuePipeline) -> Reservation
     return Reservation(provider_id=sandbox.provider_id, task=task)
 
 
-async def _home(provider: SandboxProvider, provider_id: str) -> str:
-    """Абсолютный домашний каталог песочницы: файловые вызовы не раскрывают ~."""
+async def home_dir(provider: SandboxProvider, provider_id: str) -> str:
+    """Абсолютный домашний каталог песочницы: файловые вызовы не раскрывают ~ (публично для
+    worker и CLI)."""
     result = await provider.exec(provider_id, 'printf %s "$HOME"', timeout_s=SHORT_TIMEOUT_SEC)
     home = result.stdout.strip()
     if result.exit_code != 0 or not home.startswith("/"):
@@ -403,29 +481,42 @@ async def activate(
     *,
     base_ref: str,
     timeout_min: int,
-    gitlab_token: SecretStr,
+    gitlab_token: SecretStr | None,
+    gitlab_base_url: str | None = None,
+    default_branch: str = "main",
+    memory_envs: Mapping[str, str] | None = None,
 ) -> None:
     """Подключает песочницу, продлевает её жизнь, обновляет репозиторий и создаёт worktree (design
-    10).
+    10, 4).
 
     Идемпотентно: если worktree уже на ветке task/<id>, worktree add не выполняется. Токен GitLab
     передаётся только в env git-команд. Исключения — SandboxError (провайдер) или SandboxStepError.
+
+    memory_envs не None — память проекта включена: после fetch индекс клона обновляется командой
+    memory sync (D-47). Сбой этого шага не роняет задачу: пишется предупреждение без вывода.
+    memory_envs задаёт env команды (ключ embeddings — только здесь, не в файлах).
     """
     if task.workspace_id is None:
         raise SandboxStepError("no_workspace")
+    # Токен без адреса GitLab: заголовок некуда привязать, а без привязки токен не уходит никуда.
+    # Ошибка до любого вызова провайдера (D-52, ревью).
+    if gitlab_token is not None and gitlab_base_url is None:
+        raise ValueError("gitlab_token задан без gitlab_base_url: заголовок некуда привязать")
     await provider.connect(provider_id)
     # Новосоздаваемая песочница Novita живёт по таймауту (D-19): продлеваем на лимит агента + запас.
     await provider.extend_timeout(provider_id, (timeout_min + 10) * 60)
 
-    home = await _home(provider, provider_id)
+    home = await home_dir(provider, provider_id)
     repo = f"{home}/work/{task.workspace_id}"
     worktree = worktree_dir(home, task.id)
     branch = f"task/{task.id}"
-    git_envs = {
-        "GITLAB_TOKEN": gitlab_token.get_secret_value(),
-        "GIT_ASKPASS": f"{home}/.harness/bin/git-askpass.sh",
-        "GIT_TERMINAL_PROMPT": "0",
-    }
+    # Заголовок только на префикс базового адреса GitLab (D-52). Без адреса заголовка нет:
+    # fetch пойдёт анонимно и упадёт на приватном репозитории, токен никуда не уходит.
+    # Без токена (публичный репозиторий) заголовка нет: fetch анонимный (D-52).
+    if gitlab_token is not None and gitlab_base_url is not None:
+        git_envs = git_auth_env(gitlab_base_url, gitlab_token.get_secret_value())
+    else:
+        git_envs = {"GIT_TERMINAL_PROMPT": "0"}
     await _exec_ok(
         provider,
         provider_id,
@@ -434,6 +525,16 @@ async def activate(
         envs=git_envs,
         timeout_s=GIT_TIMEOUT_SEC,
     )
+    if memory_envs is not None:
+        await _sync_memory(
+            provider,
+            provider_id,
+            task,
+            home=home,
+            repo=repo,
+            default_branch=default_branch,
+            envs=memory_envs,
+        )
 
     current = await provider.exec(
         provider_id,
@@ -457,6 +558,44 @@ async def activate(
         timeout_s=GIT_TIMEOUT_SEC,
     )
     logger.info("worktree created task=%s base=%s", task.id, base_ref)
+
+
+async def _sync_memory(
+    provider: SandboxProvider,
+    provider_id: str,
+    task: Task,
+    *,
+    home: str,
+    repo: str,
+    default_branch: str,
+    envs: Mapping[str, str],
+) -> None:
+    """Инкрементальное обновление индекса памяти клона (design 4, D-47).
+
+    Индекс отражает origin/<default_branch>, а не изменения агента: клон переводится на тип
+    default_branch. Маркер <id>.ready ставит bootstrap; без него память не настроена и шаг
+    пропускается. Ненулевой код или ошибка провайдера — предупреждение, задача продолжается.
+    """
+    workspace = shlex.quote(repo)
+    marker = shlex.quote(f"{home}/.harness/memory/{task.workspace_id}.ready")
+    ensure_docker = shlex.quote(f"{home}/.harness/bin/ensure-docker.sh")
+    cmd = (
+        f"if [ -f {marker} ] && command -v memory >/dev/null; then "
+        f"bash {ensure_docker} && "
+        f"git -C {workspace} checkout --quiet --detach --force "
+        f"{shlex.quote(f'origin/{default_branch}')} && "
+        "memory service up && "
+        f"memory sync --path {workspace}; "
+        "fi"
+    )
+    try:
+        result = await provider.exec(provider_id, cmd, envs=dict(envs), timeout_s=GIT_TIMEOUT_SEC)
+    except SandboxError as exc:
+        logger.warning("memory sync failed task=%s reason=%s", task.id, exc.reason)
+        return
+    if result.exit_code != 0:
+        # Вывод memory не логируется: он может содержать пути и текст из репозитория.
+        logger.warning("memory sync failed task=%s exit_code=%s", task.id, result.exit_code)
 
 
 def _run_script(directory: str, worktree: str, max_turns: int) -> str:
@@ -497,6 +636,8 @@ async def run_agent(
     oauth_token: SecretStr,
     agents_flow_url: str,
     now: datetime | None = None,
+    extra_envs: Mapping[str, str] | None = None,
+    memory_enabled: bool = False,
 ) -> AgentStart:
     """Запускает агента в фоне и сразу возвращается (design 3–6, 10, 18).
 
@@ -505,8 +646,12 @@ async def run_agent(
     повторного запуска нет. Токен задачи выдаётся непосредственно перед запуском (D-37). Креды
     передаются только в env команды запуска; в файлы попадают только prompt, run.json и run.sh без
     значений.
+
+    extra_envs — дополнительные переменные команды запуска (место для MCP агента); встроенные
+    переменные их перекрывают. memory_enabled — добавить HARNESS_MEMORY_PROJECT с путём клона:
+    без памяти переменной нет, как и до mvp-память (D-47).
     """
-    home = await _home(provider, provider_id)
+    home = await home_dir(provider, provider_id)
     directory = task_dir(home, task.id)
     info = await agent_run_info(session, provider_id)
     if info.started_at is not None:
@@ -565,16 +710,22 @@ async def run_agent(
         f"setsid nohup bash {shlex.quote(f'{directory}/run.sh')} >/dev/null 2>&1 < /dev/null & "
         f'pid=$!; echo "$pid" > {shlex.quote(f"{directory}/pid")}; echo "$pid"'
     )
+    launch_envs: dict[str, str] = dict(extra_envs or {})
+    if memory_enabled:
+        launch_envs["HARNESS_MEMORY_PROJECT"] = f"{home}/work/{task.workspace_id}"
+    launch_envs.update(
+        {
+            "CLAUDE_CODE_OAUTH_TOKEN": oauth_token.get_secret_value(),
+            "AGENTS_FLOW_TOKEN": token,
+            "AGENTS_FLOW_URL": agents_flow_url,
+        }
+    )
     launched = await _exec_ok(
         provider,
         provider_id,
         launch,
         reason="launch",
-        envs={
-            "CLAUDE_CODE_OAUTH_TOKEN": oauth_token.get_secret_value(),
-            "AGENTS_FLOW_TOKEN": token,
-            "AGENTS_FLOW_URL": agents_flow_url,
-        },
+        envs=launch_envs,
     )
     pid = parse_pid(launched.stdout)
     if pid is None:
@@ -633,7 +784,7 @@ async def wait_agent(
     """
     if started_at is None:
         return AgentRun(state=AgentState.DIED, reason="агент не запущен")
-    home = await _home(provider, provider_id)
+    home = await home_dir(provider, provider_id)
     directory = task_dir(home, task.id)
 
     # Хвост, а не файл целиком: stderr агента может быть большим (design 14).
@@ -709,7 +860,7 @@ async def cleanup_task(
     pid = row.agent_pid if row is not None else None
     if pid is not None and await _is_alive(provider, provider_id, pid):
         await _kill_group(provider, provider_id, pid)
-    home = await _home(provider, provider_id)
+    home = await home_dir(provider, provider_id)
     commands: list[str] = []
     if task.workspace_id is not None:
         repo = shlex.quote(f"{home}/work/{task.workspace_id}")

@@ -2,7 +2,7 @@
 
 > Подготовка песочницы без участия владельца: bootstrap, ключи из vault, память проекта. Решение владельца
 > 2026-10-19: делается сразу после `mvp-06-sandbox-runtime`, затем `integrations-mcp-config`, оба до
-> `mvp-07-agents-flow-mcp` (D-43). Решения — D-43…D-45, D-47, D-48.
+> `mvp-07-agents-flow-mcp` (D-43). Решения — D-43…D-45, D-47, D-48, D-51.
 
 ## Open questions (нужен ответ владельца)
 
@@ -11,8 +11,17 @@
 1. **Адрес и авторизация vault MCP для сервера.** Заложено: ENV `VAULT_MCP_URL` (https) и `VAULT_MCP_TOKEN`, заголовок
    `Authorization: Bearer <token>`, транспорт Streamable HTTP. Если авторизация другая — меняется только
    `adapters/vault/mcp_client.py`. Имя поля с секретом в ответе `get_credential` (заложено `secret`).
+   Ответ владельца 2026-10-19: URL `https://safe.w1do.ru/mcp` (сервер `project-vault 1.0.0`). Streamable HTTP и
+   `Authorization: Bearer <VAULT_MCP_TOKEN>` подтверждены проверкой (initialize и list_tools прошли); инструмент
+   `get_credential(project, service, name)` подтверждён. Имя поля в ответе подтверждено: `credential.secret` (ответ `project-vault 1.0.0` — один текстовый блок JSON
+   `{"credential": {..., "secret": str}}`, проверено 2026-10-19). Принимается и top-level `secret` (см. design, Decision 1).
 2. **Ссылки на ключи в vault** (`<project>/<service>/<name>`): главный ключ GitLab, ключ embeddings Polza для memory-agent.
+   Ответ владельца 2026-10-19: главный ключ GitLab — `vault:Workflow/Gitlab/админский` (админский токен; владелец принял
+   риск, D-50); ключ embeddings — `vault:Сервисы/Polza/EmbeddingsMemory` (отдельный ключ Polza для песочницы). Эти ссылки
+   идут в боевой `harness.yaml`, не в `config/harness.example.yaml`.
 3. **Ресурсы.** Если live-проверка 5.3 («memory-agent + агент в 2 ГБ») не пройдёт — какой размер песочницы брать.
+   Ответ владельца 2026-10-19: закрыт. Live 5.3 на песочнице Novita прошла: 2 ГБ достаточно (total 1991 МБ, доступно
+   ~1590 МБ, OOM нет). Размер песочницы не меняется.
 
 ## Why
 
@@ -23,12 +32,15 @@
 
 - **Bootstrap расширяется** (тот же `deploy/sandbox/bootstrap.sh`, идемпотентно, через `sudo -n`): Node ≥ 22.13
   (NodeSource), глобальные npm-пакеты в системный префикс через sudo, пустые `~/.claude/skills` и `~/.claude/agents`;
-  при включённой памяти — Docker Engine + Compose v2, memory-agent (`project-memory` точной версии,
-  `memory service up`, `memory init` для каждого workspace). Шагов про MCP нет.
+  при включённой памяти — Docker Engine + Compose v2, memory-agent (из GitHub `w1do/memory-agent`, закреплён на
+  полный sha коммита: клон, `npm ci` по lock-файлу и сборка от пользователя песочницы, ссылка `/usr/local/bin/memory`,
+  D-51), `memory service up`, `memory init` для каждого
+  workspace. Шагов про MCP нет. Пакет `project-memory` из реестра npm не ставится: под этим именем там чужой пакет.
 - **Vault-адаптер** `adapters/vault/` (Protocol `SecretVault`, фейк, MCP-клиент на официальном Python SDK,
   инструмент `get_credential`). Ссылка на секрет — `vault:<project>/<service>/<name>`. Доступ сервера — без подтверждения.
 - **Настройки** `harness.yaml`: `gitlab.access_ref` (главный ключ GitLab из vault; без него — ENV `GITLAB_TOKEN`),
-  `sandbox.memory` (`version` пакета `project-memory`, `embedding_ref`).
+  `sandbox.memory` (`repo` — GitHub-репозиторий memory-agent, по умолчанию `w1do/memory-agent`; `ref` — полный sha
+  коммита; `embedding_ref`).
 - **Рантайм (изменение `sandbox-runtime`)**: GitLab-ключ и ключ embeddings берутся из vault и передаются только в env
   команд; при активации — `memory sync` по клону workspace (сбой не роняет задачу); при запуске агента —
   `HARNESS_MEMORY_PROJECT`; redaction покрывает значения из vault.
