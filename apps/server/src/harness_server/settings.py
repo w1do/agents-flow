@@ -25,6 +25,33 @@ _CHAT_ID_RE = re.compile(r"\d+")
 _VOICE_MAX_BYTES_LIMIT = 20 * 1024 * 1024
 
 
+# Пробельные, управляющие и не-ASCII символы в адресе не допускаются: строка с переносом или
+# пробелом разбирается по-разному у разных клиентов.
+_URL_FORBIDDEN_RE = re.compile(r"[\s\x00-\x1f\x7f]|[^\x00-\x7f]")
+_HTTPS_URL_MESSAGE = (
+    "должен начинаться с https:// (строчными), без пробелов и управляющих символов, "
+    "учётных данных, query и fragment, с непустым хостом и портом 1–65535 (D-61)"
+)
+
+
+def _check_https_base_url(value: str) -> None:
+    """Проверка адреса, через который уходит токен бота или приходит webhook (D-61).
+
+    Текст ошибки не содержит значения: адрес прокси владельца в логи не попадает.
+    """
+    if _URL_FORBIDDEN_RE.search(value) or not value.startswith("https://"):
+        raise ValueError(_HTTPS_URL_MESSAGE)
+    parts = urlsplit(value)
+    if "@" in parts.netloc or parts.query or parts.fragment or "?" in value or "#" in value:
+        raise ValueError(_HTTPS_URL_MESSAGE)
+    if not parts.hostname:
+        raise ValueError(_HTTPS_URL_MESSAGE)
+    try:
+        _ = parts.port  # порт вне 0–65535 или нечисловой: urllib бросает ValueError
+    except ValueError:
+        raise ValueError(_HTTPS_URL_MESSAGE) from None
+
+
 class SettingsError(Exception):
     """Ошибка проверки ENV. Сообщение называет переменные, но не их значения."""
 
@@ -44,6 +71,10 @@ class Settings(BaseSettings):
     telegram_bot_token: SecretStr
     telegram_chat_id: str
     telegram_webhook_secret: SecretStr
+    # Адрес Bot API: прокси владельца, если прод-сервер не достаёт api.telegram.org (D-61).
+    telegram_api_url: str = "https://api.telegram.org"
+    # Адрес, куда Telegram шлёт апдейты (прокси владельца). Пусто = HARNESS_PUBLIC_URL (D-61).
+    telegram_webhook_url: str | None = None
 
     harness_public_url: str | None = None
     harness_admin_token: SecretStr | None = None
@@ -111,6 +142,22 @@ class Settings(BaseSettings):
             raise ValueError(
                 "допустимы только латиница, цифры, _ и -, длина от 32 до 256 (openssl rand -hex 32)"
             )
+        return value
+
+    @field_validator("telegram_api_url")
+    @classmethod
+    def _check_telegram_api_url(cls, value: str) -> str:
+        # Токен бота стоит в пути URL: открытый http его раскроет (D-61). Слеш в конце убираем,
+        # чтобы клиент не склеивал «//bot…».
+        _check_https_base_url(value)
+        return value.rstrip("/")
+
+    @field_validator("telegram_webhook_url")
+    @classmethod
+    def _check_telegram_webhook_url(cls, value: str | None) -> str | None:
+        # Апдейты приходят с секретом webhook: адрес тоже только https (D-61).
+        if value is not None:
+            _check_https_base_url(value)
         return value
 
     @field_validator("telegram_chat_id")

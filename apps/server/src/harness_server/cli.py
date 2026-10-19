@@ -113,11 +113,15 @@ def set_webhook() -> None:
     """Регистрирует webhook: адрес из HARNESS_PUBLIC_URL, секрет из TELEGRAM_WEBHOOK_SECRET."""
     settings, _ = _load_or_exit()
     _configure_logging()
-    try:
-        url = webhook_url(settings.harness_public_url)
-    except ValueError as exc:
-        typer.echo(f"Ошибка конфигурации: HARNESS_PUBLIC_URL: {exc}", err=True)
-        raise typer.Exit(code=1) from None
+    # TELEGRAM_WEBHOOK_URL — адрес прокси владельца (D-61); без него берём HARNESS_PUBLIC_URL.
+    if settings.telegram_webhook_url is not None:
+        url = settings.telegram_webhook_url
+    else:
+        try:
+            url = webhook_url(settings.harness_public_url)
+        except ValueError as exc:
+            typer.echo(f"Ошибка конфигурации: HARNESS_PUBLIC_URL: {exc}", err=True)
+            raise typer.Exit(code=1) from None
     try:
         asyncio.run(_set_webhook(settings, url))
     except TelegramError as exc:

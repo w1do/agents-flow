@@ -313,3 +313,125 @@ def test_vault_settings_optional_and_token_hidden(
 
     assert settings.vault_mcp_url == "https://vault.example/mcp"
     assert "vault-token-test" not in repr(settings)
+
+
+def test_telegram_api_url_defaults_to_bot_api(valid_env: dict[str, str]) -> None:
+    settings = load_settings()
+
+    assert settings.telegram_api_url == "https://api.telegram.org"
+
+
+def test_telegram_api_url_empty_means_default(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TELEGRAM_API_URL", "")
+
+    assert load_settings().telegram_api_url == "https://api.telegram.org"
+
+
+def test_telegram_api_url_must_be_https(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch
+) -> None:
+    # Токен бота стоит в пути URL: открытый http его раскроет (D-61).
+    monkeypatch.setenv("TELEGRAM_API_URL", "http://proxy.example.com")
+
+    with pytest.raises(SettingsError) as info:
+        load_settings()
+
+    message = str(info.value)
+    assert "TELEGRAM_API_URL" in message
+    assert "proxy.example.com" not in message
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        f"https://user:{LEAK_MARKER}@proxy.example.com",
+        f"https://{LEAK_MARKER}@proxy.example.com",
+        "https://proxy.example.com?token=1",
+        "https://proxy.example.com/#frag",
+    ],
+)
+def test_telegram_api_url_rejects_credentials_query_fragment(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch, url: str
+) -> None:
+    monkeypatch.setenv("TELEGRAM_API_URL", url)
+
+    with pytest.raises(SettingsError) as info:
+        load_settings()
+
+    message = str(info.value)
+    assert "TELEGRAM_API_URL" in message
+    assert LEAK_MARKER not in message
+
+
+def test_telegram_api_url_trailing_slash_stripped(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TELEGRAM_API_URL", "https://proxy.example.com/tg/")
+
+    settings = load_settings()
+
+    assert settings.telegram_api_url == "https://proxy.example.com/tg"
+
+
+# Строгие правила адресов (D-61): пробелы, управляющие символы, регистр схемы, хост, порт.
+BAD_URLS = [
+    "http://x.example.com",
+    "https://x.example.com:99999",
+    "https://x\n.example.com",
+    "HTTPS://x.example.com",
+    " https://x.example.com",
+    "https://:443",
+    "https://user@x.example.com",
+    "https://x.example.com?token=1",
+]
+
+
+@pytest.mark.parametrize("url", BAD_URLS)
+def test_telegram_api_url_strict_rules(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch, url: str
+) -> None:
+    monkeypatch.setenv("TELEGRAM_API_URL", url)
+
+    with pytest.raises(SettingsError) as info:
+        load_settings()
+
+    message = str(info.value)
+    assert "TELEGRAM_API_URL" in message
+    assert "x.example.com" not in message
+
+
+@pytest.mark.parametrize("url", BAD_URLS)
+def test_telegram_webhook_url_strict_rules(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch, url: str
+) -> None:
+    monkeypatch.setenv("TELEGRAM_WEBHOOK_URL", url)
+
+    with pytest.raises(SettingsError) as info:
+        load_settings()
+
+    message = str(info.value)
+    assert "TELEGRAM_WEBHOOK_URL" in message
+    assert "x.example.com" not in message
+
+
+def test_telegram_webhook_url_unset_is_none(valid_env: dict[str, str]) -> None:
+    assert load_settings().telegram_webhook_url is None
+
+
+def test_telegram_webhook_url_empty_means_unset(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TELEGRAM_WEBHOOK_URL", "")
+
+    assert load_settings().telegram_webhook_url is None
+
+
+def test_telegram_webhook_url_keeps_path(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch
+) -> None:
+    # Путь маршрута Worker нужен как есть: слеш в конце не отрезается.
+    monkeypatch.setenv("TELEGRAM_WEBHOOK_URL", "https://tg.example.com/tg-webhook")
+
+    assert load_settings().telegram_webhook_url == "https://tg.example.com/tg-webhook"

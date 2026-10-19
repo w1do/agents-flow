@@ -42,7 +42,7 @@ class HttpxTelegramClient:
         url = f"{self._base_url}/bot{self._token}/{method}"
         try:
             response = await self._http.post(url, json=payload)
-        except httpx.HTTPError as exc:
+        except (httpx.HTTPError, httpx.InvalidURL) as exc:
             # Имя класса, а не текст: текст httpx-исключения может содержать URL с токеном.
             raise TelegramError(method, None, type(exc).__name__) from None
         try:
@@ -140,7 +140,7 @@ class HttpxTelegramClient:
                         chunks.append(chunk)
         except TimeoutError:
             raise TelegramError("downloadFile", None, "download timeout") from None
-        except httpx.HTTPError as exc:
+        except (httpx.HTTPError, httpx.InvalidURL) as exc:
             raise TelegramError("downloadFile", None, type(exc).__name__) from None
         return b"".join(chunks)
 

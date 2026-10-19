@@ -122,3 +122,24 @@ Job `deploy:dokploy` не добавляет `curl -v` и `--trace`: при ош
   Anthropic и Novita. Код не применяет его в MVP: песочница создаётся вручную (D-38).
 - Claude Code в песочнице запускается с `--setting-sources user` и `--strict-mcp-config`: hooks и MCP-серверы
   репозитория задачи не выполняются (D-36). Bootstrap не кладёт hooks и plugins в профиль песочницы.
+
+## Telegram за прокси (сервер в РФ)
+
+Сервер в РФ не достаёт `api.telegram.org`, поэтому трафик Telegram идёт через Cloudflare Worker владельца.
+Код Worker живёт вне репозитория, в аккаунте Cloudflare владельца. Он обслуживает два маршрута:
+
+- `/tg-webhook` — входящие апдейты: Telegram → Worker → `HARNESS_PUBLIC_URL/telegram/webhook`
+  (Worker пересылает POST вместе с заголовком `X-Telegram-Bot-Api-Secret-Token`);
+- `/bot<token>/<method>` и `/file/bot<token>/<path>` — исходящие вызовы Bot API и скачивание файлов:
+  сервер → Worker → `api.telegram.org`.
+
+Настройки сервера:
+
+- `TELEGRAM_API_URL=https://<worker>` — базовый адрес исходящих вызовов;
+- `TELEGRAM_WEBHOOK_URL=https://<worker>/tg-webhook` — адрес, который регистрирует `harness-server telegram set-webhook`.
+  Без него адрес собирается из `HARNESS_PUBLIC_URL`.
+
+Оба адреса: только `https://` строчными буквами, без пробелов, учётных данных, query и fragment.
+
+Безопасность: прокси видит токен бота в пути URL. Используйте только свой Worker. Не включайте в нём
+логирование URL и тел запросов. Секрет webhook проверяет сервер, а не Worker.
