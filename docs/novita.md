@@ -199,7 +199,7 @@ cleanup: OK remaining=0
 - **Пауза сохраняет файлы и фоновый процесс.** Проверено в одном коротком цикле `pause` → `connect` (запуск 1,
   секунды паузы). Длительное хранение паузы не проверено. Изменений архитектуры песочницы по итогам спайка не
   требуется. Задача 3.3 выполнена: устаревший риск «пауза не сохраняет процессы» и креды с `ANTHROPIC_API_KEY`
-  исправлены в [`openspec/changes/mvp-06-sandbox-runtime/design.md`](../openspec/changes/mvp-06-sandbox-runtime/design.md)
+  исправлены в [`openspec/changes/archive/2026-10-19-mvp-06-sandbox-runtime/design.md`](../openspec/changes/archive/2026-10-19-mvp-06-sandbox-runtime/design.md)
   (Decisions, Risks / Trade-offs).
 - **Таймаут по умолчанию уничтожает песочницу.** Адаптер обязан либо продлевать `set_timeout` до истечения
   (отсчёт от вызова), либо задавать `lifecycle on_timeout=pause`. Вариант `pause` ещё не проверен живьём.

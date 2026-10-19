@@ -9,26 +9,18 @@
 ## Текущее состояние (2026-10-19)
 
 - Готово: ТЗ v5 сохранено, CLAUDE.md, ARCHITECTURE.md, docs/, OpenSpec-изменения для MVP (9) и после MVP (40).
-- Готово и заархивировано: `mvp-01-novita-spike` (спайк Novita и Claude Code), `mvp-02-foundation` (каркас, конфиг, health, worker, Compose, GitLab CI), `mvp-03-task-store` (схема БД, статусы, очередь, /tasks), `mvp-04-telegram-intake` (webhook, STT, кнопки проекта; live-проверка 4.3 принята владельцем). Спеки `platform-config`, `task-lifecycle`, `telegram-bot`, `speech-to-text` синхронизированы в `openspec/specs/`.
+- Готово и заархивировано: `mvp-01-novita-spike`, `mvp-02-foundation`, `mvp-03-task-store`, `mvp-04-telegram-intake`,
+  `mvp-05-command-routing` (модель `anthropic/claude-haiku-5.5`, live 10/10, D-55; проверка голосом через бота — после
+  деплоя), `mvp-06-sandbox-runtime` (live Novita 6/6, рантайм агента 2/2, демо «Контакты в README»; ложный «успех» при
+  исчерпанном лимите Claude исправлен, D-54), `sandbox-profile` (6c: ключи из vault, Node 22, Docker, memory-agent по sha,
+  авторизация git заголовком; live 7/7, D-50…D-53). Спеки `platform-config`, `task-lifecycle`, `telegram-bot`,
+  `speech-to-text`, `command-routing`, `sandbox-runtime`, `sandbox-profile` синхронизированы в `openspec/specs/`.
 - Блокеров нет: вопрос 3 закрыт (GitLab, D-01).
 - Известное ограничение: пайплайн GitLab на реальном MR не запускался (remote репозитория — GitHub). Проверить при первом MR в GitLab; см. [docs/deployment.md](docs/deployment.md).
-- На ревью: `mvp-05-command-routing` (ветка `mvp-05-command-routing`). Код реализован, проверки зелёные (ruff, format,
-  mypy strict, pytest 642 passed / 2 deselected live, `openspec validate --strict` и `--all`), ревью и security review
-  APPROVED. Открыто: задача 5.2 (live-проверка 10 фраз; модель выбирает владелец, чекбокс закрывает владелец) и 6.1
-  (project-memory). Низкие находки ревью зафиксированы как известные ограничения в `design.md` (Risks).
-  Статус `done` после подтверждения 5.2 и архивации.
-- На ревью: `sandbox-profile` (6c, ветка `sandbox-profile`). Разделы 1–3 OpenSpec реализованы, проверки зелёные
-  (`./tools/harness check`: ruff, format, mypy strict, shellcheck, pytest 814 passed / 10 deselected live;
-  `openspec validate --strict` и `--all` 51/51), ревью и security review APPROVED после одного цикла исправлений.
-  Вопросы 1–2 `proposal.md` закрыты владельцем (D-50); вопрос 3 закрыт: 2 ГБ достаточно (live 5.3). Задача 4.1
-  (project memory) сделана. Live раздел 5 на песочнице Novita: 7/7 passed (прогон 5, 80 с), OOM нет, RAM ~1,6 ГБ
-  доступно из 1991 МБ. Найдено и исправлено live: пустые списки apt на образе Novita (`apt_update` перед установкой
-  Node); путь `/tmp`-скрипта bootstrap падал при повторном запуске (уникальный путь и удаление); npm git-зависимость
-  собиралась от root (`tsc: not found`), memory-agent собирается пользователем песочницы (D-51); в песочнице нет git
-  author, поэтому `GIT_AUTHOR_*`/`GIT_COMMITTER_*` берутся из `sandbox.git_author` (решение владельца). Ожидается
-  подтверждение владельца, затем PR/merge; статус `done` после подтверждения и архивации.
-- В работе: `mvp-06-sandbox-runtime` (ветка `mvp-06-sandbox-runtime` от `mvp-05`, решение владельца). OpenSpec
-  уточнён (D-35…D-38), идёт реализация.
+- Следующее: `mvp-07-agents-flow-mcp`, затем `mvp-08`, `mvp-09` (D-53). Критерий владельца для 7 и 9 — D-56: агент коммитит и
+  вызывает «сдать работу», push и MR делает харнесс после гейтов.
+- Решено 2026-10-19: доработка задачи и диалог с агентом через Telegram — отдельное изменение `task-rework` после `mvp-09`
+  (приоритет владельца).
 - Решение 2026-10-19 (D-39): веб-панель оператора входит в MVP как `mvp-10-operator-console` после `mvp-09`.
 - Решение 2026-10-19 (D-43, порядок изменён D-53): `sandbox-profile` (6c) и `integrations-mcp-config` (6d) делаются сразу после `mvp-06`,
   до `mvp-07`. Репозитория профиля нет; раздел MCP — таблица на платформе (D-46). Открытые вопросы владельцу — в начале их
@@ -45,16 +37,16 @@ MR создан → сообщение в Telegram. Тот же поток ви�
 | 2 | [`mvp-02-foundation`](openspec/changes/archive/2026-10-18-mvp-02-foundation/) | Каркас монорепо, конфиг, health, Compose, CI | platform-config | — | done |
 | 3 | [`mvp-03-task-store`](openspec/changes/archive/2026-10-18-mvp-03-task-store/) | Схема БД, статусы, очередь, POST/GET /tasks | task-lifecycle | mvp-02 | done |
 | 4 | [`mvp-04-telegram-intake`](openspec/changes/archive/2026-10-18-mvp-04-telegram-intake/) | Webhook, голос→текст, кнопки проекта, одно сообщение | telegram-bot, speech-to-text | mvp-03 | done |
-| 5 | [`mvp-05-command-routing`](openspec/changes/mvp-05-command-routing/) | Polza: классы work/status, кандидаты, запасной путь | command-routing | mvp-04 | review (принято 2026-10-19, архив после влития) |
-| 6 | [`mvp-06-sandbox-runtime`](openspec/changes/mvp-06-sandbox-runtime/) | Адаптер Novita, bootstrap, запуск агента, очистка, пауза | sandbox-runtime | mvp-01, mvp-03 | review (принято 2026-10-19, архив после влития) |
-| 6c | [`sandbox-profile`](openspec/changes/sandbox-profile/) | Bootstrap без участия владельца: Node 22, Docker, memory-agent, ключи из vault, память проекта (D-43…D-45, D-47, D-48). Live 7/7, принято владельцем 2026-10-19; архив после `mvp-06` | sandbox-profile, sandbox-runtime | mvp-06 | review |
+| 5 | [`mvp-05-command-routing`](openspec/changes/archive/2026-10-19-mvp-05-command-routing/) | Polza: классы work/status, кандидаты, запасной путь | command-routing | mvp-04 | done |
+| 6 | [`mvp-06-sandbox-runtime`](openspec/changes/archive/2026-10-19-mvp-06-sandbox-runtime/) | Адаптер Novita, bootstrap, запуск агента, очистка, пауза | sandbox-runtime | mvp-01, mvp-03 | done |
+| 6c | [`sandbox-profile`](openspec/changes/archive/2026-10-19-sandbox-profile/) | Bootstrap без участия владельца: Node 22, Docker, memory-agent, ключи из vault, память проекта (D-43…D-45, D-47, D-48). Live 7/7, принято владельцем 2026-10-19 | sandbox-profile, sandbox-runtime | mvp-06 | done |
 | 6d | [`integrations-mcp-config`](openspec/changes/integrations-mcp-config/) | Раздел MCP на платформе, генерация `mcp.json` агента на каждый запуск, CLI `harness-server mcp` (D-46). Отложено после `mvp-09` (D-53) | integrations, sandbox-runtime | sandbox-profile | todo |
 | 7 | [`mvp-07-agents-flow-mcp`](openspec/changes/mvp-07-agents-flow-mcp/) | MCP: токен задачи, report_task, sync_spec, create_task | agents-flow-mcp | mvp-03, mvp-06 | todo |
 | 8 | [`mvp-08-spec-planning`](openspec/changes/mvp-08-spec-planning/) | Планировщик OpenSpec → задачи в backlog | spec-planning | mvp-05, mvp-06, mvp-07 | todo |
 | 9 | [`mvp-09-delivery-mr`](openspec/changes/mvp-09-delivery-mr/) | Исполнитель, гейты, MR в GitLab, итог в Telegram | delivery-gates | mvp-08 | todo |
 | 10 | [`mvp-10-operator-console`](openspec/changes/mvp-10-operator-console/) | Веб-панель: вход, канбан, карточка и создание задачи, песочница и логи агента | operator-console | mvp-06, mvp-09 | todo |
 
-`mvp-01`…`mvp-04` выполнены, `mvp-05` на ревью, `mvp-06` на ревью (ветка от `mvp-05` по решению владельца). Дальше строго
+`mvp-01`…`mvp-06` и 6c выполнены. Дальше строго
 по номеру до `mvp-10`. `sandbox-profile` (6c) — между `mvp-06` и `mvp-07` (D-43), done после подтверждения владельца; `integrations-mcp-config` (6d) отложен после `mvp-09` (D-53): порядок `mvp-07` → `mvp-08` → `mvp-09` ведёт к первому MR end-to-end как можно раньше. В MVP-критерий 6c и 6d не входят.
 
 ## После MVP — мелкие изменения по волнам

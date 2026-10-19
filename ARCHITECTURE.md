@@ -175,7 +175,7 @@ implement:  backlog → active → testing → ready (MR создан) → merge
   `HARNESS_MEMORY_PROJECT=~/work/<id>`; индекс по worktree не строится.
 - Креды (`CLAUDE_CODE_OAUTH_TOKEN`, `GITLAB_TOKEN`, токен задачи) передаются только в env конкретной exec-команды
   и не записываются на диск песочницы. Claude Code авторизуется подпиской через `CLAUDE_CODE_OAUTH_TOKEN`
-  (D-18); `ANTHROPIC_API_KEY` в песочнице не задаётся: по документации Claude Code он перекрывает OAuth-токен (спайком не проверялось). `--bare` не используется. Риски токена подписки (экфильтрация, лимиты по окнам) — в `openspec/changes/mvp-06-sandbox-runtime/design.md`, Risks.
+  (D-18); `ANTHROPIC_API_KEY` в песочнице не задаётся: по документации Claude Code он перекрывает OAuth-токен (спайком не проверялось). `--bare` не используется. Риски токена подписки (экфильтрация, лимиты по окнам) — в `openspec/changes/archive/2026-10-19-mvp-06-sandbox-runtime/design.md`, Risks.
 - Агент запускается в фоне, вывод `stream-json` пишется в `~/.harness/tasks/<id>/stream.jsonl`, итог — в
   `~/.harness/tasks/<id>/status.json`. Worker опрашивает файл статуса через exec.
 
