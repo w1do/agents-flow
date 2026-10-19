@@ -118,6 +118,15 @@
   валидными аргументами → код 3, в пустом HOME ничего не создано, заглушки npm/sudo/apt/git/curl/… не вызваны (маркеры
   не появились); ошибки аргументов по-прежнему 2; `services/sandboxes.bootstrap` выставляет переменную (тест env)
 
+- [x] 2.9 Автор коммитов агента (`sandbox.git_author`, найдено live 5.7): `config.py` — `GitAuthorConfig` (name ≤100 без
+  управляющих символов и пустых, email вида `a@b` без пробелов ≤254; значения по умолчанию `agents-flow`,
+  `agents-flow@noreply.local`), `harness.example.yaml` — закомментированный пример; `bootstrap.sh` — `--git-name`/`--git-email`
+  (оба обязательны, те же правила в bash, код 2), `git config --global user.name/user.email` после защиты и только при
+  отличии («уже настроен: git author»); `services/sandboxes.bootstrap` передаёт значения из конфига — проверка:
+  `test_config.py` (значения по умолчанию, допустимые и отклонённые имя и адрес); `test_sandbox_bootstrap.py`: аргументы
+  команды содержат `--git-name agents-flow --git-email agents-flow@noreply.local` и собственный автор из конфига; пустое,
+  многострочное, одно из пары → код 2; `git config --global` стоит после проверки песочницы (текст скрипта)
+
 ## 3. Документация
 
 - [x] 3.1 ARCHITECTURE.md §7 (bootstrap, память, ключи из vault) и §9 (ENV `VAULT_MCP_URL`, `VAULT_MCP_TOKEN`, поля

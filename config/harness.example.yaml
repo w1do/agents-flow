@@ -19,6 +19,10 @@ sandbox:
   # Версии, закреплённые для bootstrap песочницы (D-38); меняются только вместе с кодом.
   claude_code_version: "2.1.292"
   openspec_version: "1.14.3"
+  # Автор коммитов агента в песочнице (git config --global при bootstrap). По умолчанию — ниже.
+  # git_author:
+  #   name: agents-flow
+  #   email: agents-flow@noreply.local
   # Память проекта в песочнице (D-47). Блок не задан — память выключена.
   # memory:
   #   # GitHub-репозиторий memory-agent (по умолчанию w1do/memory-agent).

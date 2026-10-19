@@ -1,5 +1,6 @@
 """Сценарии platform-config 1 (секреты в YAML) и 2 (уникальность id workspace)."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -459,3 +460,56 @@ def test_memory_embedding_ref_must_be_vault_reference(tmp_path: Path) -> None:
         load_config(_write(tmp_path, body))
 
     assert "sk-plain-key-value" not in str(info.value)
+
+
+def test_git_author_defaults_when_block_absent(tmp_path: Path) -> None:
+    config = load_config(_write(tmp_path, WORKSPACE_ONLY + TAIL))
+
+    assert config.sandbox.git_author.name == "agents-flow"
+    assert config.sandbox.git_author.email == "agents-flow@noreply.local"
+
+
+def test_git_author_custom_values_accepted(tmp_path: Path) -> None:
+    body = (
+        WORKSPACE_ONLY
+        + "sandbox:\n  provider_id: sbx-1\n  git_author:\n    name: Agent Bot\n"
+        + "    email: bot@example.com\n"
+        + "gitlab:\n  base_url: https://gitlab.example.com\n"
+    )
+
+    config = load_config(_write(tmp_path, body))
+
+    assert config.sandbox.git_author.name == "Agent Bot"
+    assert config.sandbox.git_author.email == "bot@example.com"
+
+
+@pytest.mark.parametrize("name", ["   ", "a\nb", "x" * 101])
+def test_git_author_name_rejected_when_blank_control_or_long(tmp_path: Path, name: str) -> None:
+    body = (
+        WORKSPACE_ONLY
+        + "sandbox:\n  provider_id: sbx-1\n  git_author:\n    name: "
+        + json.dumps(name)
+        + "\n"
+        + "gitlab:\n  base_url: https://gitlab.example.com\n"
+    )
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "git_author" in str(info.value)
+
+
+@pytest.mark.parametrize("email", ["no-at-sign", "a b@c.d", "a@b@c"])
+def test_git_author_email_must_be_simple_address(tmp_path: Path, email: str) -> None:
+    body = (
+        WORKSPACE_ONLY
+        + "sandbox:\n  provider_id: sbx-1\n  git_author:\n    email: "
+        + repr(email)
+        + "\n"
+        + "gitlab:\n  base_url: https://gitlab.example.com\n"
+    )
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "git_author" in str(info.value)

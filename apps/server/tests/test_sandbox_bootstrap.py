@@ -29,6 +29,7 @@ MEMORY_REPO = "w1do/memory-agent"
 
 EXPECTED_ARGS = (
     "--claude-version 2.1.292 --openspec-version 1.14.3 "
+    "--git-name agents-flow --git-email agents-flow@noreply.local "
     "--gitlab-url https://gitlab.com demo=https://gitlab.com/group/demo.git"
 )
 SCRIPT_PATH_RE = re.compile(r"/tmp/harness-bootstrap-[0-9a-f]{32}\.sh")
@@ -165,6 +166,7 @@ async def test_memory_ref_goes_to_script_args_and_key_only_to_env() -> None:
     execs = [entry for entry in sandbox.journal if entry.method == "exec" and entry.cmd]
     assert execs[0].cmd == (
         f"bash {path} --claude-version 2.1.292 --openspec-version 1.14.3 "
+        "--git-name agents-flow --git-email agents-flow@noreply.local "
         "--gitlab-url https://gitlab.com "
         f"--memory-ref {MEMORY_REF} --memory-repo {MEMORY_REPO} demo=https://gitlab.com/group/demo.git"
     )
@@ -234,7 +236,16 @@ def _run_script(*args: str, env: dict[str, str] | None = None) -> subprocess.Com
     )
 
 
-ARGS_BASE = ("--claude-version", "2.1.292", "--openspec-version", "1.14.3")
+ARGS_BASE = (
+    "--claude-version",
+    "2.1.292",
+    "--openspec-version",
+    "1.14.3",
+    "--git-name",
+    "agents-flow",
+    "--git-email",
+    "agents-flow@noreply.local",
+)
 VALID_PAIR = "demo=https://gitlab.com/group/demo.git"
 
 
@@ -679,3 +690,50 @@ async def test_failed_script_cleanup_does_not_change_bootstrap_result() -> None:
     )
 
     assert result.exit_code == 0
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ("--git-name", "a\nb", "--git-email", "agents-flow@noreply.local"),
+        ("--git-name", "   ", "--git-email", "agents-flow@noreply.local"),
+        ("--git-name", "agents-flow", "--git-email", "a b@c.d"),
+        ("--git-name", "agents-flow"),
+        ("--git-email", "agents-flow@noreply.local"),
+    ],
+)
+def test_script_rejects_bad_git_author_arguments(args: tuple[str, ...]) -> None:
+    base = ("--claude-version", "2.1.292", "--openspec-version", "1.14.3")
+    result = _run_script(*base, "--gitlab-url", "https://gitlab.example.com", *args, VALID_PAIR)
+
+    assert result.returncode == 2
+
+
+def test_script_sets_git_author_after_the_guard() -> None:
+    """git config --global стоит после проверки песочницы: до неё побочных эффектов нет."""
+    text = SCRIPT_PATH.read_text(encoding="utf-8")
+    guard = text.index('if [ "${HARNESS_SANDBOX_BOOTSTRAP:-}" != "1" ]; then')
+    config_user = text.index('git config --global user.name "$git_name"')
+    assert guard < config_user
+    assert 'git config --global user.email "$git_email"' in text
+    assert "уже настроен: git author" in text
+
+
+async def test_bootstrap_uses_configured_git_author() -> None:
+    config = load_config(EXAMPLE_CONFIG)
+    author = config.sandbox.git_author.model_copy(
+        update={"name": "Agent Bot", "email": "bot@example.com"}
+    )
+    config = config.model_copy(
+        update={"sandbox": config.sandbox.model_copy(update={"git_author": author})}
+    )
+    sandbox = FakeSandbox(sandbox_id=SANDBOX_ID)
+
+    await bootstrap(
+        sandbox, SANDBOX_ID, config, script="echo\n", gitlab_token=SecretStr(GITLAB_TOKEN)
+    )
+
+    cmd = next(
+        e.cmd for e in sandbox.journal if e.method == "exec" and e.cmd and e.cmd.startswith("bash ")
+    )
+    assert "--git-name 'Agent Bot' --git-email bot@example.com" in cmd

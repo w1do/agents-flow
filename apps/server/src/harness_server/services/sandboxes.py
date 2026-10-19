@@ -25,7 +25,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from harness_server.adapters.novita import ExecResult, SandboxError, SandboxProvider
-from harness_server.config import HarnessConfig, WorkspaceConfig
+from harness_server.config import GitAuthorConfig, HarnessConfig, WorkspaceConfig
 from harness_server.db.models import Sandbox, Task, TaskToken
 from harness_server.domain.errors import UnknownWorkspace, UnsupportedKind
 from harness_server.security import tokens
@@ -141,6 +141,16 @@ def git_auth_env(base_url: str, token: str) -> dict[str, str]:
     }
 
 
+def git_author_env(author: GitAuthorConfig) -> dict[str, str]:
+    """env агента для коммитов: автор и коммиттер из sandbox.git_author (env команды запуска, не файл)."""
+    return {
+        "GIT_AUTHOR_NAME": author.name,
+        "GIT_AUTHOR_EMAIL": author.email,
+        "GIT_COMMITTER_NAME": author.name,
+        "GIT_COMMITTER_EMAIL": author.email,
+    }
+
+
 def git_auth_secret_values(token: str) -> tuple[str, str]:
     """Секреты заголовка для redaction: полная строка заголовка и bare base64 из неё (D-52)."""
     header = git_auth_header(token)
@@ -183,6 +193,10 @@ async def bootstrap(
         config.sandbox.claude_code_version,
         "--openspec-version",
         config.sandbox.openspec_version,
+        "--git-name",
+        config.sandbox.git_author.name,
+        "--git-email",
+        config.sandbox.git_author.email,
     ]
     # Токен GitLab уходит только на префикс базового адреса GitLab (D-52): заголовок строит скрипт.
     args += ["--gitlab-url", config.gitlab.base_url]

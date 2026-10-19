@@ -45,6 +45,9 @@ _GIT_SHA_PATTERN = r"^[0-9a-f]{40}$"
 # Сегмент начинается и заканчивается буквой или цифрой: ./. и ../.. не проходят (L1).
 _GITHUB_REPO_SEGMENT = r"[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?"
 _GITHUB_REPO_PATTERN = rf"^{_GITHUB_REPO_SEGMENT}/{_GITHUB_REPO_SEGMENT}$"
+# Автор коммитов: без управляющих символов (в том числе перевода строки); адрес без @ и пробелов.
+_GIT_NAME_PATTERN = r"^[^\x00-\x1f\x7f]+$"
+_GIT_EMAIL_PATTERN = r"^[^@\s\x00-\x1f\x7f]+@[^@\s\x00-\x1f\x7f]+$"
 
 
 class WorkspaceConfig(BaseModel):
@@ -82,6 +85,27 @@ class SandboxMemoryConfig(BaseModel):
         return _check_vault_ref(value, "embedding_ref")
 
 
+class GitAuthorConfig(BaseModel):
+    """Автор коммитов агента в песочнице: git config --global при bootstrap (найдено live 5.7)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # Без управляющих символов и перевода строки: значение идёт в git config и команду bootstrap.
+    name: str = Field(
+        default="agents-flow", min_length=1, max_length=100, pattern=_GIT_NAME_PATTERN
+    )
+    email: str = Field(
+        default="agents-flow@noreply.local", max_length=254, pattern=_GIT_EMAIL_PATTERN
+    )
+
+    @field_validator("name")
+    @classmethod
+    def _check_name_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("не должен быть пустым или из пробелов")
+        return value
+
+
 class SandboxConfig(BaseModel):
     """Песочница. В MVP — одна, созданная вручную; id выдаёт провайдер."""
 
@@ -92,6 +116,7 @@ class SandboxConfig(BaseModel):
     claude_code_version: str = Field(default="2.1.292", pattern=_SEMVER_PATTERN)
     openspec_version: str = Field(default="1.14.3", pattern=_SEMVER_PATTERN)
     memory: SandboxMemoryConfig | None = None
+    git_author: GitAuthorConfig = Field(default_factory=GitAuthorConfig)
 
 
 class GitLabConfig(BaseModel):
