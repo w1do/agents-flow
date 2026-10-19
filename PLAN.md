@@ -62,6 +62,7 @@ MR создан → сообщение в Telegram. Тот же поток ви�
 | [`telegram-other-project`](openspec/changes/telegram-other-project/) | Кнопка «Другой проект» | telegram-bot | mvp-05 | todo |
 | [`routing-uncertainty`](openspec/changes/routing-uncertainty/) | Неуверенность маршрутизации и напоминание | command-routing | mvp-05 | todo |
 | [`telegram-full-stages`](openspec/changes/telegram-full-stages/) | Полные этапы и кнопки задачи | telegram-bot | mvp-09 | todo |
+| [`task-rework`](openspec/changes/task-rework/) | Доработка по замечанию владельца (та же ветка и MR) и диалог с агентом через Telegram (D-57). Приоритет владельца: **важно** | task-dialog, command-routing, telegram-bot | mvp-09, mvp-07 | todo |
 | [`voice-robustness`](openspec/changes/voice-robustness/) | Надёжность голосового пути | speech-to-text | mvp-04 | todo |
 | [`check-tasks`](openspec/changes/check-tasks/) | Задачи проверки (класс «проверка») | task-lifecycle | mvp-09 | todo |
 
@@ -93,7 +94,7 @@ MR создан → сообщение в Telegram. Тот же поток ви�
 
 | Изменение | Что даёт | Capability | Зависит от | Статус |
 |---|---|---|---|---|
-| [`gates-tests-deploy`](openspec/changes/gates-tests-deploy/) | Гейты тестов и деплоя по workspace | delivery-gates | processes | todo |
+| [`gates-tests-deploy`](openspec/changes/gates-tests-deploy/) | Пресеты гейтов (content, data, docs), гейты задачи (только добавляют), файл гейтов из основной ветки, деплой (D-58) | delivery-gates | processes, mvp-09 | todo |
 | [`staging-auto-merge`](openspec/changes/staging-auto-merge/) | Авто-мердж через staging | delivery-gates | gates-tests-deploy | todo |
 | [`revert-task`](openspec/changes/revert-task/) | Откат влитой задачи | delivery-gates | staging-auto-merge | todo |
 | [`spec-approval`](openspec/changes/spec-approval/) | Утверждение спецификации кнопкой | spec-planning | mvp-08 | todo |
