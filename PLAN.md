@@ -15,9 +15,10 @@
   исчерпанном лимите Claude исправлен, D-54), `sandbox-profile` (6c: ключи из vault, Node 22, Docker, memory-agent по sha,
   авторизация git заголовком; live 7/7, D-50…D-53). Спеки `platform-config`, `task-lifecycle`, `telegram-bot`,
   `speech-to-text`, `command-routing`, `sandbox-runtime`, `sandbox-profile` синхронизированы в `openspec/specs/`.
-- Блокеров нет: вопрос 3 закрыт (GitLab, D-01).
+- Блокеров нет: вопрос 3 закрыт (GitLab, D-01); репозитории workspace — GitHub или GitLab по выбору workspace (D-60).
 - Известное ограничение: пайплайн GitLab на реальном MR не запускался (remote репозитория — GitHub). Проверить при первом MR в GitLab; см. [docs/deployment.md](docs/deployment.md).
-- Следующее: `mvp-07-agents-flow-mcp`, затем `mvp-08`, `mvp-09` (D-53). Критерий владельца для 7 и 9 — D-56: агент коммитит и
+- Следующее: `git-providers` (6e, D-60: workspace на GitHub или GitLab, первым `w1do/chistotyumen`), затем
+  `mvp-07-agents-flow-mcp`, `mvp-08`, `mvp-09` (D-53). Критерий владельца для 7 и 9 — D-56: агент коммитит и
   вызывает «сдать работу», push и MR делает харнесс после гейтов.
 - Решено 2026-10-19: доработка задачи и диалог с агентом через Telegram — отдельное изменение `task-rework` после `mvp-09`
   (приоритет владельца).
@@ -41,13 +42,14 @@ MR создан → сообщение в Telegram. Тот же поток ви�
 | 6 | [`mvp-06-sandbox-runtime`](openspec/changes/archive/2026-10-19-mvp-06-sandbox-runtime/) | Адаптер Novita, bootstrap, запуск агента, очистка, пауза | sandbox-runtime | mvp-01, mvp-03 | done |
 | 6c | [`sandbox-profile`](openspec/changes/archive/2026-10-19-sandbox-profile/) | Bootstrap без участия владельца: Node 22, Docker, memory-agent, ключи из vault, память проекта (D-43…D-45, D-47, D-48). Live 7/7, принято владельцем 2026-10-19 | sandbox-profile, sandbox-runtime | mvp-06 | done |
 | 6d | [`integrations-mcp-config`](openspec/changes/integrations-mcp-config/) | Раздел MCP на платформе, генерация `mcp.json` агента на каждый запуск, CLI `harness-server mcp` (D-46). Отложено после `mvp-09` (D-53) | integrations, sandbox-runtime | sandbox-profile | todo |
+| 6e | [`git-providers`](openspec/changes/git-providers/) | Репозиторий workspace на GitHub или GitLab: `workspaces[].repo`, ключ из vault по workspace, git-заголовок на префикс репозитория, `GIT_AUTH_HEADER_<i>` в bootstrap (D-60). До `mvp-07`: задачи worker на `w1do/chistotyumen` | platform-config, sandbox-profile, sandbox-runtime | sandbox-profile | todo |
 | 7 | [`mvp-07-agents-flow-mcp`](openspec/changes/mvp-07-agents-flow-mcp/) | MCP: токен задачи, report_task, sync_spec, create_task | agents-flow-mcp | mvp-03, mvp-06 | todo |
 | 8 | [`mvp-08-spec-planning`](openspec/changes/mvp-08-spec-planning/) | Планировщик OpenSpec → задачи в backlog | spec-planning | mvp-05, mvp-06, mvp-07 | todo |
-| 9 | [`mvp-09-delivery-mr`](openspec/changes/mvp-09-delivery-mr/) | Исполнитель, гейты, MR в GitLab, итог в Telegram | delivery-gates | mvp-08 | todo |
+| 9 | [`mvp-09-delivery-mr`](openspec/changes/mvp-09-delivery-mr/) | Исполнитель, базовые гейты безопасности и гейты проекта (D-58), MR в GitLab или PR в GitHub (`adapters/git`, D-60), итог в Telegram | delivery-gates | mvp-08, git-providers | todo |
 | 10 | [`mvp-10-operator-console`](openspec/changes/mvp-10-operator-console/) | Веб-панель: вход, канбан, карточка и создание задачи, песочница и логи агента | operator-console | mvp-06, mvp-09 | todo |
 
 `mvp-01`…`mvp-06` и 6c выполнены. Дальше строго
-по номеру до `mvp-10`. `sandbox-profile` (6c) — между `mvp-06` и `mvp-07` (D-43), done после подтверждения владельца; `integrations-mcp-config` (6d) отложен после `mvp-09` (D-53): порядок `mvp-07` → `mvp-08` → `mvp-09` ведёт к первому MR end-to-end как можно раньше. В MVP-критерий 6c и 6d не входят.
+по номеру до `mvp-10`. `sandbox-profile` (6c) — между `mvp-06` и `mvp-07` (D-43), done после подтверждения владельца; `git-providers` (6e, D-60) — до `mvp-07` по решению владельца 2026-10-19: worker должен скоро работать с GitHub-репозиторием; `mvp-09` зависит от него (`adapters/git`). `integrations-mcp-config` (6d) отложен после `mvp-09` (D-53): порядок `mvp-07` → `mvp-08` → `mvp-09` ведёт к первому MR end-to-end как можно раньше. В MVP-критерий 6c, 6d и 6e не входят.
 
 ## После MVP — мелкие изменения по волнам
 
