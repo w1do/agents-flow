@@ -150,7 +150,7 @@
 
 ## 5. Live-проверки (владелец, песочница Novita, после ответов на вопросы 1–2)
 
-Результат live 2026-10-19: 7/7 passed (прогон 5), ждёт подтверждения владельца. Чекбоксы ниже владелец отмечает сам.
+Результат live 2026-10-19: 7/7 passed (прогон 5), принято владельцем 2026-10-19 (повторный прогон 7/7).
 
 Новый файл `test_sandbox_profile_live.py` (`-m live`, пропуск без `LIVE_NOVITA_API_KEY`, `LIVE_NOVITA_SANDBOX_ID`,
 `LIVE_CLAUDE_CODE_OAUTH_TOKEN`; значения не печатаются). Перед проверками — `harness-server sandbox bootstrap` с
@@ -158,18 +158,18 @@
 собирает конфиг, sha берётся из ENV `LIVE_MEMORY_REF` (пропуск без него); значение по умолчанию в коде нет, закреплённый
 коммит указан в `docs/deployment.md`.
 
-- [ ] 5.1 Двойной bootstrap: второй запуск — код 0, Node, Docker, npm-пакеты не переустанавливаются («уже установлен»),
+- [x] 5.1 Двойной bootstrap: второй запуск — код 0, Node, Docker, npm-пакеты не переустанавливаются («уже установлен»),
   в выводе второго запуска `уже установлен: github:<repo>#<ref>`; `cat ~/.harness/memory/installed-ref` равен
   `github:<repo>#<ref>`; `memory --help` от пользователя песочницы — код 0 (бинарь доступен не только root)
-- [ ] 5.2 `memory status --json --path ~/work/<id>` с `EMBEDDING_API_KEY` в env команды — Qdrant, Typesense и embeddings
+- [x] 5.2 `memory status --json --path ~/work/<id>` с `EMBEDDING_API_KEY` в env команды — Qdrant, Typesense и embeddings
   `ok`; `grep -rlF` значения ключа (через env) в `~`, `~/.config/project-memory`, `~/work` — пусто
-- [ ] 5.3 Ресурсы: сервисы memory-agent запущены, агент выполняет `MULTI_TURN_PROMPT` из `test_novita_live.py` — без
+- [x] 5.3 Ресурсы: сервисы memory-agent запущены, агент выполняет `MULTI_TURN_PROMPT` из `test_novita_live.py` — без
   OOM (`dmesg | grep -i oom` пусто), `free -m` в отчёт. Провал → открытый вопрос 3
-- [ ] 5.4 Изоляция не изменилась: `test_novita_live.py::test_live_worktree_hooks_and_repo_mcp_are_not_loaded` проходит
-- [ ] 5.5 Docker после паузы: `sandbox pause`, `sandbox resume`, `bash ~/.harness/bin/ensure-docker.sh`, `memory status` — `ok`
-- [ ] 5.6 Skill и агент видны: тест кладёт `~/.claude/skills/harness-probe/SKILL.md` и
+- [x] 5.4 Изоляция не изменилась: `test_novita_live.py::test_live_worktree_hooks_and_repo_mcp_are_not_loaded` проходит
+- [x] 5.5 Docker после паузы: `sandbox pause`, `sandbox resume`, `bash ~/.harness/bin/ensure-docker.sh`, `memory status` — `ok`
+- [x] 5.6 Skill и агент видны: тест кладёт `~/.claude/skills/harness-probe/SKILL.md` и
   `~/.claude/agents/harness-probe-agent.md` (frontmatter `name`, `description`), запускает агента с
   `--setting-sources user`; `harness-probe` есть в `system/init` (`skills` или `slash_commands`), `harness-probe-agent` —
   в `system/init.agents`; тест удаляет оба файла
-- [ ] 5.7 Активация с памятью: задача-заглушка через диспетчер — `memory sync` без предупреждения в логе, агент запущен
+- [x] 5.7 Активация с памятью: задача-заглушка через диспетчер — `memory sync` без предупреждения в логе, агент запущен
   с `HARNESS_MEMORY_PROJECT`
