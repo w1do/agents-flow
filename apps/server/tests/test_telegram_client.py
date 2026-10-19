@@ -262,3 +262,42 @@ async def test_set_webhook_sends_secret_and_allowed_updates() -> None:
         "secret_token": "test-webhook-secret-0123456789abcdef",
         "allowed_updates": ["message", "callback_query"],
     }
+
+
+PROXY = "https://tg-proxy.example.com"
+
+
+@respx.mock
+async def test_custom_base_url_is_used_for_api_and_file_calls() -> None:
+    api_route = respx.post(f"{PROXY}/bot{TOKEN}/sendMessage").mock(
+        return_value=httpx.Response(200, json={"ok": True, "result": {"message_id": 5}})
+    )
+    file_route = respx.get(f"{PROXY}/file/bot{TOKEN}/voice/file_1.oga").mock(
+        return_value=httpx.Response(200, content=b"OggS")
+    )
+
+    async with httpx.AsyncClient() as http:
+        client = HttpxTelegramClient(TOKEN, http, base_url=PROXY)
+        message_id = await client.send_message(CHAT_ID, "текст")
+        data = await client.download_file("voice/file_1.oga", max_bytes=1000)
+
+    assert message_id == 5
+    assert data == b"OggS"
+    assert api_route.called
+    assert file_route.called
+
+
+@respx.mock
+async def test_custom_base_url_error_contains_no_token_or_url() -> None:
+    respx.post(f"{PROXY}/bot{TOKEN}/sendMessage").mock(
+        side_effect=httpx.ConnectError(f"cannot connect to {PROXY}/bot{TOKEN}/sendMessage")
+    )
+
+    async with httpx.AsyncClient() as http:
+        client = HttpxTelegramClient(TOKEN, http, base_url=PROXY)
+        with pytest.raises(TelegramError) as info:
+            await client.send_message(CHAT_ID, "текст")
+
+    assert TOKEN not in str(info.value)
+    assert PROXY not in str(info.value)
+    assert TOKEN not in repr(info.value)

@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     telegram_bot_token: SecretStr
     telegram_chat_id: str
     telegram_webhook_secret: SecretStr
+    # Адрес Bot API: прокси владельца, если прод-сервер не достаёт api.telegram.org (D-61).
+    telegram_api_url: str = "https://api.telegram.org"
 
     harness_public_url: str | None = None
     harness_admin_token: SecretStr | None = None
@@ -112,6 +114,26 @@ class Settings(BaseSettings):
                 "допустимы только латиница, цифры, _ и -, длина от 32 до 256 (openssl rand -hex 32)"
             )
         return value
+
+    @field_validator("telegram_api_url")
+    @classmethod
+    def _check_telegram_api_url(cls, value: str) -> str:
+        # Токен бота стоит в пути URL: без https он уйдёт открытым текстом, а учётные данные и
+        # query в адресе прокси не нужны и попадали бы в логи (D-61). Слеш в конце убираем,
+        # чтобы клиент не склеивал «//bot…». Значение в текст ошибки не выводится.
+        stripped = value.rstrip("/")
+        parts = urlsplit(stripped)
+        if (
+            parts.scheme != "https"
+            or not parts.netloc
+            or "@" in parts.netloc
+            or parts.query
+            or parts.fragment
+        ):
+            raise ValueError(
+                "должен начинаться с https://, без учётных данных, query и fragment (D-61)"
+            )
+        return stripped
 
     @field_validator("telegram_chat_id")
     @classmethod

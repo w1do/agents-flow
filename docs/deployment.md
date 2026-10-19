@@ -122,3 +122,7 @@ Job `deploy:dokploy` не добавляет `curl -v` и `--trace`: при ош
   Anthropic и Novita. Код не применяет его в MVP: песочница создаётся вручную (D-38).
 - Claude Code в песочнице запускается с `--setting-sources user` и `--strict-mcp-config`: hooks и MCP-серверы
   репозитория задачи не выполняются (D-36). Bootstrap не кладёт hooks и plugins в профиль песочницы.
+
+## Telegram за прокси (сервер в РФ)
+
+Если сервер в РФ не достаёт `api.telegram.org`, задайте `TELEGRAM_API_URL` на прокси Bot API (Cloudflare Worker владельца), например `https://<worker>`. Входящий webhook тоже идёт через прокси: `set-webhook` регистрирует адрес через тот же `TELEGRAM_API_URL`. Пустое значение = `https://api.telegram.org`.

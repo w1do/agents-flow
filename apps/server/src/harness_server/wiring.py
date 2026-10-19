@@ -43,7 +43,12 @@ def build_http_client() -> httpx.AsyncClient:
 
 def build_adapters(settings: Settings, http: httpx.AsyncClient) -> BotAdapters:
     """Реальные адаптеры из настроек. STT и маршрутизатор — только при заданных ключе и модели."""
-    telegram = HttpxTelegramClient(settings.telegram_bot_token.get_secret_value(), http)
+    # Один адрес Bot API для всех вызовов, включая скачивание файлов: прокси задаётся один раз.
+    telegram = HttpxTelegramClient(
+        settings.telegram_bot_token.get_secret_value(),
+        http,
+        base_url=settings.telegram_api_url,
+    )
     stt: SpeechToText | None = None
     if settings.stt_api_url and settings.stt_api_key is not None and settings.stt_model:
         stt = OpenAiCompatibleStt(

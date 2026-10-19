@@ -313,3 +313,63 @@ def test_vault_settings_optional_and_token_hidden(
 
     assert settings.vault_mcp_url == "https://vault.example/mcp"
     assert "vault-token-test" not in repr(settings)
+
+
+def test_telegram_api_url_defaults_to_bot_api(valid_env: dict[str, str]) -> None:
+    settings = load_settings()
+
+    assert settings.telegram_api_url == "https://api.telegram.org"
+
+
+def test_telegram_api_url_empty_means_default(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TELEGRAM_API_URL", "")
+
+    assert load_settings().telegram_api_url == "https://api.telegram.org"
+
+
+def test_telegram_api_url_must_be_https(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch
+) -> None:
+    # Токен бота стоит в пути URL: открытый http его раскроет (D-61).
+    monkeypatch.setenv("TELEGRAM_API_URL", "http://proxy.example.com")
+
+    with pytest.raises(SettingsError) as info:
+        load_settings()
+
+    message = str(info.value)
+    assert "TELEGRAM_API_URL" in message
+    assert "proxy.example.com" not in message
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        f"https://user:{LEAK_MARKER}@proxy.example.com",
+        f"https://{LEAK_MARKER}@proxy.example.com",
+        "https://proxy.example.com?token=1",
+        "https://proxy.example.com/#frag",
+    ],
+)
+def test_telegram_api_url_rejects_credentials_query_fragment(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch, url: str
+) -> None:
+    monkeypatch.setenv("TELEGRAM_API_URL", url)
+
+    with pytest.raises(SettingsError) as info:
+        load_settings()
+
+    message = str(info.value)
+    assert "TELEGRAM_API_URL" in message
+    assert LEAK_MARKER not in message
+
+
+def test_telegram_api_url_trailing_slash_stripped(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TELEGRAM_API_URL", "https://proxy.example.com/tg/")
+
+    settings = load_settings()
+
+    assert settings.telegram_api_url == "https://proxy.example.com/tg"

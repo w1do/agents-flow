@@ -5,7 +5,9 @@ import inspect
 import logging
 from pathlib import Path
 
+import httpx
 import pytest
+import respx
 import yaml
 from harness_server import wiring
 from harness_server.adapters.novita import FakeSandbox
@@ -505,3 +507,22 @@ def test_sandbox_bootstrap_redacts_bare_base64_in_failure_output(
     assert result.exit_code == 1
     assert bare not in result.output
     assert "[REDACTED]" in result.output
+
+
+def test_set_webhook_goes_through_configured_telegram_api_url(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch
+) -> None:
+    # Прод-сервер в РФ регистрирует webhook через прокси владельца (D-61); без подмены сборки.
+    proxy = "https://tg-proxy.example.com"
+    monkeypatch.setenv("HARNESS_PUBLIC_URL", "https://harness.example.com")
+    monkeypatch.setenv("TELEGRAM_API_URL", proxy)
+
+    with respx.mock(assert_all_called=True) as mock:
+        route = mock.post(f"{proxy}/bot{valid_env['TELEGRAM_BOT_TOKEN']}/setWebhook").mock(
+            return_value=httpx.Response(200, json={"ok": True, "result": True})
+        )
+        result = runner.invoke(app, ["telegram", "set-webhook"])
+
+    assert result.exit_code == 0, result.output
+    assert route.called
+    assert valid_env["TELEGRAM_BOT_TOKEN"] not in result.output
