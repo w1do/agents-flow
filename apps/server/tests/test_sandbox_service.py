@@ -600,6 +600,35 @@ async def test_wait_agent_reports_finished_success() -> None:
     assert run.result is not None and run.result.num_turns == 3
 
 
+async def test_wait_agent_marks_usage_limit_reason() -> None:
+    """Код 0 и итог «исчерпан лимит подписки»: сервис сам ставит reason usage_limit, run не успешен.
+
+    Текст лимита в reason не попадает (D-54).
+    """
+    task = _orphan_task()
+    fake = _fake()
+    fake.respond("kill -0 -- -4242", exit_code=1)
+    limit_line = json.dumps(
+        {
+            "type": "result",
+            "subtype": "success",
+            "is_error": False,
+            "num_turns": 1,
+            "session_id": "s-1",
+            "result": "You've hit your session limit · resets 5:30pm (UTC)",
+        }
+    )
+    await _seed_run(fake, task, status_exit=0, stream=(limit_line,))
+
+    run = await _wait(fake, task, started_at=datetime.now(UTC), secrets=(OAUTH,))
+
+    assert run.state is AgentState.FINISHED
+    assert run.exit_code == 0
+    assert run.reason == "usage_limit"
+    assert not run.succeeded
+    assert run.result is not None and run.result.limit_reached
+
+
 async def test_wait_agent_reports_running_while_process_alive() -> None:
     task = _orphan_task()
     fake = _fake()

@@ -32,6 +32,7 @@ from harness_server.security import tokens
 from harness_server.security.redaction import redact
 from harness_server.services.agent_result import (
     LOG_TEXT_LIMIT,
+    USAGE_LIMIT_REASON,
     AgentRun,
     AgentState,
     parse_exit_code,
@@ -820,7 +821,12 @@ async def wait_agent(
     status_text = await provider.read_file(provider_id, f"{directory}/status.json")
     if status_text is not None:
         exit_code = parse_exit_code(status_text)
-        reason = None if exit_code is not None else "статус не читается"
+        # Исчерпанный лимит подписки: код 0 без работы, задача не выполнена (D-54).
+        reason: str | None
+        if result is not None and result.limit_reached:
+            reason = USAGE_LIMIT_REASON
+        else:
+            reason = None if exit_code is not None else "статус не читается"
         return AgentRun(
             state=AgentState.FINISHED,
             exit_code=exit_code,

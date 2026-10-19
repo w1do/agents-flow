@@ -60,6 +60,19 @@ def _result_line() -> str:
     return json.dumps(event)
 
 
+def _limit_line() -> str:
+    """Итог исчерпанного лимита подписки: код 0 и success, но один ход и текст лимита (D-54)."""
+    event: dict[str, Any] = {
+        "type": "result",
+        "subtype": "success",
+        "is_error": False,
+        "num_turns": 1,
+        "session_id": "s-1",
+        "result": "You've hit your session limit · resets 5:30pm (UTC)",
+    }
+    return json.dumps(event)
+
+
 AGENT_PID = 4242
 
 
@@ -96,9 +109,12 @@ class _Pipeline:
     to_status: TaskStatus | None = TaskStatus.ACTIVE
     role = AgentRole.IMPLEMENTER
 
-    def __init__(self, fake: _AgentFake, *, agent_finishes: bool) -> None:
+    def __init__(
+        self, fake: _AgentFake, *, agent_finishes: bool, stream_line: str | None = None
+    ) -> None:
         self._fake = fake
         self._agent_finishes = agent_finishes
+        self._stream_line = stream_line
 
     def base_ref(self, task: Task, config: HarnessConfig) -> str:
         return "main"
@@ -109,7 +125,7 @@ class _Pipeline:
             directory = sandboxes.task_dir(HOME, task.id)
             status = {"exit_code": 0, "finished_at": "2026-10-19T10:00:00Z"}
             await self._fake.write_file(PROVIDER_ID, f"{directory}/status.json", json.dumps(status))
-            self._fake.respond("tail -n", stdout=_result_line())
+            self._fake.respond("tail -n", stdout=self._stream_line or _result_line())
         run = await runner.wait_agent()
         return Outcome(ok=run.succeeded, reason=None if run.succeeded else run.reason)
 
@@ -235,6 +251,29 @@ async def test_successful_run_releases_sandbox(committed_session_factory: Factor
     assert await _sandbox_row(committed_session_factory) == (SandboxStatus.PAUSED, None)
     assert fake.paused
     assert any(e.cmd and "worktree remove --force" in e.cmd for e in fake.journal)
+
+
+async def test_usage_limit_result_marks_task_error_without_retry(
+    committed_session_factory: Factory,
+) -> None:
+    """Агент завершился кодом 0, но итог — исчерпанный лимит подписки: задача error с причиной
+    usage_limit, текст лимита в ленту не попадает, повторного запуска нет (D-54)."""
+    task = await _prepare(committed_session_factory)
+    fake = _fake()
+    pipelines = {
+        TaskKind.IMPLEMENT: _Pipeline(fake, agent_finishes=True, stream_line=_limit_line()),
+    }
+
+    await dispatch_once(_ctx(committed_session_factory, fake), pipelines)
+
+    assert await _task_status(committed_session_factory, task.id) == TaskStatus.ERROR
+    assert await _sandbox_row(committed_session_factory) == (SandboxStatus.PAUSED, None)
+    assert len(_launches(fake)) == 1
+    async with committed_session_factory() as session:
+        events = await list_task_events(session, task.id)
+    texts = [e.text for e in events if e.text]
+    assert any("usage_limit" in text for text in texts)
+    assert not any("hit your" in text for text in texts)
 
 
 async def test_lost_agent_marks_task_error_and_releases_sandbox(
