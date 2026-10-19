@@ -15,7 +15,7 @@
 - [x] 1.3 `adapters/novita/fake.py` `FakeSandbox`: файлы в памяти, журнал `(method, cmd, env_keys, cwd)`, значения env
   отдельно для проверки диска, программируемые ответы по префиксу команды, флаг `paused` — проверка: используется в
   тестах ниже
-- [ ] 1.4 `test_novita_live.py` (`-m live`, пропуск без `LIVE_NOVITA_API_KEY`, `LIVE_NOVITA_SANDBOX_ID`,
+- [x] 1.4 `test_novita_live.py` (`-m live`, пропуск без `LIVE_NOVITA_API_KEY`, `LIVE_NOVITA_SANDBOX_ID`,
   `LIVE_CLAUDE_CODE_OAUTH_TOKEN`): exec, write/read, pause/connect; многоходовой `claude -p --output-format stream-json
   --verbose` с tool-use — `result.usage` и поведение `message.id` (записать в отчёт), `--max-turns 1` на задаче из
   нескольких ходов → `subtype: error_max_turns`; изоляция (design 5): hook-ловушка в `.claude/settings.json` и сервер в
@@ -24,7 +24,7 @@
 
 ## 2. Bootstrap
 
-- [ ] 2.1 `deploy/sandbox/bootstrap.sh` (design 16): `set -euo pipefail`, pinned `claude`/`openspec` через `npm -g` только
+- [x] 2.1 `deploy/sandbox/bootstrap.sh` (design 16): `set -euo pipefail`, pinned `claude`/`openspec` через `npm -g` только
   при другой версии, `~/.harness/{bin,tasks,worktrees}`, `~/work`, `git-askpass.sh` (0700, без значений), `mcp.json` с
   `${AGENTS_FLOW_URL}`/`${AGENTS_FLOW_TOKEN}`, клон `<id>=<url>` только если каталога нет, иначе `set-url` + `fetch` —
   проверка: `shellcheck` (dev-зависимость `shellcheck-py`, шаг в `./tools/harness check`); двойной запуск в песочнице без
@@ -210,3 +210,9 @@ Allowlist: `.gitignore` (только добавить строку), `db/migrat
   видит живого агента во время работы, итог `FINISHED`, после `cleanup_task` токены отозваны, worktree и каталог
   задачи удалены, ветка `task/<id>` удалена. Второй сценарий: агент убит до завершения (kill группы), без
   `status.json` → `wait_agent` даёт `DIED`, повторного запуска нет — проверка: `pytest -m live` зелёный у владельца
+
+## Приёмка владельца
+
+2026-10-19: принято. Live: `test_novita_live.py` 6/6, `test_agent_runtime_live.py` 2/2 (песочница Novita); двойной bootstrap
+(2.1) подтверждён live 5.1 в `sandbox-profile`; демо «Контакты в README» — агент закоммитил правку в worktree, очистка и пауза
+отработали. Найденный в демо ложный «успех» при исчерпанном лимите Claude исправлен (3.8, D-54).
