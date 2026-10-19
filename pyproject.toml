@@ -25,6 +25,8 @@ dev = [
     "testcontainers[postgres]>=4.8",
     "asgi-lifespan>=2.1",
     "types-PyYAML>=6.0",
+    # Линт bash-скриптов песочницы (deploy/sandbox), шаг ./tools/harness check.
+    "shellcheck-py>=0.10",
 ]
 
 [tool.ruff]
@@ -46,6 +48,12 @@ explicit_package_bases = true
 
 [[tool.mypy.overrides]]
 module = ["testcontainers.*"]
+ignore_missing_imports = true
+
+# novita-sandbox 2.1.1 не содержит py.typed: типы берутся только из аннотаций адаптера
+# adapters/novita/client.py, где граница с SDK типизирована вручную (D-35).
+[[tool.mypy.overrides]]
+module = ["novita_sandbox", "novita_sandbox.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
