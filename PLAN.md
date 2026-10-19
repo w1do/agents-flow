@@ -20,6 +20,9 @@
 - В работе: `mvp-06-sandbox-runtime` (ветка `mvp-06-sandbox-runtime` от `mvp-05`, решение владельца). OpenSpec
   уточнён (D-35…D-38), идёт реализация.
 - Решение 2026-10-19 (D-39): веб-панель оператора входит в MVP как `mvp-10-operator-console` после `mvp-09`.
+- Решение 2026-10-19 (D-43): `sandbox-profile` (6c) и `integrations-mcp-config` (6d) делаются сразу после `mvp-06`,
+  до `mvp-07`. Репозитория профиля нет; раздел MCP — таблица на платформе (D-46). Открытые вопросы владельцу — в начале их
+  `proposal.md`.
 
 ## MVP — сквозной срез (ТЗ §16.0)
 
@@ -34,13 +37,15 @@ MR создан → сообщение в Telegram. Тот же поток ви�
 | 4 | [`mvp-04-telegram-intake`](openspec/changes/archive/2026-10-18-mvp-04-telegram-intake/) | Webhook, голос→текст, кнопки проекта, одно сообщение | telegram-bot, speech-to-text | mvp-03 | done |
 | 5 | [`mvp-05-command-routing`](openspec/changes/mvp-05-command-routing/) | Polza: классы work/status, кандидаты, запасной путь | command-routing | mvp-04 | review |
 | 6 | [`mvp-06-sandbox-runtime`](openspec/changes/mvp-06-sandbox-runtime/) | Адаптер Novita, bootstrap, запуск агента, очистка, пауза | sandbox-runtime | mvp-01, mvp-03 | review |
+| 6c | [`sandbox-profile`](openspec/changes/sandbox-profile/) | Bootstrap без участия владельца: Node 22, Docker, memory-agent, ключи из vault, память проекта (D-43…D-45, D-47, D-48) | sandbox-profile, sandbox-runtime | mvp-06 | todo |
+| 6d | [`integrations-mcp-config`](openspec/changes/integrations-mcp-config/) | Раздел MCP на платформе, генерация `mcp.json` агента на каждый запуск, CLI `harness-server mcp` (D-46) | integrations, sandbox-runtime | sandbox-profile | todo |
 | 7 | [`mvp-07-agents-flow-mcp`](openspec/changes/mvp-07-agents-flow-mcp/) | MCP: токен задачи, report_task, sync_spec, create_task | agents-flow-mcp | mvp-03, mvp-06 | todo |
 | 8 | [`mvp-08-spec-planning`](openspec/changes/mvp-08-spec-planning/) | Планировщик OpenSpec → задачи в backlog | spec-planning | mvp-05, mvp-06, mvp-07 | todo |
 | 9 | [`mvp-09-delivery-mr`](openspec/changes/mvp-09-delivery-mr/) | Исполнитель, гейты, MR в GitLab, итог в Telegram | delivery-gates | mvp-08 | todo |
 | 10 | [`mvp-10-operator-console`](openspec/changes/mvp-10-operator-console/) | Веб-панель: вход, канбан, карточка и создание задачи, песочница и логи агента | operator-console | mvp-06, mvp-09 | todo |
 
 `mvp-01`…`mvp-04` выполнены, `mvp-05` на ревью, `mvp-06` на ревью (ветка от `mvp-05` по решению владельца). Дальше строго
-по номеру до `mvp-10`.
+по номеру до `mvp-10`. `sandbox-profile` (6c) и `integrations-mcp-config` (6d) — между `mvp-06` и `mvp-07` (D-43); в MVP-критерий не входят.
 
 ## После MVP — мелкие изменения по волнам
 
@@ -101,10 +106,8 @@ MR создан → сообщение в Telegram. Тот же поток ви�
 | [`stalled-reassign`](openspec/changes/stalled-reassign/) | Перенос сорванной задачи | sandbox-runtime | agent-heartbeat, sandbox-pool, harness-snap | todo |
 | [`repo-queue`](openspec/changes/repo-queue/) | Очередь на репозиторий | delivery-gates | sandbox-pool | todo |
 | [`idle-pause`](openspec/changes/idle-pause/) | Пауза простаивающих песочниц | sandbox-runtime | sandbox-pool | todo |
-| [`sandbox-profile`](openspec/changes/sandbox-profile/) | Версионируемый профиль песочницы | sandbox-profile | sandbox-pool | todo |
 | [`cli-version-pin`](openspec/changes/cli-version-pin/) | Закрепление версий CLI агентов | sandbox-profile | sandbox-profile | todo |
-| [`skills-library`](openspec/changes/skills-library/) | Библиотека skills через MCP | skills-library | sandbox-profile | todo |
-| [`integrations-mcp-config`](openspec/changes/integrations-mcp-config/) | Интеграции и MCP-серверы | integrations | skills-library | todo |
+| [`skills-library`](openspec/changes/skills-library/) | Библиотека skills и агентов Claude через MCP (D-49) | skills-library | sandbox-profile, mvp-07 | todo |
 | [`codex-agent`](openspec/changes/codex-agent/) | Второй тип агента: Codex | sandbox-runtime | sandbox-pool, skills-library | todo |
 
 ### Волна 6. Консоль
@@ -135,7 +138,7 @@ MR создан → сообщение в Telegram. Тот же поток ви�
 | §9, §13 | mvp-01, mvp-06, sandbox-pool, sandbox-profile, idle-pause, cli-version-pin |
 | §10, §10.1 | mvp-06, mvp-08, mvp-09, checkpoints, harness-snap, agent-sessions, budget-usage, task-limits, processes |
 | §11 | mvp-07, operator-tokens, mcp-operator-tools (+ инструменты в профильных изменениях) |
-| §12 | skills-library, integrations-mcp-config, gates-tests-deploy, codex-agent |
+| §12 | skills-library, integrations-mcp-config (раздел MCP), gates-tests-deploy, codex-agent |
 | §14, §16.1 A | mvp-01 (A1), mvp-07 (A2), mvp-04/08/09 (A3), mvp-04 (A4), mvp-03/06 (A5) |
 | §16.1 B | mvp-09 (B1, B2), repo-queue (B3), revert-task (B4), staging-auto-merge (B5) |
 | §16.1 C | harness-snap (C1), agent-heartbeat (C2), task-limits (C3), mvp-05 (C4), voice-robustness (C5), confirm-second-factor (C6), db-retention-backups (C7), cli-version-pin (C8), health-alerts (C9), dry-run (C10), idle-pause (C11), workspace-settings-snapshot (C12), spec-drift (C13) |
