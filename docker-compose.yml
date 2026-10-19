@@ -2,7 +2,13 @@
 # Наружу порты не публикуются: домен и HTTPS выставляет Dokploy поверх expose.
 
 x-harness-common: &harness-common
-  image: ${HARNESS_IMAGE:-registry.gitlab.com/CHANGE_ME/agents-flow:main}
+  # Dokploy собирает образ из git по Dockerfile: реестра пока нет (GitLab CI не запускался, D-59).
+  # Локальный тег общий для migrate, server и worker: Compose собирает его один раз. Когда появится
+  # реестр GitLab, HARNESS_IMAGE задаётся в ENV Dokploy, и сборка не нужна.
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: ${HARNESS_IMAGE:-agents-flow:local}
   environment:
     # Обязательные ENV (ядро и Telegram). Пустое значение считается отсутствующим, сервер не стартует.
     DATABASE_URL: ${DATABASE_URL:-}
@@ -33,6 +39,10 @@ x-harness-common: &harness-common
     ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     WORKER_POLL_INTERVAL_SEC: ${WORKER_POLL_INTERVAL_SEC:-}
     VOICE_MAX_BYTES: ${VOICE_MAX_BYTES:-}
+    AGENT_POLL_INTERVAL_SEC: ${AGENT_POLL_INTERVAL_SEC:-}
+    # Vault с ключами владельца (D-45): без этих ENV ссылки vault:… не разрешаются.
+    VAULT_MCP_URL: ${VAULT_MCP_URL:-}
+    VAULT_MCP_TOKEN: ${VAULT_MCP_TOKEN:-}
   # File Mount Dokploy: config/harness.yaml из раздела Files стека попадает в ../files/.
   volumes:
     - ../files/harness.yaml:/app/config/harness.yaml:ro

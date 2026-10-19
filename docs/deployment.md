@@ -13,6 +13,32 @@
   `depends_on: { migrate: { condition: service_completed_successfully } }`.
 - Секреты приложения — только в Environment Dokploy. `config/harness.yaml` — File Mount Dokploy.
 
+## Первый деплой в Dokploy (без реестра)
+
+Реестра GitLab пока нет: CI не запускался, remote репозитория — GitHub (D-59). Dokploy собирает образ сам
+из `Dockerfile` по `docker-compose.yml`, поэтому `HARNESS_IMAGE` не задаётся. Раздел «CI» ниже — цель после переноса в GitLab.
+
+1. **Postgres.** Нативный сервис Dokploy `postgres:16` в той же сети `dokploy-network`, порты наружу не публикуются.
+   `DATABASE_URL` стека харнесса указывает на внутренний хост этого сервиса (имя сервиса в Dokploy), пользователь,
+   пароль и база — из его настроек. Пароль в документацию и репозиторий не пишется.
+2. **Стек харнесса.** Dokploy → Compose → Source: GitHub `w1do/agents-flow`, ветка `main`, Compose Path `docker-compose.yml`.
+   Dokploy выполняет `build` из `Dockerfile`; образ получает локальный тег `agents-flow:local`, один на migrate, server и worker.
+3. **Домен.** Домен `flow.w1do.ru` привязать к сервису `server`, порт `8000`, HTTPS: Let's Encrypt.
+   `HARNESS_PUBLIC_URL=https://flow.w1do.ru`.
+4. **File Mount.** Файл `harness.yaml` с боевыми значениями (ссылки `vault:…`, workspace, sandbox) — путь монтирования
+   `config/harness.yaml`. Образец — `config/harness.example.yaml`; боевой файл в репозиторий не коммитится.
+5. **ENV.** Environment стека в Dokploy: обязательные и опциональные переменные из ARCHITECTURE.md §9, которые нужны
+   текущим этапам. Значения секретов — только в Dokploy. `docker-compose.yml` передаёт все переменные из `Settings`;
+   тест `apps/server/tests/test_compose.py` следит за этим.
+6. **Запуск.** Сначала выполняется `migrate` (`alembic upgrade head`), затем стартуют `server` и `worker`.
+7. **Webhook Telegram.** В терминале контейнера `server` (Dokploy → сервис server → Terminal):
+   `harness-server telegram set-webhook`. Команда регистрирует `https://flow.w1do.ru/telegram/webhook` с секретом
+   `TELEGRAM_WEBHOOK_SECRET`. Повторять при смене домена или секрета.
+8. **Проверка.** `https://flow.w1do.ru/health` отвечает успехом; healthcheck сервиса `server` использует тот же путь.
+
+Сборка без реестра: образ каждый раз пересобирается при деплое из текущего `main`. Когда появится реестр GitLab (CI),
+`build` в Compose и `HARNESS_IMAGE` переводятся на `registry.gitlab.com/…:main` (см. раздел «CI»).
+
 ## CI (`.gitlab-ci.yml`)
 
 ```
