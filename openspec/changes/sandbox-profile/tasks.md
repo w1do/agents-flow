@@ -150,6 +150,8 @@
 
 ## 5. Live-проверки (владелец, песочница Novita, после ответов на вопросы 1–2)
 
+Результат live 2026-10-19: 7/7 passed (прогон 5), ждёт подтверждения владельца. Чекбоксы ниже владелец отмечает сам.
+
 Новый файл `test_sandbox_profile_live.py` (`-m live`, пропуск без `LIVE_NOVITA_API_KEY`, `LIVE_NOVITA_SANDBOX_ID`,
 `LIVE_CLAUDE_CODE_OAUTH_TOKEN`; значения не печатаются). Перед проверками — `harness-server sandbox bootstrap` с
 `sandbox.memory` и ссылками на vault; memory-agent ставится с коммита `sandbox.memory.ref` (D-51). Если тест сам
