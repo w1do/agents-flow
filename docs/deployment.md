@@ -89,7 +89,7 @@ Job `deploy:dokploy` не добавляет `curl -v` и `--trace`: при ош
   Без `access_ref` сервер берёт `GITLAB_TOKEN` из ENV, как раньше.
 - Значения для боевого запуска (D-50): `VAULT_MCP_URL=https://safe.w1do.ru/mcp`; `VAULT_MCP_TOKEN` — значение задаёт
   владелец и вносит только в ENV Dokploy (в репозиторий и документацию не пишется). В боевом `harness.yaml`:
-  `gitlab.access_ref: "vault:Workflow/Gitlab/админский"` и `sandbox.memory.embedding_ref: "vault:Сервисы/Polza/EmbeddingsMemory"`.
+  `gitlab.access_ref: "vault:Repository/Gitlab/админский"` и `sandbox.memory.embedding_ref: "vault:Сервисы/Polza/EmbeddingsMemory"`.
   В `config/harness.example.yaml` эти ссылки не заносятся.
 - Первый bootstrap с памятью (после заполнения `sandbox.memory`): `harness-server sandbox bootstrap`. Команда
   ставит Node 22, Docker, memory-agent из GitHub на коммите `sandbox.memory.ref` и индексирует клоны. Повторный запуск не
