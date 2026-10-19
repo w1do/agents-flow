@@ -263,6 +263,8 @@ def sandbox_bootstrap(script: Path = Path("deploy/sandbox/bootstrap.sh")) -> Non
     vault_values = tuple(
         value.get_secret_value() for value in (gitlab_key, embedding_key) if value is not None
     )
+    # Заголовок Basic и его base64-часть тоже секреты: попадают в git-команды (D-52).
+    vault_values += sandboxes.git_auth_secret_values(gitlab_key.get_secret_value())
     try:
         result = asyncio.run(
             sandboxes.bootstrap(
@@ -271,7 +273,8 @@ def sandbox_bootstrap(script: Path = Path("deploy/sandbox/bootstrap.sh")) -> Non
                 config,
                 script=text,
                 gitlab_token=gitlab_key,
-                memory_version=memory.version if memory is not None else None,
+                memory_ref=memory.ref if memory is not None else None,
+                memory_repo=memory.repo if memory is not None else None,
                 embedding_key=embedding_key,
             )
         )

@@ -159,10 +159,13 @@ implement:  backlog → active → testing → ready (MR создан) → merge
 - Bootstrap (`deploy/sandbox/bootstrap.sh`, `sandbox-profile`): Node ≥ 22.13 (NodeSource, если нужно, через
   `sudo -n`), pinned `claude`, `git`, `openspec`, клон репозиториев, пустые `~/.claude/skills` и `~/.claude/agents`
   (D-48), `mcp.json` с `${AGENTS_FLOW_TOKEN}` (значение приходит в env exec-команды). Секретов в файле нет. Идемпотентен.
-  С `--memory-version` (`sandbox.memory`, D-47): Docker Engine + Compose v2, `project-memory` точной версии,
+  С `--memory-ref`/`--memory-repo` (`sandbox.memory`, D-47, D-51): Docker Engine + Compose v2, memory-agent из GitHub
+  на закреплённом коммите (`npm install -g github:<repo>#<sha>`, маркер `~/.harness/memory/installed-ref`),
   `memory service up`, `memory init --path ~/work/<id>` на клон каждого workspace; маркер `~/.harness/memory/<id>.ready`.
+  Пакет `project-memory` из реестра npm не ставится (чужой пакет, D-51).
   Скрипт `~/.harness/bin/ensure-docker.sh` поднимает демон при активации (после паузы Novita). Ключ embeddings
   приходит только в env команды bootstrap; `EMBEDDING_API_KEY` в `.memory/.env` и конфиг memory не пишется.
+- Токен GitLab уходит git заголовком `Authorization` только на префикс `gitlab.base_url` (`GIT_CONFIG_*` в env клона и fetch, D-52); askpass не используется.
 - Ключи из vault (D-45, `adapters/vault`, MCP-клиент на официальном SDK): ссылка `vault:<project>/<service>/<name>`
   в `harness.yaml` (`gitlab.access_ref`, `sandbox.memory.embedding_ref`); значение берётся на каждую команду и
   передаётся только в env (bootstrap, активация, запуск агента). Без vault ссылка даёт `not_configured`; ключ
@@ -196,7 +199,7 @@ implement:  backlog → active → testing → ready (MR создан) → merge
 
 `config/harness.yaml` (путь в `HARNESS_CONFIG`, без секретов, пример — `config/harness.example.yaml`):
 workspaces (id, name, voice_aliases, gitlab_project, default_branch, test_command, agent), sandbox (provider_id,
-версии, опционально `memory`: `version`, `embedding_ref`), gitlab (base_url, опционально `access_ref` — ссылка
+версии, опционально `memory`: `repo` (по умолчанию `w1do/memory-agent`), `ref` (полный sha коммита), `embedding_ref`), gitlab (base_url, опционально `access_ref` — ссылка
 `vault:…` на главный ключ GitLab). Ключи с сегментами `token`/`tokens`, `key`, `password`/`passwd`/`pwd`, `secret`/`secrets`, `apikey`,
 `credential`/`credentials` сервер отклоняет на любом уровне. `gitlab.base_url` с учётными данными (`user@host`) тоже
 отклоняется (D-26); токен GitLab задаётся только в ENV.

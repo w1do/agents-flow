@@ -40,6 +40,11 @@ _SEGMENT_SPLIT = re.compile(r"[_-]")
 _CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 # Версия пакета в bootstrap подставляется в команду npm: принимаем только X.Y.Z (D-38).
 _SEMVER_PATTERN = r"^\d+\.\d+\.\d+$"
+# memory-agent ставится по полному sha: теги и ветки изменяемы, короткий sha неоднозначен (D-51).
+_GIT_SHA_PATTERN = r"^[0-9a-f]{40}$"
+# Сегмент начинается и заканчивается буквой или цифрой: ./. и ../.. не проходят (L1).
+_GITHUB_REPO_SEGMENT = r"[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?"
+_GITHUB_REPO_PATTERN = rf"^{_GITHUB_REPO_SEGMENT}/{_GITHUB_REPO_SEGMENT}$"
 
 
 class WorkspaceConfig(BaseModel):
@@ -64,8 +69,10 @@ class SandboxMemoryConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    # Версия пакета project-memory: закреплена, как версии claude и openspec (D-38).
-    version: str = Field(pattern=_SEMVER_PATTERN)
+    # GitHub-репозиторий memory-agent (D-51).
+    repo: str = Field(default="w1do/memory-agent", pattern=_GITHUB_REPO_PATTERN)
+    # Полный sha коммита memory-agent, тег и ветка не принимаются (D-51). Обязателен.
+    ref: str = Field(pattern=_GIT_SHA_PATTERN)
     # Ключ embeddings — только ссылка vault:…; без неё поиск лексический.
     embedding_ref: str | None = None
 

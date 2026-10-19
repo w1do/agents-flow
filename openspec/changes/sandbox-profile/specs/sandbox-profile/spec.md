@@ -4,19 +4,35 @@
 
 Bootstrap SHALL готовить песочницу одной командой: Node не ниже 22.13, `claude` и `openspec` закреплённых версий,
 доступ к GitLab по ключу, клоны репозиториев workspace, пустые каталоги `~/.claude/skills` и `~/.claude/agents`, а при
-включённой памяти — Docker Engine с Compose v2 и memory-agent закреплённой версии. Bootstrap MUST быть идемпотентным и
-MUST NOT ставить языки и стек проектов.
+включённой памяти — Docker Engine с Compose v2. Bootstrap MUST быть идемпотентным и MUST NOT ставить языки и стек
+проектов.
 
 #### Scenario: Повторный bootstrap с памятью
 
 - **WHEN** bootstrap с включённой памятью запускается второй раз на подготовленной песочнице
-- **THEN** скрипт завершается с кодом 0, Node, Docker и npm-пакеты не переустанавливаются, репозитории не клонируются
-  заново
+- **THEN** скрипт завершается с кодом 0, Node, Docker и npm-пакеты не переустанавливаются, memory-agent с тем же
+  sha не переустанавливается, репозитории не клонируются заново
 
 #### Scenario: Нет sudo и старый Node
 
 - **WHEN** в песочнице Node ниже 22.13 и нет `sudo`
 - **THEN** bootstrap завершается с кодом 1 и сообщением, что нужен Node 22.13 или sudo
+
+### Requirement: Установка memory-agent
+
+Когда память включена, bootstrap SHALL ставить memory-agent из GitHub-репозитория, закреплённого на полный sha коммита.
+memory-agent MUST NOT ставиться по имени из реестра npm, а ссылка на него MUST быть полным sha из 40 шестнадцатеричных
+символов (не тег, не ветка).
+
+#### Scenario: Смена коммита memory-agent
+
+- **WHEN** в настройках памяти указан другой sha коммита и bootstrap запускается снова
+- **THEN** memory-agent переустанавливается из GitHub на этот коммит
+
+#### Scenario: Ссылка на memory-agent не sha
+
+- **WHEN** в настройках памяти или в аргументах bootstrap ссылка на memory-agent — тег, ветка или короткий sha
+- **THEN** конфигурация не загружается, а скрипт bootstrap завершается с кодом 2 до любых установок
 
 ### Requirement: Ключи из vault
 

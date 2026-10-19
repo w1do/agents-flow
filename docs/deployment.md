@@ -66,8 +66,18 @@ Job `deploy:dokploy` не добавляет `curl -v` и `--trace`: при ош
   `gitlab.access_ref: "vault:Workflow/Gitlab/админский"` и `sandbox.memory.embedding_ref: "vault:Сервисы/Polza/EmbeddingsMemory"`.
   В `config/harness.example.yaml` эти ссылки не заносятся.
 - Первый bootstrap с памятью (после заполнения `sandbox.memory`): `harness-server sandbox bootstrap`. Команда
-  ставит Node 22, Docker, `project-memory` точной версии и индексирует клоны. Повторный запуск не переустанавливает
-  совпадающие версии и не клонирует заново.
+  ставит Node 22, Docker, memory-agent из GitHub на коммите `sandbox.memory.ref` и индексирует клоны. Повторный запуск не
+  переустанавливает совпадающие версии и не клонирует заново.
+- Блок памяти в `harness.yaml` (закреплённый коммит memory-agent, D-51):
+  ```yaml
+  sandbox:
+    memory:
+      ref: 09e5e63ac721db75020fcfa69e33930750975139
+      embedding_ref: vault:Сервисы/Polza/EmbeddingsMemory
+  ```
+  `repo` не задан — `w1do/memory-agent`. Пакет `project-memory` из реестра npm не ставится: он чужой.
+- Обновление memory-agent: новый полный sha в `ref` и повторный `harness-server sandbox bootstrap`. Тег и ветка
+  в `ref` не принимаются; маркер `~/.harness/memory/installed-ref` сверяет установленный коммит.
 - Рекомендация: ключ embeddings для песочницы — отдельный ключ Polza с лимитом расходов, не основной ключ.
   Ключ доступен процессам песочницы на время команды (см. design, Risks).
 - После паузы Novita демон Docker поднимает `~/.harness/bin/ensure-docker.sh`; активация вызывает его сама.

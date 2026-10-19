@@ -6,6 +6,7 @@
 идентификаторы, роли и коды; текст из песочницы — только после redaction.
 """
 
+import base64
 import json
 import logging
 import shlex
@@ -113,41 +114,83 @@ def clone_url(config: HarnessConfig, workspace: WorkspaceConfig) -> str:
     return f"{config.gitlab.base_url.rstrip('/')}/{workspace.gitlab_project}.git"
 
 
+def git_auth_header(token: str) -> str:
+    """Заголовок Basic для git: oauth2:<token> в base64 (D-52). Значение — секрет."""
+    basic = base64.b64encode(f"oauth2:{token}".encode()).decode("ascii")
+    return f"Authorization: Basic {basic}"
+
+
+def git_auth_env(base_url: str, token: str) -> dict[str, str]:
+    """env git-команды: заголовок только для URL, начинающихся с base_url (D-52).
+
+    GIT_CONFIG_* передаются через env, а не argv и не файлы; git сопоставляет http.<url>.*
+    по префиксу
+    URL, поэтому другой хост заголовка не получает. Требуется git >= 2.31 (Ubuntu 24.04 — 2.43).
+    """
+    prefix = f"{base_url.rstrip('/')}/"
+    # Редиректы выключены, чтобы заголовок не ушёл на другой хост (D-52).
+    return {
+        "GIT_CONFIG_COUNT": "2",
+        "GIT_CONFIG_KEY_0": f"http.{prefix}.extraHeader",
+        "GIT_CONFIG_VALUE_0": git_auth_header(token),
+        "GIT_CONFIG_KEY_1": "http.followRedirects",
+        "GIT_CONFIG_VALUE_1": "false",
+        "GIT_TERMINAL_PROMPT": "0",
+    }
+
+
+def git_auth_secret_values(token: str) -> tuple[str, str]:
+    """Секреты заголовка для redaction: полная строка заголовка и bare base64 из неё (D-52)."""
+    header = git_auth_header(token)
+    return header, header.removeprefix("Authorization: Basic ")
+
+
 async def bootstrap(
     provider: SandboxProvider,
     sandbox_id: str,
     config: HarnessConfig,
     *,
     script: str,
-    gitlab_token: SecretStr,
-    memory_version: str | None = None,
+    gitlab_token: SecretStr | None,
+    memory_ref: str | None = None,
+    memory_repo: str | None = None,
     embedding_key: SecretStr | None = None,
 ) -> ExecResult:
     """Подготавливает песочницу скриптом deploy/sandbox/bootstrap.sh (design 16, 3).
 
     Скрипт записывается в песочницу как есть и запускается с версиями и парами <id>=<url> из
-    конфига. memory_version — версия project-memory: тогда bootstrap ставит Docker и memory-agent
-    и индексирует клоны (D-47). Ключи (GitLab и embeddings) передаются только в env этой команды:
-    в скрипт и файлы они не попадают. Возвращает результат команды; код ненулевой — ответственность
-    вызывающего (CLI). Вывод команды вызывающий должен пропустить через redaction, прежде чем
-    показать.
+    конфига. memory_ref — полный sha коммита memory-agent, memory_repo — его GitHub-репозиторий
+    (D-51): задаются вместе, иначе ValueError до любого вызова провайдера. Тогда bootstrap ставит
+    Docker и memory-agent и индексирует клоны (D-47). Ключи (GitLab и embeddings) передаются только
+    в env этой команды: в скрипт и файлы они не попадают. Возвращает результат команды; код
+    ненулевой — ответственность вызывающего (CLI). Вывод команды вызывающий должен пропустить через
+    redaction, прежде чем показать.
     """
+    if (memory_ref is None) != (memory_repo is None):
+        raise ValueError("memory_ref и memory_repo задаются вместе")
     args = [
         "--claude-version",
         config.sandbox.claude_code_version,
         "--openspec-version",
         config.sandbox.openspec_version,
     ]
-    if memory_version is not None:
-        args += ["--memory-version", memory_version]
+    # Токен GitLab уходит только на префикс базового адреса GitLab (D-52): заголовок строит скрипт.
+    args += ["--gitlab-url", config.gitlab.base_url]
+    if memory_ref is not None and memory_repo is not None:
+        args += ["--memory-ref", memory_ref, "--memory-repo", memory_repo]
     args += [f"{ws.id}={clone_url(config, ws)}" for ws in config.workspaces]
     command = shlex.join(["bash", BOOTSTRAP_SCRIPT_PATH, *args])
 
-    envs = {"GITLAB_TOKEN": gitlab_token.get_secret_value(), "GIT_TERMINAL_PROMPT": "0"}
+    # GITLAB_TOKEN нужен скрипту, чтобы собрать заголовок git; скрипт снимает его из env сразу.
+    # Без токена (публичные репозитории) переменной нет: клоны идут анонимно.
+    # HARNESS_SANDBOX_BOOTSTRAP — защита скрипта от запуска вне песочницы (ревью, D-52).
+    envs = {"GIT_TERMINAL_PROMPT": "0", "HARNESS_SANDBOX_BOOTSTRAP": "1"}
+    if gitlab_token is not None:
+        envs["GITLAB_TOKEN"] = gitlab_token.get_secret_value()
     if embedding_key is not None:
         envs["EMBEDDING_API_KEY"] = embedding_key.get_secret_value()
     # Память без таймаута памяти оборвёт первый memory init на большом проекте.
-    timeout_s = BOOTSTRAP_TIMEOUT_SEC if memory_version is None else BOOTSTRAP_MEMORY_TIMEOUT_SEC
+    timeout_s = BOOTSTRAP_TIMEOUT_SEC if memory_ref is None else BOOTSTRAP_MEMORY_TIMEOUT_SEC
 
     await provider.connect(sandbox_id)
     await provider.write_file(sandbox_id, BOOTSTRAP_SCRIPT_PATH, script)
@@ -413,7 +456,8 @@ async def activate(
     *,
     base_ref: str,
     timeout_min: int,
-    gitlab_token: SecretStr,
+    gitlab_token: SecretStr | None,
+    gitlab_base_url: str | None = None,
     default_branch: str = "main",
     memory_envs: Mapping[str, str] | None = None,
 ) -> None:
@@ -429,6 +473,10 @@ async def activate(
     """
     if task.workspace_id is None:
         raise SandboxStepError("no_workspace")
+    # Токен без адреса GitLab: заголовок некуда привязать, а без привязки токен не уходит никуда.
+    # Ошибка до любого вызова провайдера (D-52, ревью).
+    if gitlab_token is not None and gitlab_base_url is None:
+        raise ValueError("gitlab_token задан без gitlab_base_url: заголовок некуда привязать")
     await provider.connect(provider_id)
     # Новосоздаваемая песочница Novita живёт по таймауту (D-19): продлеваем на лимит агента + запас.
     await provider.extend_timeout(provider_id, (timeout_min + 10) * 60)
@@ -437,11 +485,13 @@ async def activate(
     repo = f"{home}/work/{task.workspace_id}"
     worktree = worktree_dir(home, task.id)
     branch = f"task/{task.id}"
-    git_envs = {
-        "GITLAB_TOKEN": gitlab_token.get_secret_value(),
-        "GIT_ASKPASS": f"{home}/.harness/bin/git-askpass.sh",
-        "GIT_TERMINAL_PROMPT": "0",
-    }
+    # Заголовок только на префикс базового адреса GitLab (D-52). Без адреса заголовка нет:
+    # fetch пойдёт анонимно и упадёт на приватном репозитории, токен никуда не уходит.
+    # Без токена (публичный репозиторий) заголовка нет: fetch анонимный (D-52).
+    if gitlab_token is not None and gitlab_base_url is not None:
+        git_envs = git_auth_env(gitlab_base_url, gitlab_token.get_secret_value())
+    else:
+        git_envs = {"GIT_TERMINAL_PROMPT": "0"}
     await _exec_ok(
         provider,
         provider_id,

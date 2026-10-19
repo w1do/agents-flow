@@ -313,6 +313,8 @@ def test_sandbox_bootstrap_refuses_busy_sandbox(
 
 VAULT_GITLAB = "glpat-vault-value-0123456789abcdef"
 VAULT_EMBEDDING = "emb-vault-value-0123456789abcdef"
+# Фиктивный sha для тестов (D-51): настоящий закреплённый коммит — только в harness.yaml и D-51.
+MEMORY_REF = "0123456789abcdef0123456789abcdef01234567"
 
 
 def _write_vault_config(tmp_path: Path, valid_env: dict[str, str], *, memory: bool) -> Path:
@@ -321,7 +323,7 @@ def _write_vault_config(tmp_path: Path, valid_env: dict[str, str], *, memory: bo
     data["gitlab"]["access_ref"] = "vault:demo/gitlab/main"
     if memory:
         data["sandbox"]["memory"] = {
-            "version": "1.2.3",
+            "ref": MEMORY_REF,
             "embedding_ref": "vault:demo/polza/embeddings",
         }
     path = tmp_path / "harness.yaml"
@@ -363,7 +365,8 @@ def test_sandbox_bootstrap_takes_keys_from_vault_into_env(
     assert result.exit_code == 0, result.output
     assert fake.received_env("GITLAB_TOKEN") == VAULT_GITLAB
     assert fake.received_env("EMBEDDING_API_KEY") == VAULT_EMBEDDING
-    assert "--memory-version 1.2.3" in " ".join(e.cmd or "" for e in fake.journal)
+    expected = f"--memory-ref {MEMORY_REF} --memory-repo w1do/memory-agent"
+    assert expected in " ".join(e.cmd or "" for e in fake.journal)
     assert VAULT_EMBEDDING not in result.output
 
 
@@ -441,4 +444,64 @@ def test_sandbox_bootstrap_redacts_vault_value_in_failure_output(
 
     assert result.exit_code == 1
     assert VAULT_GITLAB not in result.output
+    assert "[REDACTED]" in result.output
+
+
+def test_sandbox_bootstrap_redacts_auth_header_in_failure_output(
+    valid_env: dict[str, str],
+    monkeypatch: MonkeyPatch,
+    migrated_database_url: str,
+    tmp_path: Path,
+) -> None:
+    """Заголовок Basic от токена GitLab не попадает в вывод bootstrap (D-52)."""
+    monkeypatch.setenv("DATABASE_URL", migrated_database_url)
+    monkeypatch.delenv("GITLAB_TOKEN", raising=False)
+    monkeypatch.setenv(
+        "HARNESS_CONFIG", str(_write_vault_config(tmp_path, valid_env, memory=False))
+    )
+    fake = FakeSandbox(
+        sandbox_id=load_config(Path(valid_env["HARNESS_CONFIG"])).sandbox.provider_id
+    )
+    header = sandboxes.git_auth_header(VAULT_GITLAB)
+    fake.respond("bash /tmp/harness-bootstrap.sh", exit_code=1, stderr=f"эхо {header}")
+    vault = FakeVault({VaultRef("demo", "gitlab", "main"): VAULT_GITLAB})
+    monkeypatch.setattr(wiring, "build_sandbox_provider", lambda settings: fake)
+    monkeypatch.setattr(wiring, "build_vault", lambda settings: vault)
+
+    result = runner.invoke(
+        app, ["sandbox", "bootstrap", "--script", str(_bootstrap_script(tmp_path))]
+    )
+
+    assert result.exit_code == 1
+    assert header.removeprefix("Authorization: Basic ") not in result.output
+    assert "[REDACTED]" in result.output
+
+
+def test_sandbox_bootstrap_redacts_bare_base64_in_failure_output(
+    valid_env: dict[str, str],
+    monkeypatch: MonkeyPatch,
+    migrated_database_url: str,
+    tmp_path: Path,
+) -> None:
+    """Голый base64 заголовка (без префикса) в выводе bootstrap редактируется (D-52, ревью)."""
+    monkeypatch.setenv("DATABASE_URL", migrated_database_url)
+    monkeypatch.delenv("GITLAB_TOKEN", raising=False)
+    monkeypatch.setenv(
+        "HARNESS_CONFIG", str(_write_vault_config(tmp_path, valid_env, memory=False))
+    )
+    fake = FakeSandbox(
+        sandbox_id=load_config(Path(valid_env["HARNESS_CONFIG"])).sandbox.provider_id
+    )
+    _, bare = sandboxes.git_auth_secret_values(VAULT_GITLAB)
+    fake.respond("bash /tmp/harness-bootstrap.sh", exit_code=1, stderr=f"эхо {bare}")
+    vault = FakeVault({VaultRef("demo", "gitlab", "main"): VAULT_GITLAB})
+    monkeypatch.setattr(wiring, "build_sandbox_provider", lambda settings: fake)
+    monkeypatch.setattr(wiring, "build_vault", lambda settings: vault)
+
+    result = runner.invoke(
+        app, ["sandbox", "bootstrap", "--script", str(_bootstrap_script(tmp_path))]
+    )
+
+    assert result.exit_code == 1
+    assert bare not in result.output
     assert "[REDACTED]" in result.output

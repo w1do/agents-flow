@@ -208,7 +208,9 @@ async def _run_reserved(ctx: DispatchContext, pipeline: Pipeline, reservation: R
         )
         if gitlab is None:
             raise SandboxStepError("gitlab_token")
-        runner.secrets = (*runner.secrets, gitlab.get_secret_value())
+        # Токен и заголовок Basic (base64 от него) — оба секреты для redaction (D-52).
+        header, bare_b64 = sandboxes.git_auth_secret_values(gitlab.get_secret_value())
+        runner.secrets = (*runner.secrets, gitlab.get_secret_value(), header, bare_b64)
         memory_envs = await _memory_envs(ctx, runner)
         await sandboxes.activate(
             ctx.provider,
@@ -217,6 +219,7 @@ async def _run_reserved(ctx: DispatchContext, pipeline: Pipeline, reservation: R
             base_ref=pipeline.base_ref(task, ctx.config),
             timeout_min=ctx.timeout_min,
             gitlab_token=gitlab,
+            gitlab_base_url=ctx.config.gitlab.base_url,
             default_branch=sandboxes.workspace_for(ctx.config, task).default_branch,
             memory_envs=memory_envs,
         )

@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # Подготовка песочницы агентов (mvp-06, design 16; sandbox-profile, design 3). Запуск, например:
 #   bootstrap.sh --claude-version 2.1.292 --openspec-version 1.14.3 demo=https://gitlab.example/group/demo.git
-#   bootstrap.sh ... --memory-version 1.2.3 demo=https://gitlab.example/group/demo.git   # с памятью проекта
+#   bootstrap.sh ... --memory-ref <sha> --memory-repo w1do/memory-agent demo=https://gitlab.example/group/demo.git
+#     (с памятью проекта: memory-agent из GitHub по полному sha коммита, D-51)
 #
 # Идемпотентен: повторный запуск не переустанавливает совпадающие версии и не клонирует заново.
 # Секреты в файлы не пишутся. mcp.json содержит литеральные плейсхолдеры ${AGENTS_FLOW_URL} и
-# ${AGENTS_FLOW_TOKEN}: Claude Code раскрывает их из env процесса. git-askpass.sh читает
-# GITLAB_TOKEN из env при каждом запросе, значение в файле не появляется. EMBEDDING_API_KEY
+# ${AGENTS_FLOW_TOKEN}: Claude Code раскрывает их из env процесса. Токен GitLab уходит git только
+# заголовком Authorization на префикс --gitlab-url (GIT_CONFIG_* в env одной команды), в файлы не
+# пишется, git-askpass.sh не используется (D-52). EMBEDDING_API_KEY
 # читается memory-agent из env этой команды; в .memory/.env и конфиг memory он не пишется.
 # Все установки — через sudo -n: без sudo скрипт сообщает, что нужно поставить вручную.
 set -euo pipefail
@@ -14,30 +16,35 @@ umask 077
 
 # Ключи приходят в env процесса. Скрипт забирает их в переменные оболочки и снимает из env, чтобы
 # postinst пакетов apt и lifecycle-скрипты npm их не видели. Значение получает только строка, где
-# оно нужно: git-команда (askpass читает GITLAB_TOKEN из env git) и memory init (EMBEDDING_API_KEY).
+# оно нужно: заголовок git для клонов и fetch (GIT_CONFIG_* одной команды) и memory init (EMBEDDING_API_KEY).
 gitlab_token="${GITLAB_TOKEN:-}"
 embedding_key="${EMBEDDING_API_KEY:-}"
 unset GITLAB_TOKEN EMBEDDING_API_KEY
 
 usage() {
   cat <<'USAGE'
-Использование: bootstrap.sh --claude-version V --openspec-version V [--memory-version V] <workspace_id>=<clone_url>...
+Использование: bootstrap.sh --claude-version V --openspec-version V [--memory-ref SHA --memory-repo OWNER/NAME] <workspace_id>=<clone_url>...
   workspace_id — [A-Za-z0-9_-]{1,28}; clone_url — http(s)-адрес без учётных данных.
-  Для git-операций нужен GITLAB_TOKEN в env. Для памяти (--memory-version) — project-memory точной
-  версии; ключ embeddings, если нужен, — в env EMBEDDING_API_KEY.
+  Для git-операций нужен GITLAB_TOKEN в env; --gitlab-url — https-адрес GitLab, на его префикс уходит токен. Память: memory-agent ставится из GitHub по полному sha
+  коммита (--memory-ref, 40 символов 0-9a-f) из репозитория --memory-repo; флаги задаются вместе.
+  Ключ embeddings, если нужен, — в env EMBEDDING_API_KEY.
 USAGE
 }
 
 SEMVER_RE='^[0-9]+\.[0-9]+\.[0-9]+$'
+# Базовый адрес GitLab: только https, без учётных данных, пробелов и query (D-52).
+GITLAB_URL_RE='^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~-]+)*/?$'
 PAIR_RE='^[A-Za-z0-9_-]{1,28}=https?://[^[:space:]@]+$'
 
 claude_version=""
 openspec_version=""
-memory_version=""
+memory_ref=""
+memory_repo=""
+gitlab_url=""
 repos=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --claude-version | --openspec-version | --memory-version)
+    --claude-version | --openspec-version | --memory-ref | --memory-repo | --gitlab-url)
       if [ "$#" -lt 2 ]; then
         echo "аргумент $1 без значения" >&2
         exit 2
@@ -45,7 +52,9 @@ while [ "$#" -gt 0 ]; do
       case "$1" in
         --claude-version) claude_version="$2" ;;
         --openspec-version) openspec_version="$2" ;;
-        *) memory_version="$2" ;;
+        --memory-ref) memory_ref="$2" ;;
+        --gitlab-url) gitlab_url="$2" ;;
+        *) memory_repo="$2" ;;
       esac
       shift 2
       ;;
@@ -68,9 +77,35 @@ if ! [[ "$claude_version" =~ $SEMVER_RE && "$openspec_version" =~ $SEMVER_RE ]];
   echo "нужны --claude-version и --openspec-version в формате X.Y.Z" >&2
   exit 2
 fi
-if [ -n "$memory_version" ] && ! [[ "$memory_version" =~ $SEMVER_RE ]]; then
-  echo "--memory-version в формате X.Y.Z" >&2
+# memory-agent ставится по полному sha коммита: тег и ветка изменяемы (D-51). Флаги — только вместе.
+SHA_RE='^[0-9a-f]{40}$'
+# Сегменты owner/name: начинаются и заканчиваются буквой или цифрой, внутри — . _ - (L1).
+GH_REPO_RE='^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?/[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$'
+if [ -n "$memory_ref" ] || [ -n "$memory_repo" ]; then
+  if [ -z "$memory_ref" ] || [ -z "$memory_repo" ]; then
+    echo "--memory-ref и --memory-repo задаются вместе" >&2
+    exit 2
+  fi
+  if ! [[ "$memory_ref" =~ $SHA_RE ]]; then
+    echo "--memory-ref — полный sha коммита (40 символов 0-9a-f)" >&2
+    exit 2
+  fi
+  if ! [[ "$memory_repo" =~ $GH_REPO_RE ]]; then
+    echo "--memory-repo в формате owner/name" >&2
+    exit 2
+  fi
+fi
+if [ -n "$gitlab_url" ] && ! [[ "$gitlab_url" =~ $GITLAB_URL_RE ]]; then
+  echo "--gitlab-url — https-адрес без учётных данных, пробелов и query" >&2
   exit 2
+fi
+if [ "${#repos[@]}" -gt 0 ] && [ -z "$gitlab_url" ]; then
+  echo "нужен --gitlab-url: токен GitLab уходит только на префикс этого адреса" >&2
+  exit 2
+fi
+# Нормализация: префикс с завершающим слэшем, как его сопоставляет git (http.<url>.*).
+if [ -n "$gitlab_url" ]; then
+  gitlab_url="${gitlab_url%/}/"
 fi
 for pair in "${repos[@]}"; do
   if ! [[ "$pair" =~ $PAIR_RE ]]; then
@@ -78,6 +113,14 @@ for pair in "${repos[@]}"; do
     exit 2
   fi
 done
+
+# Защита от случайного запуска на машине разработчика (D-52, ревью): всё, что ниже, меняет систему
+# (npm, apt, каталоги, клоны). Без HARNESS_SANDBOX_BOOTSTRAP=1 скрипт выходит до побочных эффектов;
+# harness-server выставляет переменную в env своей команды.
+if [ "${HARNESS_SANDBOX_BOOTSTRAP:-}" != "1" ]; then
+  echo "bootstrap.sh выполняется только в песочнице харнесса (HARNESS_SANDBOX_BOOTSTRAP=1)" >&2
+  exit 3
+fi
 
 HARNESS_DIR="${HOME:?HOME не задан}/.harness"
 
@@ -88,11 +131,19 @@ node_ok() {
 }
 
 # apt всегда без вопросов: скрипт не должен ждать ввода в песочнице.
+# Файлы, которые создаёт root (ключи и списки источников apt), тоже с umask 022: sudo берёт
+# объединение umask пользователя и своего, и без этого ключ apt получается 0600 и apt его не читает.
+root_umask() {
+  (
+    umask 022
+    "$@"
+  )
+}
 apt_update() {
-  sudo -n env DEBIAN_FRONTEND=noninteractive apt-get update -qq
+  root_umask sudo -n env DEBIAN_FRONTEND=noninteractive apt-get update -qq
 }
 apt_install() {
-  sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y "$@"
+  root_umask sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y "$@"
 }
 
 # Node из репозитория NodeSource: ключ подписи скачивается и проверяется gpg, удалённый
@@ -110,12 +161,12 @@ ensure_node() {
   apt_install ca-certificates curl gnupg
   sudo -n install -m 0755 -d /etc/apt/keyrings
   curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key |
-    sudo -n gpg --batch --yes --dearmor -o /etc/apt/keyrings/nodesource.gpg
+    root_umask sudo -n gpg --batch --yes --dearmor -o /etc/apt/keyrings/nodesource.gpg
   echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" |
-    sudo -n tee /etc/apt/sources.list.d/nodesource.list >/dev/null
+    root_umask sudo -n tee /etc/apt/sources.list.d/nodesource.list >/dev/null
   # npm из Ubuntu конфликтует с npm из пакета nodejs NodeSource.
   if dpkg -s npm >/dev/null 2>&1; then
-    sudo -n env DEBIAN_FRONTEND=noninteractive apt-get remove -y npm
+    root_umask sudo -n env DEBIAN_FRONTEND=noninteractive apt-get remove -y npm
   fi
   apt_update
   apt_install nodejs
@@ -132,15 +183,25 @@ command -v git >/dev/null || { echo "нет git в песочнице" >&2; exit
 
 # Глобальные пакеты ставятся в префикс npm. Если его lib/node_modules недоступен на запись
 # (системный префикс), установка идёт через sudo -n; пользовательский префикс — без sudo.
+# umask 022 — только внутри подшелла: umask 077 скрипта через sudo дал бы файлам глобального
+# префикса права 0600/0700 у root, и пользователь песочницы не запустил бы memory, claude, openspec.
 npm_global() {
-  local prefix lib
-  prefix="$(npm config get prefix)"
-  lib="$prefix/lib/node_modules"
-  if { [ -d "$lib" ] && [ -w "$lib" ]; } || { [ ! -e "$lib" ] && [ -w "$prefix/lib" ]; }; then
-    npm "$@"
-  else
-    sudo -n env PATH="$PATH" npm "$@"
+  # Кэш npm пользователя — только его; при создании 700, существующий каталог — тоже 700 (L2).
+  [ -e "$HOME/.npm" ] || mkdir -m 700 "$HOME/.npm"
+  if [ -O "$HOME/.npm" ]; then
+    chmod 700 "$HOME/.npm"
   fi
+  (
+    umask 022
+    local prefix lib
+    prefix="$(npm config get prefix)"
+    lib="$prefix/lib/node_modules"
+    if { [ -d "$lib" ] && [ -w "$lib" ]; } || { [ ! -e "$lib" ] && [ -w "$prefix/lib" ]; }; then
+      npm "$@"
+    else
+      sudo -n env PATH="$PATH" npm "$@"
+    fi
+  )
 }
 
 # Ставит пакет, только если нужная версия ещё не установлена: повтор не переустанавливает.
@@ -153,6 +214,27 @@ ensure_npm_package() {
   npm_global install -g "${package}@${version}"
 }
 
+# memory-agent из GitHub по полному sha (D-51). Маркер хранит установленный spec: по нему повтор
+# не переустанавливает, а новый sha в harness.yaml даёт новую установку. Маркер пишется только после
+# успешной установки и проверки команды memory.
+ensure_memory_agent() {
+  local spec="github:${memory_repo}#${memory_ref}"
+  local marker="$HARNESS_DIR/memory/installed-ref"
+  if command -v memory >/dev/null 2>&1 && [ -f "$marker" ] && [ "$(cat "$marker")" = "$spec" ]; then
+    echo "уже установлен: $spec"
+    return 0
+  fi
+  mkdir -p "$HARNESS_DIR/memory"
+  npm_global install -g "$spec"
+  hash -r
+  if ! command -v memory >/dev/null 2>&1; then
+    echo "memory-agent установлен, но команды memory нет" >&2
+    exit 1
+  fi
+  printf '%s\n' "$spec" >"$marker.tmp"
+  mv "$marker.tmp" "$marker"
+}
+
 ensure_npm_package "@anthropic-ai/claude-code" "$claude_version"
 ensure_npm_package "@fission-ai/openspec" "$openspec_version"
 
@@ -161,17 +243,8 @@ mkdir -p "$HARNESS_DIR/bin" "$HARNESS_DIR/tasks" "$HARNESS_DIR/worktrees" "$HOME
 mkdir -p "$HOME/.claude/skills" "$HOME/.claude/agents"
 chmod 700 "$HOME/.claude/skills" "$HOME/.claude/agents"
 
-# Значения не записываются: токен берётся из GITLAB_TOKEN в момент запроса git.
-# Квотированный heredoc не раскрывает переменные, поэтому текст скрипта пишется как есть.
-cat > "$HARNESS_DIR/bin/git-askpass.sh" <<'ASKPASS'
-#!/usr/bin/env bash
-# Ответ на запрос git: логин фиксирован, пароль — токен из окружения процесса.
-case "$1" in
-  Username*) printf '%s\n' oauth2 ;;
-  Password*) printf '%s\n' "${GITLAB_TOKEN:?GITLAB_TOKEN не задан}" ;;
-esac
-ASKPASS
-chmod 700 "$HARNESS_DIR/bin/git-askpass.sh"
+# Старый git-askpass.sh (до D-52) удаляется, если остался от прошлых запусков: токен в нём не нужен.
+rm -f "$HARNESS_DIR/bin/git-askpass.sh"
 
 # Плейсхолдеры остаются литеральными: Claude Code подставляет их из env при запуске агента.
 cat > "$HARNESS_DIR/mcp.json" <<'MCP'
@@ -189,14 +262,30 @@ cat > "$HARNESS_DIR/mcp.json" <<'MCP'
 MCP
 chmod 600 "$HARNESS_DIR/mcp.json"
 
+# Заголовок git для клонов и fetch: не экспортируется, передаётся только env git-команд.
+# Без токена заголовка нет: git ходит анонимно, это публичные репозитории (D-52).
+git_auth_header=""
+if [ -n "$gitlab_token" ]; then
+  git_auth_header="Authorization: Basic $(printf '%s' "oauth2:$gitlab_token" | base64 -w0)"
+fi
+# Один вызов git для клона и fetch: заголовок — префиксная переменная той же команды, не argv.
+run_git_auth() {
+  if [ -n "$git_auth_header" ]; then
+    # Редиректы выключены, чтобы заголовок не ушёл на другой хост.
+    GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0="http.${gitlab_url}.extraHeader" \
+      GIT_CONFIG_VALUE_0="$git_auth_header" GIT_CONFIG_KEY_1=http.followRedirects \
+      GIT_CONFIG_VALUE_1=false GIT_TERMINAL_PROMPT=0 git "$@"
+  else
+    GIT_TERMINAL_PROMPT=0 git "$@"
+  fi
+}
 for pair in "${repos[@]}"; do
   workspace_id="${pair%%=*}"
   url="${pair#*=}"
   dir="$HOME/work/$workspace_id"
   if [ ! -e "$dir" ]; then
     echo "клонирую $workspace_id"
-    GITLAB_TOKEN="$gitlab_token" GIT_ASKPASS="$HARNESS_DIR/bin/git-askpass.sh" GIT_TERMINAL_PROMPT=0 \
-      git clone --quiet -- "$url" "$dir"
+    run_git_auth clone --quiet -- "$url" "$dir"
   else
     if [ ! -d "$dir/.git" ]; then
       echo "$dir существует и не является git-репозиторием" >&2
@@ -204,12 +293,11 @@ for pair in "${repos[@]}"; do
     fi
     echo "обновляю $workspace_id"
     git -C "$dir" remote set-url origin "$url"
-    GITLAB_TOKEN="$gitlab_token" GIT_ASKPASS="$HARNESS_DIR/bin/git-askpass.sh" GIT_TERMINAL_PROMPT=0 \
-      git -C "$dir" fetch --quiet --prune origin
+    run_git_auth -C "$dir" fetch --quiet --prune origin
   fi
 done
 
-if [ -n "$memory_version" ]; then
+if [ -n "$memory_ref" ]; then
   # setfacl нужен ensure-docker.sh при каждом запуске демона, поэтому пакет acl ставится отдельно
   # от установки Docker: при уже стоящем Docker иначе не будет setfacl (ревью, пункт 6).
   ensure_acl() {
@@ -234,12 +322,12 @@ if [ -n "$memory_version" ]; then
       apt_update
       apt_install ca-certificates curl
       sudo -n install -m 0755 -d /etc/apt/keyrings
-      sudo -n curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+      root_umask sudo -n curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
       sudo -n chmod a+r /etc/apt/keyrings/docker.asc
       # shellcheck source=/dev/null
       codename="$(. /etc/os-release && echo "$VERSION_CODENAME")"
       echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $codename stable" |
-        sudo -n tee /etc/apt/sources.list.d/docker.list >/dev/null
+        root_umask sudo -n tee /etc/apt/sources.list.d/docker.list >/dev/null
       apt_update
       apt_install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     fi
@@ -275,7 +363,7 @@ ENSURE
   ensure_acl
   ensure_docker
 
-  ensure_npm_package project-memory "$memory_version"
+  ensure_memory_agent
   memory service up
 
   mkdir -p "$HARNESS_DIR/memory"

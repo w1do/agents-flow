@@ -5,6 +5,7 @@
 """
 
 import asyncio
+import base64
 import json
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -474,6 +475,8 @@ VAULT_GITLAB = "glpat-vault-value-0123456789abcdef"
 VAULT_EMBEDDING = "emb-vault-value-0123456789abcdef"
 GITLAB_REF = "vault:demo/gitlab/main"
 EMBEDDING_REF = "vault:demo/polza/embeddings"
+# Фиктивный sha для тестов (D-51): настоящий закреплённый коммит — только в harness.yaml и D-51.
+MEMORY_REF = "0123456789abcdef0123456789abcdef01234567"
 
 
 def _vault_config(*, memory: bool) -> HarnessConfig:
@@ -481,7 +484,7 @@ def _vault_config(*, memory: bool) -> HarnessConfig:
     gitlab = CONFIG.gitlab.model_copy(update={"access_ref": GITLAB_REF})
     sandbox_update: dict[str, Any] = {}
     if memory:
-        sandbox_update["memory"] = SandboxMemoryConfig(version="1.2.3", embedding_ref=EMBEDDING_REF)
+        sandbox_update["memory"] = SandboxMemoryConfig(ref=MEMORY_REF, embedding_ref=EMBEDDING_REF)
     sandbox = CONFIG.sandbox.model_copy(update=sandbox_update)
     return CONFIG.model_copy(update={"gitlab": gitlab, "sandbox": sandbox})
 
@@ -503,7 +506,12 @@ async def test_gitlab_key_comes_from_vault_and_env_is_not_needed(
     await dispatch_once(ctx, {TaskKind.IMPLEMENT: pipeline})
 
     assert vault.requested == [VaultRef("demo", "gitlab", "main")]
-    assert fake.received_env("GITLAB_TOKEN") == VAULT_GITLAB
+    # Ключ из vault уходит git только заголовком на префикс base_url (D-52), не как GITLAB_TOKEN.
+    assert fake.received_env("GITLAB_TOKEN") is None
+    assert fake.received_env("GIT_CONFIG_KEY_0") == "http.https://gitlab.com/.extraHeader"
+    header = fake.received_env("GIT_CONFIG_VALUE_0") or ""
+    decoded = base64.b64decode(header.split()[-1]).decode()
+    assert decoded == f"oauth2:{VAULT_GITLAB}"
     assert await _task_status(committed_session_factory, task.id) == TaskStatus.ACTIVE
     assert await _sandbox_row(committed_session_factory) == (SandboxStatus.PAUSED, None)
 
@@ -619,3 +627,66 @@ async def test_build_context_without_access_ref_uses_env_token(
     assert ctx.vault is None
     assert ctx.gitlab_token is not None
     assert ctx.gitlab_token.get_secret_value() == GITLAB
+
+
+async def test_dispatcher_fetch_is_bound_to_gitlab_base_url(
+    committed_session_factory: Factory,
+) -> None:
+    """Диспетчер передаёт базовый адрес GitLab в fetch: заголовок только на его префикс (D-52)."""
+    await _prepare(committed_session_factory)
+    fake = _fake()
+    pipelines = {TaskKind.IMPLEMENT: _Pipeline(fake, agent_finishes=True)}
+
+    await dispatch_once(_ctx(committed_session_factory, fake), pipelines)
+
+    assert fake.received_env("GIT_CONFIG_KEY_0") == "http.https://gitlab.com/.extraHeader"
+    assert fake.received_env("GIT_ASKPASS") is None
+
+
+async def test_auth_header_value_is_redacted_from_agent_output(
+    committed_session_factory: Factory,
+) -> None:
+    """Base64 заголовка Basic от токена GitLab — секрет: в ленте задачи его быть не должно."""
+    task = await _prepare(committed_session_factory)
+    fake = _fake()
+    pipeline = _Pipeline(fake, agent_finishes=False)
+    await _reserve_for_pipeline(committed_session_factory, pipeline)
+    await _set_agent_run(committed_session_factory, started_at=datetime.now(UTC), pid=AGENT_PID)
+    header = sandboxes.git_auth_header(VAULT_GITLAB)
+    encoded = header.removeprefix("Authorization: Basic ")
+    vault = FakeVault({VaultRef("demo", "gitlab", "main"): VAULT_GITLAB})
+    await _seed_agent(fake, task, status_exit=1, stderr=f"эхо заголовка {header}")
+    ctx = replace(
+        _ctx(committed_session_factory, fake), config=_vault_config(memory=False), vault=vault
+    )
+
+    await dispatch_once(ctx, {TaskKind.IMPLEMENT: pipeline})
+
+    async with committed_session_factory() as session:
+        events = await list_task_events(session, task.id)
+    assert all(e.text is None or encoded not in e.text for e in events)
+    assert all(e.text is None or VAULT_GITLAB not in e.text for e in events)
+
+
+async def test_bare_base64_auth_value_is_redacted_from_agent_output(
+    committed_session_factory: Factory,
+) -> None:
+    """Голый base64 из заголовка (без префикса Authorization) тоже редактируется (D-52, ревью)."""
+    task = await _prepare(committed_session_factory)
+    fake = _fake()
+    pipeline = _Pipeline(fake, agent_finishes=False)
+    await _reserve_for_pipeline(committed_session_factory, pipeline)
+    await _set_agent_run(committed_session_factory, started_at=datetime.now(UTC), pid=AGENT_PID)
+    _, bare = sandboxes.git_auth_secret_values(VAULT_GITLAB)
+    vault = FakeVault({VaultRef("demo", "gitlab", "main"): VAULT_GITLAB})
+    await _seed_agent(fake, task, status_exit=1, stderr=f"base64 без префикса: {bare}")
+    ctx = replace(
+        _ctx(committed_session_factory, fake), config=_vault_config(memory=False), vault=vault
+    )
+
+    await dispatch_once(ctx, {TaskKind.IMPLEMENT: pipeline})
+
+    async with committed_session_factory() as session:
+        events = await list_task_events(session, task.id)
+    assert all(e.text is None or bare not in e.text for e in events)
+    assert any(e.text and "[REDACTED]" in e.text for e in events)

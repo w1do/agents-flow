@@ -21,8 +21,10 @@ sandbox:
   openspec_version: "1.14.3"
   # Память проекта в песочнице (D-47). Блок не задан — память выключена.
   # memory:
-  #   # Точная версия пакета project-memory.
-  #   version: "X.Y.Z"
+  #   # GitHub-репозиторий memory-agent (по умолчанию w1do/memory-agent).
+  #   # repo: w1do/memory-agent
+  #   # Полный sha коммита memory-agent (40 символов 0-9a-f), не тег (D-51).
+  #   ref: CHANGE_ME_40_HEX_COMMIT_SHA
   #   # Ключ embeddings из vault; без поля поиск лексический.
   #   embedding_ref: vault:CHANGE_ME/CHANGE_ME/CHANGE_ME
 

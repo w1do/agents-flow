@@ -6,6 +6,8 @@ import pytest
 from harness_server.config import ConfigError, load_config
 
 EXAMPLE_CONFIG = Path(__file__).resolve().parents[3] / "config" / "harness.example.yaml"
+# Фиктивный sha для тестов (D-51): настоящий закреплённый коммит — только в harness.yaml и D-51.
+MEMORY_REF = "0123456789abcdef0123456789abcdef01234567"
 
 WORKSPACE_BLOCK = """\
   - id: {id}
@@ -354,42 +356,91 @@ def test_gitlab_access_ref_must_be_vault_reference(tmp_path: Path) -> None:
     assert "glpat-plain" not in str(info.value)
 
 
+def _memory_body(memory_lines: str) -> str:
+    """Конфиг с блоком sandbox.memory; memory_lines — строки под memory (с отступом 4)."""
+    return (
+        WORKSPACE_ONLY
+        + "sandbox:\n"
+        + "  provider_id: sbx-1\n"
+        + "  memory:\n"
+        + memory_lines
+        + "gitlab:\n"
+        + "  base_url: https://gitlab.example.com\n"
+    )
+
+
 def test_memory_block_is_optional_and_parsed(tmp_path: Path) -> None:
     plain = load_config(_write(tmp_path, WORKSPACE_ONLY + TAIL))
     assert plain.sandbox.memory is None
 
-    body = (
-        WORKSPACE_ONLY
-        + "sandbox:\n"
-        + "  provider_id: sbx-1\n"
-        + "  memory:\n"
-        + "    version: 1.2.3\n"
-        + "    embedding_ref: vault:demo/polza/embeddings\n"
-        + "gitlab:\n"
-        + "  base_url: https://gitlab.example.com\n"
-    )
+    body = _memory_body(f"    ref: {MEMORY_REF}\n    embedding_ref: vault:demo/polza/embeddings\n")
     config = load_config(_write(tmp_path, body))
 
     assert config.sandbox.memory is not None
-    assert config.sandbox.memory.version == "1.2.3"
+    assert config.sandbox.memory.ref == MEMORY_REF
+    assert config.sandbox.memory.repo == "w1do/memory-agent"
     assert config.sandbox.memory.embedding_ref == "vault:demo/polza/embeddings"
 
 
-def test_memory_version_must_be_semver(tmp_path: Path) -> None:
-    body = (
-        WORKSPACE_ONLY
-        + "sandbox:\n"
-        + "  provider_id: sbx-1\n"
-        + "  memory:\n"
-        + "    version: latest\n"
-        + "gitlab:\n"
-        + "  base_url: https://gitlab.example.com\n"
-    )
+@pytest.mark.parametrize(
+    "ref",
+    [
+        "v1.0.0",  # тег изменяем
+        "main",  # ветка изменяема
+        "09e5e63",  # короткий sha неоднозначен
+        MEMORY_REF.upper(),  # sha в верхнем регистре
+        MEMORY_REF + "0",  # 41 символ
+    ],
+)
+def test_memory_ref_must_be_full_commit_sha(tmp_path: Path, ref: str) -> None:
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, _memory_body(f"    ref: {ref}\n")))
+
+    assert "memory.ref" in str(info.value)
+    assert ref not in str(info.value)
+
+
+def test_memory_ref_is_required(tmp_path: Path) -> None:
+    with pytest.raises(ConfigError) as info:
+        load_config(
+            _write(tmp_path, _memory_body("    embedding_ref: vault:demo/polza/embeddings\n"))
+        )
+
+    assert "memory.ref" in str(info.value)
+
+
+@pytest.mark.parametrize("repo", ["a/b/c", "w1do", "w1do/memory agent"])
+def test_memory_repo_must_be_owner_slash_name(tmp_path: Path, repo: str) -> None:
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, _memory_body(f"    repo: {repo}\n    ref: {MEMORY_REF}\n")))
+
+    assert "memory.repo" in str(info.value)
+
+
+@pytest.mark.parametrize("repo", ["../..", "./.", "-x/y", "x./y", "w1do/-agent", "w1do/agent."])
+def test_memory_repo_segments_must_start_and_end_with_alnum(tmp_path: Path, repo: str) -> None:
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, _memory_body(f"    repo: {repo}\n    ref: {MEMORY_REF}\n")))
+
+    assert "memory.repo" in str(info.value)
+
+
+def test_memory_repo_accepts_fork_name(tmp_path: Path) -> None:
+    body = _memory_body(f"    repo: other-org/memory-agent.fork\n    ref: {MEMORY_REF}\n")
+
+    config = load_config(_write(tmp_path, body))
+
+    assert config.sandbox.memory is not None
+    assert config.sandbox.memory.repo == "other-org/memory-agent.fork"
+
+
+def test_memory_version_field_is_rejected(tmp_path: Path) -> None:
+    body = _memory_body(f"    version: 1.2.3\n    ref: {MEMORY_REF}\n")
 
     with pytest.raises(ConfigError) as info:
         load_config(_write(tmp_path, body))
 
-    assert "memory.version" in str(info.value)
+    assert "version" in str(info.value)
 
 
 def test_memory_embedding_ref_must_be_vault_reference(tmp_path: Path) -> None:
@@ -398,7 +449,7 @@ def test_memory_embedding_ref_must_be_vault_reference(tmp_path: Path) -> None:
         + "sandbox:\n"
         + "  provider_id: sbx-1\n"
         + "  memory:\n"
-        + "    version: 1.2.3\n"
+        + f"    ref: {MEMORY_REF}\n"
         + "    embedding_ref: sk-plain-key-value\n"
         + "gitlab:\n"
         + "  base_url: https://gitlab.example.com\n"

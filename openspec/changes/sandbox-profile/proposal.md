@@ -2,7 +2,7 @@
 
 > Подготовка песочницы без участия владельца: bootstrap, ключи из vault, память проекта. Решение владельца
 > 2026-10-19: делается сразу после `mvp-06-sandbox-runtime`, затем `integrations-mcp-config`, оба до
-> `mvp-07-agents-flow-mcp` (D-43). Решения — D-43…D-45, D-47, D-48.
+> `mvp-07-agents-flow-mcp` (D-43). Решения — D-43…D-45, D-47, D-48, D-51.
 
 ## Open questions (нужен ответ владельца)
 
@@ -31,12 +31,14 @@
 
 - **Bootstrap расширяется** (тот же `deploy/sandbox/bootstrap.sh`, идемпотентно, через `sudo -n`): Node ≥ 22.13
   (NodeSource), глобальные npm-пакеты в системный префикс через sudo, пустые `~/.claude/skills` и `~/.claude/agents`;
-  при включённой памяти — Docker Engine + Compose v2, memory-agent (`project-memory` точной версии,
-  `memory service up`, `memory init` для каждого workspace). Шагов про MCP нет.
+  при включённой памяти — Docker Engine + Compose v2, memory-agent (из GitHub `w1do/memory-agent`, закреплён на
+  полный sha коммита: `npm install -g github:<repo>#<sha>`, D-51), `memory service up`, `memory init` для каждого
+  workspace. Шагов про MCP нет. Пакет `project-memory` из реестра npm не ставится: под этим именем там чужой пакет.
 - **Vault-адаптер** `adapters/vault/` (Protocol `SecretVault`, фейк, MCP-клиент на официальном Python SDK,
   инструмент `get_credential`). Ссылка на секрет — `vault:<project>/<service>/<name>`. Доступ сервера — без подтверждения.
 - **Настройки** `harness.yaml`: `gitlab.access_ref` (главный ключ GitLab из vault; без него — ENV `GITLAB_TOKEN`),
-  `sandbox.memory` (`version` пакета `project-memory`, `embedding_ref`).
+  `sandbox.memory` (`repo` — GitHub-репозиторий memory-agent, по умолчанию `w1do/memory-agent`; `ref` — полный sha
+  коммита; `embedding_ref`).
 - **Рантайм (изменение `sandbox-runtime`)**: GitLab-ключ и ключ embeddings берутся из vault и передаются только в env
   команд; при активации — `memory sync` по клону workspace (сбой не роняет задачу); при запуске агента —
   `HARNESS_MEMORY_PROJECT`; redaction покрывает значения из vault.
