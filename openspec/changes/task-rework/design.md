@@ -29,7 +29,7 @@
 - вопрос агента приходит в Telegram, ответ доставляется агенту, задача продолжается;
 - только статусы ТЗ v5, переходы — через `domain/statuses.py`;
 - бизнес-логика в `services/task_dialog.py`; Telegram (`services/intake.py`, `telegram/*`) и MCP — тонкие входы;
-- все тексты диалога проходят redaction до БД, Telegram, GitLab и промпта.
+- все тексты диалога проходят redaction до БД, Telegram, удалённого репозитория (GitLab или GitHub, D-60) и промпта.
 
 **Non-Goals:** см. «Не входит» в proposal.md.
 
@@ -104,7 +104,7 @@
 8. **Доработка — та же ветка, тот же MR.** Активация: если `origin/task/<id>` существует (`git ls-remote --heads`),
    worktree строится на ней, иначе — правило mvp-09. `tasks.run_base_sha` = HEAD worktree на старте прогона.
    `commit_check` сравнивает с `run_base_sha`: нет новых коммитов → `error` «нет изменений». `push` — без `--force`,
-   отказ non-fast-forward → `error` «ветка расходится с GitLab». `merge_request` находит открытый MR
+   отказ non-fast-forward → `error` «ветка расходится с удалённым репозиторием». `merge_request` находит открытый MR
    (`find_open_mr`) и добавляет заметку «Доработка N: <краткое замечание>» (`add_mr_note`). Если MR закрыт без
    мерджа, гейт по правилу mvp-09 создаёт новый MR из той же ветки. Отвергнуто: новая ветка на каждую доработку —
    несколько MR на одну задачу, ревью теряет историю.
@@ -115,7 +115,7 @@
     Ответ `merged` → задача `ready → merged`, затем задача-продолжение. Задача-продолжение: `implement` в `backlog`,
     тот же workspace и `spec_item_id`, `parent_id` исходной, `followup_of_id = исходная`, текст «Доработка задачи
     #<ref>: <краткое название>» + замечание. Её ветка `task/<new_id>` растёт от `origin/<default_branch>`.
-    Ошибка GitLab → замечание сохраняется как `pending`, бот отвечает «не удалось проверить MR, повторите позже»,
+    Ошибка провайдера (`GitProviderError`, сбой ключа из vault) → замечание сохраняется как `pending`, бот отвечает «не удалось проверить MR, повторите позже»,
     статус не меняется. Отвергнуто: доработка в старой ветке после мерджа — MR из влитой ветки показывает уже влитые
     коммиты и конфликтует с основной веткой.
 11. **Вопрос агента не блокирует прогон (ответ владельца на вопрос 5, 2026-10-19).** `ask_owner` пишет реплику `question`
@@ -168,7 +168,8 @@
 `services/notify.py`, `services/prompts/routing.md`, `services/prompts/implementer.md` (mvp-09), `services/tasks.py`,
 `domain/statuses.py`, `domain/errors.py`, `db/models/tasks.py`, `db/models/planning.py` (`Routing`),
 `db/models/__init__.py`, `adapters/telegram/protocol.py`, `adapters/telegram/client.py`, `adapters/telegram/fake.py`,
-`adapters/gitlab/protocol.py`, `adapters/gitlab/client.py`, `adapters/gitlab/fake.py` (mvp-09),
+`adapters/git/protocol.py`, `adapters/git/gitlab.py`, `adapters/git/github.py`, `adapters/git/fake.py`,
+`adapters/git/factory.py` (mvp-09, D-60), `services/git_access.py` (git-providers),
 `mcp/` — модуль инструментов mvp-07, `worker/dispatcher.py`, пайплайны `implement`/`plan` (mvp-08, mvp-09),
 модуль гейтов mvp-09, `settings.py`; тесты `test_statuses.py`, `test_telegram_parse.py`, `test_telegram_render.py`,
 `test_routing_service.py`, `test_migrations.py`, `conftest.py`; документация (см. «Разрешённые файлы»).
@@ -207,7 +208,7 @@ MCP ask_owner ─► task_dialog.ask_owner (реплика question/open, соб
 ```
 
 Правила зависимостей: `services/task_dialog.py` не импортирует `httpx`, `adapters/*/client.py`, `telegram/*`;
-Telegram вызывается через `services/notify.py`, GitLab — через `GitProvider`. `telegram/render.py` не импортирует
+Telegram вызывается через `services/notify.py`, провайдер репозитория (GitLab или GitHub) — через `GitProvider`. `telegram/render.py` не импортирует
 `db` и `services`. `mcp/` вызывает только `task_dialog.ask_owner`.
 
 ## Detailed specification
@@ -545,7 +546,8 @@ async def deliver_owner_questions(ctx: BotContext) -> int
      `CLARIFY_ASKED`. Ясно → `accept_feedback`.
 - **`accept_feedback`** — под `select … with_for_update()` строки задачи:
   - `max_cycle(task) ≥ ctx.rework_max` → реплика `cancelled`, `LIMIT_REACHED` (`count = max_cycle`).
-  - `ready`: `state = await ctx.git.get_mr_state(workspace.gitlab_project, task.branch)`; `GitProviderError` →
+  - `ready`: `git = await ctx.git_for(workspace)`, `state = await git.get_mr_state(workspace.repo.project, task.branch)`;
+    `GitProviderError` или ошибка vault →
     реплика остаётся `pending`, `MR_CHECK_FAILED`. `merged` → `change_status(ready → merged)`, затем
     `create_followup_task`, реплика `consumed` (`consumed_at`), `FOLLOWUP_CREATED`. Иначе → `change_status(ready →
     backlog, source=telegram, text="доработка")`, `REWORK_QUEUED`, `cycle = max_cycle + 1` (только для ответа бота,
@@ -668,26 +670,32 @@ TaskKind.IMPLEMENT: {
   задача `error` с причиной гейта (без значений), как в mvp-09; события гейтов пишутся как обычно (решение 9), так
   что следующий прогон проверяет их заново.
 - Гейты: условие пропуска шага (решение 9); `commit_check` — сравнение с `run_base_sha`; `push` — без `--force`,
-  отказ non-fast-forward → `error` «ветка расходится с GitLab». При цикле доработки (`cycle is not None`) после
-  `merge_request`: `add_mr_note(project, mr_iid, f"Доработка {cycle}: {short_title(текст замечания)}")` (redact),
+  отказ non-fast-forward → `error` «ветка расходится с удалённым репозиторием». При цикле доработки (`cycle is not None`) после
+  `merge_request`: `add_mr_note(workspace.repo.project, mr.number, f"Доработка {cycle}: {short_title(текст замечания)}")` (redact),
   идемпотентно по событию `gate:mr_note:passed`. Строка этапа `STAGE_REWORK_DONE` вместо «готова, MR создан» и
   `send_rework_done` reply'ем на `owner_message_id` последнего замечания цикла.
 - После `ready`: `requeue_if_pending(rework_max=settings.task_rework_max)`.
 
-### 16. `adapters/gitlab` (mvp-09) — дополнения
+### 16. `adapters/git` (mvp-09, D-60) — дополнения
+
+Контракт — design.md `git-providers`, раздел 9; REST-детали обеих реализаций — design.md `mvp-09-delivery-mr`.
+Тип состояния — `MergeRequestState` из `adapters/git/protocol.py`, отдельный `MrState` не вводится.
 
 ```python
-class MrState(StrEnum):
-    OPEN = "open"; MERGED = "merged"; CLOSED = "closed"; NONE = "none"
+MergeRequestState = Literal["open", "merged", "closed", "none"]
 
-async def get_mr_state(self, project: str, source_branch: str) -> MrState
-    # GET /projects/:id/merge_requests?source_branch=…&order_by=created_at&sort=desc&per_page=1
-    # opened → OPEN, merged → MERGED, closed|locked → CLOSED, пусто → NONE
-async def add_mr_note(self, project: str, mr_iid: int, body: str) -> None
-    # POST /projects/:id/merge_requests/:iid/notes
+async def get_mr_state(self, project: str, source_branch: str) -> MergeRequestState
+    # GitLab: GET /projects/:id/merge_requests?source_branch=…&order_by=created_at&sort=desc&per_page=1
+    #   opened|locked → "open", merged → "merged", closed → "closed", пусто → "none"
+    # GitHub: GET /repos/{owner}/{name}/pulls?state=all&head={owner}:{branch}&sort=created&direction=desc&per_page=1
+    #   merged_at не null → "merged", state=open → "open", иначе "closed", пусто → "none"
+async def add_mr_note(self, project: str, number: int, body: str) -> None
+    # GitLab: POST /projects/:id/merge_requests/:iid/notes {body}
+    # GitHub: POST /repos/{owner}/{name}/issues/{number}/comments {body}
 ```
 
-Фейк хранит состояние MR и заметки. Контрактные тесты respx на записанных ответах.
+Фейк `FakeGitProvider` хранит состояние MR/PR и заметки. Контрактные тесты respx на записанных ответах для обеих
+реализаций.
 
 ### 17. MCP `ask_owner` (mvp-07)
 
@@ -700,8 +708,11 @@ async def add_mr_note(self, project: str, mr_iid: int, body: str) -> None
 ### 18. `settings.py`
 
 `task_rework_max: int = Field(default=5, ge=1, le=50)` — комментарий «предел циклов доработки на задачу (task-rework)».
-`BotContext` получает `rework_max: int = 5` и `git: GitProvider | None = None` (со значениями по умолчанию,
-существующие тесты не меняются). `git is None` → для `ready` ведёт себя как `MR_CHECK_FAILED`.
+`BotContext` получает `rework_max: int = 5` и `git_for: Callable[[WorkspaceConfig], Awaitable[GitProvider]] | None =
+None` (со значениями по умолчанию, существующие тесты не меняются). `git_for` — провайдер workspace задачи (D-60):
+ключ по `workspace.repo.access_ref` из vault, затем `adapters/git/factory.build_git_provider(repo.provider,
+repo.base_url, token, client)`; собирается в wiring, сервис не импортирует фабрику. `git_for is None` → для `ready`
+ведёт себя как `MR_CHECK_FAILED`.
 
 ## Data flow / control flow
 
@@ -734,7 +745,7 @@ WIP) → `paused` → владелец отвечает reply'ем «ISO 8601» 
 - Ссылка на задачу, которой нет (удалена) — `resolve_link` вернёт `None` (CASCADE), сообщение идёт в классификацию.
 - `InvalidTransition` при гонке (задача сменила статус между чтением и записью) → реплика остаётся `pending`, бот
   отвечает `TEXT_FEEDBACK_PENDING`. Переход проверяется под `with_for_update`.
-- Ошибки Polza в `assess_feedback` → кнопки подтверждения. Ошибки GitLab → `MR_CHECK_FAILED`.
+- Ошибки Polza в `assess_feedback` → кнопки подтверждения. Ошибки провайдера репозитория и vault → `MR_CHECK_FAILED`.
 - MCP: `InvalidInput`, `InvalidTransition`, `Forbidden` (чужая задача) — формат mvp-07.
 
 ## Authorization and security

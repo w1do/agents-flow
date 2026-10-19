@@ -171,6 +171,9 @@ implement:  backlog → active → testing → ready (MR создан) → merge
   Скрипт `~/.harness/bin/ensure-docker.sh` поднимает демон при активации (после паузы Novita). Ключ embeddings
   приходит только в env команды bootstrap; `EMBEDDING_API_KEY` в `.memory/.env` и конфиг memory не пишется.
 - Токен GitLab уходит git заголовком `Authorization` только на префикс `gitlab.base_url` (`GIT_CONFIG_*` в env клона и fetch, D-52); askpass не используется.
+  План `git-providers` (6e, D-60, todo): ключ у каждого workspace (`repo.access_ref`), заголовок `Basic` с пользователем
+  `oauth2` (GitLab) или `x-access-token` (GitHub) на префикс `<base_url>/<project>.git/`, bootstrap получает его в env
+  `GIT_AUTH_HEADER_<i>` вместо `--gitlab-url`; без ключа workspace задача — `error` `repo_access_ref`.
 - Ключи из vault (D-45, `adapters/vault`, MCP-клиент на официальном SDK): ссылка `vault:<project>/<service>/<name>`
   в `harness.yaml` (`gitlab.access_ref`, `sandbox.memory.embedding_ref`); значение берётся на каждую команду и
   передаётся только в env (bootstrap, активация, запуск агента). Без vault ссылка даёт `not_configured`; ключ
@@ -209,6 +212,9 @@ workspaces (id, name, voice_aliases, gitlab_project, default_branch, test_comman
 `vault:…` на главный ключ GitLab). Ключи с сегментами `token`/`tokens`, `key`, `password`/`passwd`/`pwd`, `secret`/`secrets`, `apikey`,
 `credential`/`credentials` сервер отклоняет на любом уровне. `gitlab.base_url` с учётными данными (`user@host`) тоже
 отклоняется (D-26); токен GitLab задаётся только в ENV.
+План `git-providers` (6e, D-60, todo): секция `gitlab` и `gitlab_project` заменяются блоком `workspaces[].repo`
+(`provider: github | gitlab`, `base_url` только https с адресом по умолчанию провайдера, `project`, `access_ref`),
+ENV `GITLAB_URL`/`GITLAB_TOKEN` удаляются. До выката владелец переносит поля в боевом `harness.yaml`.
 
 Обязательные ENV (решение D-20): `DATABASE_URL`, `HARNESS_CONFIG`, `HARNESS_SECRET_KEY`, `TELEGRAM_BOT_TOKEN`,
 `TELEGRAM_CHAT_ID`, `TELEGRAM_WEBHOOK_SECRET`. Сервер и worker не стартуют, если их нет или они пустые.

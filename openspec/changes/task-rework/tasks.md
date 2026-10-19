@@ -48,7 +48,7 @@
 ## 5. MCP, worker, гейты
 
 - [ ] 5.1 MCP-инструмент `ask_owner` и строка в промптах планировщика и исполнителя — проверка: `test_ask_owner_tool.py`
-- [ ] 5.2 `GitProvider.get_mr_state`, `add_mr_note` + фейк + respx — проверка: контрактные тесты адаптера
+- [ ] 5.2 `GitProvider.get_mr_state`, `add_mr_note` в `adapters/git` (GitLab и GitHub, D-60) + фейк + respx — проверка: контрактные тесты адаптера
 - [ ] 5.3 Активация на существующей ветке, `run_base_sha`, `consume_for_run` в пайплайнах `implement` и `plan`,
   `deliver_owner_questions` в `dispatch_once` — проверка: `test_rework_uses_existing_branch`, `test_followup_branch_from_default`
 - [ ] 5.4 `pause_for_owner` (WIP-коммит → все базовые гейты D-58 из `CORE_GATES` → push `task/<id>` без force,

@@ -86,7 +86,7 @@ MCP агента.
 
 ## Impact
 
-- Зависит от: `mvp-09-delivery-mr` (ветка `task/<id>`, гейты, MR, адаптер GitLab) и `mvp-07-agents-flow-mcp`
+- Зависит от: `mvp-09-delivery-mr` (ветка `task/<id>`, гейты, MR, адаптер `adapters/git` — GitLab или GitHub, D-60) и `mvp-07-agents-flow-mcp`
   (MCP, токен задачи, «сдать работу»). Использует `mvp-05-command-routing` (Polza, `routings`, уточнение) и
   `mvp-04-telegram-intake` (приём, `telegram_messages`).
 - Согласуется с `telegram-full-stages`: кнопка «Доработать» добавляется в ту же клавиатуру сообщения задачи, что и
