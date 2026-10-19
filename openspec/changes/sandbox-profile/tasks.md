@@ -77,9 +77,9 @@
   (`--memory-version 1.2.3` → код 2, `неизвестный аргумент` в stderr); `test_script_help_exits_zero` — в stdout
   `--memory-ref` и `--memory-repo`; `test_script_runs_argument_path_with_secrets_in_env` — `--memory-ref x` вместо
   `--memory-version x` (код 2); новый `test_script_installs_memory_agent_from_github_pinned_commit`: в тексте скрипта
-  есть `spec="github:${memory_repo}#${memory_ref}"` и `npm_global install -g "$spec"`, нет `project-memory@` и
-  `ensure_npm_package project-memory`; позиция `npm_global install -g "$spec"` меньше позиции
-  `mv "$marker.tmp" "$marker"`; `installed-ref` в тексте; прежние тесты про секреты (`unset`, присваивания ключей,
+  нет `npm_global install -g "github:` и `project-memory@`; в функции `ensure_memory_agent` по порядку `npm ci`,
+  `npm run build`, `npm prune --omit=dev`, `chmod u+x`, `ln -sfn … /usr/local/bin/memory`, `mv "$marker.tmp"`; клон не
+  через `run_git_auth`; удаление старых сборок только для имён из 40 hex; `sudo`-проверка; `installed-ref` в тексте; прежние тесты про секреты (`unset`, присваивания ключей,
   литерал `EMBEDDING_API_KEY`) зелёные без правок ожиданий. Все вызовы скрипта в тестах — до установок (код 2/0),
   сеть не нужна
 - [x] 2.7 `services/sandboxes.py` `bootstrap` (design 3, последний абзац): kw `memory_version` → `memory_ref: str |
@@ -125,7 +125,8 @@
   — вопрос 4 (клон при bootstrap) и 6 (шаблон не делаем, D-44); PLAN.md — статус — проверка: ревью диффа
 - [x] 3.2 Документация под D-51: ARCHITECTURE.md §7 — `--memory-version`/«`project-memory` точной версии» → «С
   `--memory-ref`/`--memory-repo` (`sandbox.memory`, D-47, D-51): … memory-agent из GitHub на закреплённом коммите
-  (`npm install -g github:<repo>#<sha>`, маркер `~/.harness/memory/installed-ref`)»; ARCHITECTURE.md §9 — поля
+  (клон по sha, `npm ci` по lockfile, сборка от пользователя, симлинк `/usr/local/bin/memory`, маркер
+  `~/.harness/memory/installed-ref`)»; ARCHITECTURE.md §9 — поля
   `sandbox.memory.repo`, `sandbox.memory.ref` вместо `version`, если `version` там упомянут; `docs/deployment.md` —
   «`project-memory` точной версии» → «memory-agent из GitHub на коммите `sandbox.memory.ref`», пример блока
   `sandbox.memory` с `ref: 09e5e63ac721db75020fcfa69e33930750975139` (закреплённый коммит, D-51) и фразой: обновление

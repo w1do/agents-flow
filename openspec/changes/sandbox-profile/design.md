@@ -138,13 +138,15 @@ vault и не пишутся на диск песочницы; у агента �
      `sudo -n sh -c 'nohup dockerd >/var/log/dockerd.log 2>&1 &'`; ждать `/var/run/docker.sock` до 30 с;
      `sudo -n setfacl -m "u:$(id -un):rw" /var/run/docker.sock` (доступ без перелогина в группу `docker`);
      `docker info >/dev/null`. Запускает его.
-   - `ensure_memory_agent` (D-51) вместо `ensure_npm_package project-memory`: `spec="github:${memory_repo}#${memory_ref}"`,
-     маркер `marker="$HARNESS_DIR/memory/installed-ref"`. Если `command -v memory` успешен и содержимое маркера
-     (`cat`, без перевода строки) равно `$spec` — «уже установлен: $spec», пропуск. Иначе `mkdir -p
-     "$HARNESS_DIR/memory"`, `npm_global install -g "$spec"`, `hash -r`; `command -v memory` не находит команду →
-     выход 1 «memory-agent установлен, но команды memory нет»; затем маркер пишется атомарно: `printf '%s\n' "$spec"
-     >"$marker.tmp"` и `mv "$marker.tmp" "$marker"`. Маркер пишется только после успешной установки (`set -e`), поэтому
-     сбой установки оставляет старый маркер или никакого, и следующий запуск повторяет установку.
+   - `ensure_memory_agent` (D-51, уточнено после live): `spec="github:${memory_repo}#${memory_ref}"`, каталог
+     `~/.harness/memory-agent/<sha>`, маркер `~/.harness/memory/installed-ref`. Пропуск, если маркер равен `$spec`, есть
+     `dist/cli/index.js` и `readlink -f /usr/local/bin/memory` ведёт на него: «уже установлен: $spec». Иначе: требуется
+     `sudo -n` (без него exit 1 «нужен sudo для установки memory-agent»); клон публичного репозитория анонимный (без
+     заголовка); `git checkout` нужного sha; от пользователя песочницы `npm ci` по lockfile, `npm run build`,
+     `npm prune --omit=dev`; `chmod u+x dist/cli/index.js`; `sudo -n ln -sfn … /usr/local/bin/memory`; проверка
+     `readlink -f`; маркер пишется атомарно (`printf` в `.tmp` и `mv`) после ссылки; затем удаляются каталоги прежних
+     сборок с 40-hex именем (не текущего sha). Причина: npm-зависимость из GitHub собирается `prepare` от root и падает
+     (`tsc: not found`, код 127), поэтому `npm install -g github:…` не используется.
      Почему маркер, а не `npm ls -g --json`: формат `resolved` у git-зависимостей (`git+ssh://…#sha`, `github:…`)
      зависит от версии npm. Ограничение: ручная переустановка memory-agent мимо bootstrap маркер не обновляет.
      Установка git-зависимости запускает `prepare` (tsc с devDependencies): нужна сеть к GitHub (codeload или git) и
@@ -295,8 +297,8 @@ live), `secrets.resolve`, конфиг, `bootstrap` (аргументы, env, т
   (`GIT_CONFIG_*` одной команды), `EMBEDDING_API_KEY` — только `memory init`. Установки apt и npm (включая lifecycle-скрипты) их не видят.
 - **memory-agent из GitHub (D-51).** Bootstrap с памятью зависит от доступности GitHub и сборки tsc на песочнице;
   обновление memory-agent — смена `sandbox.memory.ref` в `harness.yaml` и повторный bootstrap (маркер не совпадёт).
-  (а) Закреплён только код memory-agent по sha. Транзитивные и dev-зависимости разрешаются при установке; поведение
-  lockfile для глобальной установки из git не проверено. Риск принят: песочница одноразова, ключи в установке не
+  (а) Зависимости memory-agent закреплены `package-lock.json` коммита и ставятся `npm ci` от пользователя
+  песочницы (lifecycle-скрипты не от root). Риск принят: доверие к коммиту и lockfile владельца; ключи в установке не
   видны (unset). Усиление позже: готовый tarball с контрольной суммой.
   (б) Маркер `installed-ref` — кэш идемпотентности, не проверка целостности: процесс того же uid может его подменить.
 - **Токен GitLab — только на префикс `gitlab.base_url` (D-52).** Заголовок уходит git по URL-префиксу через `GIT_CONFIG_*`

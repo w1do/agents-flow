@@ -76,6 +76,7 @@ Job `deploy:dokploy` не добавляет `curl -v` и `--trace`: при ош
       embedding_ref: vault:Сервисы/Polza/EmbeddingsMemory
   ```
   `repo` не задан — `w1do/memory-agent`. Пакет `project-memory` из реестра npm не ставится: он чужой.
+- memory-agent собирается от пользователя песочницы по lockfile коммита; команда `memory` — симлинк `/usr/local/bin/memory`.
 - Обновление memory-agent: новый полный sha в `ref` и повторный `harness-server sandbox bootstrap`. Тег и ветка
   в `ref` не принимаются; маркер `~/.harness/memory/installed-ref` сверяет установленный коммит.
 - Рекомендация: ключ embeddings для песочницы — отдельный ключ Polza с лимитом расходов, не основной ключ.

@@ -332,15 +332,57 @@ def test_acl_install_is_independent_of_docker_branch() -> None:
     assert text.index("\n  ensure_acl\n") < text.index("\n  ensure_docker\n")
 
 
+def _memory_body(text: str) -> str:
+    return text[
+        text.index("ensure_memory_agent() {") : text.index(
+            "\n}\n", text.index("ensure_memory_agent() {")
+        )
+    ]
+
+
 def test_script_installs_memory_agent_from_github_pinned_commit() -> None:
+    """Установка по sha: клон, npm ci по lockfile, сборка от пользователя, симлинк (D-51)."""
     text = SCRIPT_PATH.read_text(encoding="utf-8")
-    assert 'spec="github:${memory_repo}#${memory_ref}"' in text
-    assert 'npm_global install -g "$spec"' in text
+    body = _memory_body(text)
+    assert 'npm_global install -g "github:' not in text
+    assert 'npm_global install -g "$spec"' not in text
     assert "project-memory" not in text
     assert "ensure_npm_package project-memory" not in text
     assert "installed-ref" in text
-    # Маркер пишется только после установки.
-    assert text.index('npm_global install -g "$spec"') < text.index('mv "$marker.tmp" "$marker"')
+    # Порядок шагов: сборка, подрезка devDependencies, исполняемый бит, симлинк, маркер.
+    steps = [
+        "npm ci",
+        "npm run build",
+        "npm prune --omit=dev",
+        "chmod u+x",
+        "ln -sfn",
+        'mv "$marker.tmp" "$marker"',
+    ]
+    positions = [body.index(step) for step in steps]
+    assert positions == sorted(positions)
+    assert 'sudo -n ln -sfn "$bin" /usr/local/bin/memory' in body
+
+
+def test_memory_agent_clone_is_anonymous_and_not_via_auth_wrapper() -> None:
+    body = _memory_body(SCRIPT_PATH.read_text(encoding="utf-8"))
+    assert 'git clone -q "https://github.com/${memory_repo}.git"' in body
+    assert "run_git_auth" not in body
+    assert "GIT_CONFIG_" not in body
+    assert "GITLAB" not in body
+
+
+def test_memory_agent_old_builds_are_removed_only_for_sha_names() -> None:
+    body = _memory_body(SCRIPT_PATH.read_text(encoding="utf-8"))
+    assert '[[ "$name" =~ ^[0-9a-f]{40}$ ]]' in body
+    assert 'rm -rf -- "$old"' in body
+    # Удаление стоит после переключения ссылки и маркера.
+    assert body.index('rm -rf -- "$old"') > body.index('mv "$marker.tmp" "$marker"')
+
+
+def test_memory_agent_requires_sudo_for_the_link() -> None:
+    body = _memory_body(SCRIPT_PATH.read_text(encoding="utf-8"))
+    assert "нужен sudo для установки memory-agent" in body
+    assert 'if [ ! -f "$bin" ]' in body
 
 
 def test_npm_global_and_root_writes_run_with_umask_022() -> None:
@@ -476,9 +518,10 @@ def test_script_rejects_repo_segments_that_are_not_names(repo: str) -> None:
 
 def test_npm_home_is_created_private_before_npm_calls() -> None:
     text = SCRIPT_PATH.read_text(encoding="utf-8")
-    body = text[text.index("npm_global() {") : text.index("local prefix")]
+    body = text[text.index("ensure_npm_home() {") : text.index("npm_global() {")]
     assert 'mkdir -m 700 "$HOME/.npm"' in body
     assert 'chmod 700 "$HOME/.npm"' in body
+    assert "ensure_npm_home\n  (" in text
     assert "root_umask sudo -n env DEBIAN_FRONTEND=noninteractive apt-get remove -y npm" in text
 
 

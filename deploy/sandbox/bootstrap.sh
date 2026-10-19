@@ -187,12 +187,16 @@ command -v git >/dev/null || { echo "нет git в песочнице" >&2; exit
 # (системный префикс), установка идёт через sudo -n; пользовательский префикс — без sudo.
 # umask 022 — только внутри подшелла: umask 077 скрипта через sudo дал бы файлам глобального
 # префикса права 0600/0700 у root, и пользователь песочницы не запустил бы memory, claude, openspec.
-npm_global() {
-  # Кэш npm пользователя — только его; при создании 700, существующий каталог — тоже 700 (L2).
+# Кэш npm пользователя — только его; при создании 700, существующий каталог — тоже 700 (L2).
+ensure_npm_home() {
   [ -e "$HOME/.npm" ] || mkdir -m 700 "$HOME/.npm"
   if [ -O "$HOME/.npm" ]; then
     chmod 700 "$HOME/.npm"
   fi
+}
+
+npm_global() {
+  ensure_npm_home
   (
     umask 022
     local prefix lib
@@ -222,19 +226,59 @@ ensure_npm_package() {
 ensure_memory_agent() {
   local spec="github:${memory_repo}#${memory_ref}"
   local marker="$HARNESS_DIR/memory/installed-ref"
-  if command -v memory >/dev/null 2>&1 && [ -f "$marker" ] && [ "$(cat "$marker")" = "$spec" ]; then
+  local base="$HOME/.harness/memory-agent"
+  local dir="$base/$memory_ref"
+  local bin="$dir/dist/cli/index.js"
+  # Пропуск, только если маркер совпадает и memory ведёт на сборку этого коммита (ревью).
+  if [ -f "$marker" ] && [ "$(cat "$marker")" = "$spec" ] && [ -x "$bin" ] \
+    && [ "$(readlink -f /usr/local/bin/memory 2>/dev/null)" = "$(readlink -f "$bin")" ]; then
     echo "уже установлен: $spec"
     return 0
   fi
-  mkdir -p "$HARNESS_DIR/memory"
-  npm_global install -g "$spec"
+  # Симлинк в /usr/local/bin требует sudo; без него установка бессмысленна (Docker тоже нужен sudo).
+  if ! sudo -n true 2>/dev/null; then
+    echo "нужен sudo для установки memory-agent" >&2
+    exit 1
+  fi
+  # Установка от пользователя песочницы (D-51, уточнено после live): npm-зависимость из GitHub
+  # собирается prepare от root и падает (tsc: not found), поэтому клон по sha, npm ci по lockfile,
+  # сборка и подрезка devDependencies идут здесь. Публичный репозиторий: клон анонимный, без заголовка.
+  ensure_npm_home
+  mkdir -p "$base" "$HARNESS_DIR/memory"
+  if [ ! -d "$dir/.git" ]; then
+    rm -rf -- "$dir"
+    GIT_TERMINAL_PROMPT=0 git clone -q "https://github.com/${memory_repo}.git" "$dir"
+  fi
+  if ! git -C "$dir" cat-file -e "${memory_ref}^{commit}" 2>/dev/null; then
+    GIT_TERMINAL_PROMPT=0 git -C "$dir" fetch -q origin
+  fi
+  git -C "$dir" -c advice.detachedHead=false checkout -q "$memory_ref"
+  (
+    cd "$dir" && npm ci --no-audit --no-fund && npm run build && npm prune --omit=dev --no-audit --no-fund
+  )
+  if [ ! -f "$bin" ]; then
+    echo "memory-agent: после сборки нет $bin" >&2
+    exit 1
+  fi
+  # tsc не выставляет бит исполнения; shebang сборки — #!/usr/bin/env node.
+  chmod u+x "$bin"
+  sudo -n ln -sfn "$bin" /usr/local/bin/memory
   hash -r
-  if ! command -v memory >/dev/null 2>&1; then
-    echo "memory-agent установлен, но команды memory нет" >&2
+  if [ "$(readlink -f /usr/local/bin/memory)" != "$(readlink -f "$bin")" ]; then
+    echo "memory-agent: /usr/local/bin/memory не ведёт на сборку $memory_ref" >&2
     exit 1
   fi
   printf '%s\n' "$spec" >"$marker.tmp"
   mv "$marker.tmp" "$marker"
+  # Прежние сборки других коммитов удаляются только после успешного переключения (ревью).
+  local old name
+  for old in "$base"/*; do
+    [ -d "$old" ] || continue
+    name="${old##*/}"
+    if [[ "$name" =~ ^[0-9a-f]{40}$ ]] && [ "$name" != "$memory_ref" ]; then
+      rm -rf -- "$old"
+    fi
+  done
 }
 
 ensure_npm_package "@anthropic-ai/claude-code" "$claude_version"

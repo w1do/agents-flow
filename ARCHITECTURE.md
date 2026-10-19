@@ -160,7 +160,7 @@ implement:  backlog → active → testing → ready (MR создан) → merge
   `sudo -n`), pinned `claude`, `git`, `openspec`, клон репозиториев, пустые `~/.claude/skills` и `~/.claude/agents`
   (D-48), `mcp.json` с `${AGENTS_FLOW_TOKEN}` (значение приходит в env exec-команды). Секретов в файле нет. Идемпотентен.
   С `--memory-ref`/`--memory-repo` (`sandbox.memory`, D-47, D-51): Docker Engine + Compose v2, memory-agent из GitHub
-  на закреплённом коммите (`npm install -g github:<repo>#<sha>`, маркер `~/.harness/memory/installed-ref`),
+  на закреплённом коммите (клон по sha, `npm ci` по lockfile, сборка от пользователя песочницы, симлинк `/usr/local/bin/memory`, маркер `~/.harness/memory/installed-ref`),
   `memory service up`, `memory init --path ~/work/<id>` на клон каждого workspace; маркер `~/.harness/memory/<id>.ready`.
   Пакет `project-memory` из реестра npm не ставится (чужой пакет, D-51).
   Скрипт `~/.harness/bin/ensure-docker.sh` поднимает демон при активации (после паузы Novita). Ключ embeddings

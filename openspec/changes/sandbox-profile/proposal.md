@@ -32,7 +32,8 @@
 - **Bootstrap расширяется** (тот же `deploy/sandbox/bootstrap.sh`, идемпотентно, через `sudo -n`): Node ≥ 22.13
   (NodeSource), глобальные npm-пакеты в системный префикс через sudo, пустые `~/.claude/skills` и `~/.claude/agents`;
   при включённой памяти — Docker Engine + Compose v2, memory-agent (из GitHub `w1do/memory-agent`, закреплён на
-  полный sha коммита: `npm install -g github:<repo>#<sha>`, D-51), `memory service up`, `memory init` для каждого
+  полный sha коммита: клон, `npm ci` по lock-файлу и сборка от пользователя песочницы, ссылка `/usr/local/bin/memory`,
+  D-51), `memory service up`, `memory init` для каждого
   workspace. Шагов про MCP нет. Пакет `project-memory` из реестра npm не ставится: под этим именем там чужой пакет.
 - **Vault-адаптер** `adapters/vault/` (Protocol `SecretVault`, фейк, MCP-клиент на официальном Python SDK,
   инструмент `get_credential`). Ссылка на секрет — `vault:<project>/<service>/<name>`. Доступ сервера — без подтверждения.
