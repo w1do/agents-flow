@@ -199,7 +199,7 @@ implement:  backlog → active → testing → ready (MR создан) → merge
 
 `config/harness.yaml` (путь в `HARNESS_CONFIG`, без секретов, пример — `config/harness.example.yaml`):
 workspaces (id, name, voice_aliases, gitlab_project, default_branch, test_command, agent), sandbox (provider_id,
-версии, опционально `git_author` (`name`, `email`: автор коммитов агента, по умолчанию `agents-flow`), опционально `memory`: `repo` (по умолчанию `w1do/memory-agent`), `ref` (полный sha коммита), `embedding_ref`), gitlab (base_url, опционально `access_ref` — ссылка
+версии, опционально `git_author` (`name`, `email`: автор коммитов агента, передаётся агенту env `GIT_AUTHOR_*`/`GIT_COMMITTER_*`, по умолчанию `agents-flow`), опционально `memory`: `repo` (по умолчанию `w1do/memory-agent`), `ref` (полный sha коммита), `embedding_ref`), gitlab (base_url, опционально `access_ref` — ссылка
 `vault:…` на главный ключ GitLab). Ключи с сегментами `token`/`tokens`, `key`, `password`/`passwd`/`pwd`, `secret`/`secrets`, `apikey`,
 `credential`/`credentials` сервер отклоняет на любом уровне. `gitlab.base_url` с учётными данными (`user@host`) тоже
 отклоняется (D-26); токен GitLab задаётся только в ENV.

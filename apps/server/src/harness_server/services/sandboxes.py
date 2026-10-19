@@ -142,7 +142,7 @@ def git_auth_env(base_url: str, token: str) -> dict[str, str]:
 
 
 def git_author_env(author: GitAuthorConfig) -> dict[str, str]:
-    """env агента для коммитов: автор и коммиттер из sandbox.git_author (env команды запуска, не файл)."""
+    """env агента для коммитов: автор и коммиттер из sandbox.git_author (env запуска, не файл)."""
     return {
         "GIT_AUTHOR_NAME": author.name,
         "GIT_AUTHOR_EMAIL": author.email,
@@ -193,10 +193,6 @@ async def bootstrap(
         config.sandbox.claude_code_version,
         "--openspec-version",
         config.sandbox.openspec_version,
-        "--git-name",
-        config.sandbox.git_author.name,
-        "--git-email",
-        config.sandbox.git_author.email,
     ]
     # Токен GitLab уходит только на префикс базового адреса GitLab (D-52): заголовок строит скрипт.
     args += ["--gitlab-url", config.gitlab.base_url]

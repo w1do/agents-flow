@@ -124,7 +124,6 @@ fi
 
 HARNESS_DIR="${HOME:?HOME не задан}/.harness"
 
-
 # Node 22.13 — минимум для memory-agent (D-47). Проверка без внешних утилит.
 node_ok() {
   command -v node >/dev/null 2>&1 &&

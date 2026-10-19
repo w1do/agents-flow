@@ -99,7 +99,7 @@ vault и не пишутся на диск песочницы; у агента �
    код 2 и текст с именем флага: «--memory-ref — полный sha коммита (40 символов 0-9a-f)», «--memory-repo в формате
    owner/name», «--memory-ref и --memory-repo задаются вместе». `--memory-version` удалён и даёт «неизвестный
    аргумент» (код 2).
-1в. Автор коммитов агента — `sandbox.git_author` (`name`, `email`, по умолчанию `agents-flow`): `bootstrap.sh --git-name --git-email` ставит `git config --global user.name/user.email` после защиты, только при отличии; без автора коммит агента падает (найдено live 5.7).
+1в. Автор коммитов агента — `sandbox.git_author` (`name`, `email`, по умолчанию `agents-flow`): передаётся агенту env запуска `GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL` и `GIT_COMMITTER_NAME`/`GIT_COMMITTER_EMAIL` (`extra_envs` команды `run_agent`), без `git config` и без аргументов bootstrap; без автора коммит агента падает (найдено live 5.7).
 1б. Скрипт пишется в `/tmp/harness-bootstrap-<uuid>.sh` (уникальное имя на каждый запуск) и удаляется `rm -f` в `finally`: envd пишет файлы от root, а `fs.protected_regular=2` запрещает открыть на запись существующий файл другого uid в sticky `/tmp` (второй bootstrap падал бы; найдено на живом прогоне). Файлы задач в домашнем каталоге песочницы этой проблемы не имеют.
 1а. Защита от запуска вне песочницы: без `HARNESS_SANDBOX_BOOTSTRAP=1` скрипт выходит с кодом 3 сразу после разбора и проверки аргументов, до любых побочных эффектов; `services/sandboxes.bootstrap` выставляет переменную в env команды.
 2. `ensure_node`: `node` есть и версия ≥ 22.13 (проверка

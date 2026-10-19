@@ -15,7 +15,7 @@ from typing import Any
 
 import pytest
 from harness_server.adapters.novita import FakeSandbox
-from harness_server.config import HarnessConfig, load_config
+from harness_server.config import GitAuthorConfig, HarnessConfig, load_config
 from harness_server.db.models import Task, TaskToken
 from harness_server.security import tokens
 from harness_server.services import sandboxes
@@ -1194,3 +1194,21 @@ async def test_activate_without_token_fetches_anonymously() -> None:
     assert fake.received_env("GIT_CONFIG_VALUE_0") is None
     assert fake.received_env("GITLAB_TOKEN") is None
     assert fake.received_env("GIT_TERMINAL_PROMPT") == "0"
+
+
+async def test_git_author_env_is_passed_to_agent_launch_only(
+    committed_session_factory: Factory,
+) -> None:
+    """Автор коммитов агента — env запуска (GIT_AUTHOR_*, GIT_COMMITTER_*), не файл."""
+    author = GitAuthorConfig(name="Agent Bot", email="bot@example.com")
+    task = await _task(committed_session_factory)
+    fake = _fake()
+
+    await _start_with(committed_session_factory, fake, task, extra=sandboxes.git_author_env(author))
+
+    launch = [e for e in fake.journal if e.cmd and "setsid nohup" in e.cmd]
+    for key in ("GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL"):
+        assert key in launch[0].env_keys
+    assert fake.received_env("GIT_AUTHOR_NAME") == "Agent Bot"
+    assert fake.received_env("GIT_COMMITTER_EMAIL") == "bot@example.com"
+    assert fake.files_containing("Agent Bot") == []

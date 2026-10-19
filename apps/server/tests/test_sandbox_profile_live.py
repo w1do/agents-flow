@@ -656,6 +656,8 @@ async def test_5_7_activation_with_memory_commits_in_worktree(
                 oauth_token=SecretStr(p.env.oauth_token),
                 agents_flow_url="https://harness.invalid/mcp",
                 memory_enabled=True,
+                # Как диспетчер: автор коммитов агента — env запуска (sandbox.git_author).
+                extra_envs=sandboxes.git_author_env(p.config.sandbox.git_author),
             )
         started = start.state is AgentStartState.STARTED
         assert started, "агент не запущен"

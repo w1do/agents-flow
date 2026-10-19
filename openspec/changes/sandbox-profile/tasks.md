@@ -120,12 +120,11 @@
 
 - [x] 2.9 Автор коммитов агента (`sandbox.git_author`, найдено live 5.7): `config.py` — `GitAuthorConfig` (name ≤100 без
   управляющих символов и пустых, email вида `a@b` без пробелов ≤254; значения по умолчанию `agents-flow`,
-  `agents-flow@noreply.local`), `harness.example.yaml` — закомментированный пример; `bootstrap.sh` — `--git-name`/`--git-email`
-  (оба обязательны, те же правила в bash, код 2), `git config --global user.name/user.email` после защиты и только при
-  отличии («уже настроен: git author»); `services/sandboxes.bootstrap` передаёт значения из конфига — проверка:
-  `test_config.py` (значения по умолчанию, допустимые и отклонённые имя и адрес); `test_sandbox_bootstrap.py`: аргументы
-  команды содержат `--git-name agents-flow --git-email agents-flow@noreply.local` и собственный автор из конфига; пустое,
-  многострочное, одно из пары → код 2; `git config --global` стоит после проверки песочницы (текст скрипта)
+  `agents-flow@noreply.local`), `harness.example.yaml` — закомментированный пример; `services/sandboxes.git_author_env` —
+  `GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL`/`GIT_COMMITTER_NAME`/`GIT_COMMITTER_EMAIL` в `extra_envs` запуска агента
+  (диспетчер) — проверка: `test_config.py` (значения по умолчанию, допустимые и отклонённые имя и адрес);
+  `test_sandbox_service.py`: автор попадает в env запуска и не в файлы; `test_dispatcher.py`: по умолчанию
+  `agents-flow`; `test_sandbox_bootstrap.py`: аргументы bootstrap без автора (`git config` в скрипте не используется)
 
 ## 3. Документация
 

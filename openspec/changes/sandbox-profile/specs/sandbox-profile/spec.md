@@ -15,8 +15,8 @@ Bootstrap SHALL готовить песочницу одной командой:
 
 #### Scenario: Автор коммитов
 
-- **WHEN** bootstrap выполняется с автором из `sandbox.git_author` (по умолчанию `agents-flow`)
-- **THEN** в песочнице задан глобальный `user.name` и `user.email`; повтор с тем же автором ничего не меняет
+- **WHEN** агент запускается с автором из `sandbox.git_author` (по умолчанию `agents-flow`)
+- **THEN** в env процесса агента заданы `GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL` и `GIT_COMMITTER_*`, а не глобальный git config
 
 #### Scenario: Нет sudo и старый Node
 

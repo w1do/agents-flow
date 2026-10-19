@@ -103,7 +103,7 @@ class _Runner:
                 oauth_token=self._ctx.oauth_token,
                 agents_flow_url=self._ctx.agents_flow_url,
                 now=self._ctx.clock(),
-                extra_envs={},
+                extra_envs=sandboxes.git_author_env(self._ctx.config.sandbox.git_author),
                 memory_enabled=self._ctx.config.sandbox.memory is not None,
             )
         if start.token is not None:

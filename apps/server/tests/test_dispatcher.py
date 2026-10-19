@@ -690,3 +690,17 @@ async def test_bare_base64_auth_value_is_redacted_from_agent_output(
         events = await list_task_events(session, task.id)
     assert all(e.text is None or bare not in e.text for e in events)
     assert any(e.text and "[REDACTED]" in e.text for e in events)
+
+
+async def test_dispatcher_launch_env_carries_default_git_author(
+    committed_session_factory: Factory,
+) -> None:
+    """Агент запускается с автором коммитов из sandbox.git_author (по умолчанию agents-flow)."""
+    await _prepare(committed_session_factory)
+    fake = _fake()
+    pipelines = {TaskKind.IMPLEMENT: _Pipeline(fake, agent_finishes=True)}
+
+    await dispatch_once(_ctx(committed_session_factory, fake), pipelines)
+
+    assert fake.received_env("GIT_AUTHOR_NAME") == "agents-flow"
+    assert fake.received_env("GIT_COMMITTER_EMAIL") == "agents-flow@noreply.local"
