@@ -16,12 +16,15 @@
   mypy strict, pytest 642 passed / 2 deselected live, `openspec validate --strict` и `--all`), ревью и security review
   APPROVED. Открыто: задача 5.2 (live-проверка 10 фраз; модель выбирает владелец, чекбокс закрывает владелец) и 6.1
   (project-memory). Низкие находки ревью зафиксированы как известные ограничения в `design.md` (Risks).
-  Статус `done` после подтверждения 5.2 и архивации. Дальше — `mvp-06-sandbox-runtime`.
+  Статус `done` после подтверждения 5.2 и архивации.
+- В работе: `mvp-06-sandbox-runtime` (ветка `mvp-06-sandbox-runtime` от `mvp-05`, решение владельца). OpenSpec
+  уточнён (D-35…D-38), идёт реализация.
+- Решение 2026-10-19 (D-39): веб-панель оператора входит в MVP как `mvp-10-operator-console` после `mvp-09`.
 
 ## MVP — сквозной срез (ТЗ §16.0)
 
 Критерий приёмки: голосом «создай X» → спецификация → задачи в `backlog` → агент делает одну задачу →
-MR создан → сообщение в Telegram.
+MR создан → сообщение в Telegram. Тот же поток виден и проверяется в веб-панели (`mvp-10`, D-39).
 
 | # | Изменение | Что даёт | Capability | Зависит от | Статус |
 |---|---|---|---|---|---|
@@ -34,8 +37,10 @@ MR создан → сообщение в Telegram.
 | 7 | [`mvp-07-agents-flow-mcp`](openspec/changes/mvp-07-agents-flow-mcp/) | MCP: токен задачи, report_task, sync_spec, create_task | agents-flow-mcp | mvp-03, mvp-06 | todo |
 | 8 | [`mvp-08-spec-planning`](openspec/changes/mvp-08-spec-planning/) | Планировщик OpenSpec → задачи в backlog | spec-planning | mvp-05, mvp-06, mvp-07 | todo |
 | 9 | [`mvp-09-delivery-mr`](openspec/changes/mvp-09-delivery-mr/) | Исполнитель, гейты, MR в GitLab, итог в Telegram | delivery-gates | mvp-08 | todo |
+| 10 | [`mvp-10-operator-console`](openspec/changes/mvp-10-operator-console/) | Веб-панель: вход, канбан, карточка и создание задачи, песочница и логи агента | operator-console | mvp-06, mvp-09 | todo |
 
-`mvp-01`…`mvp-04` выполнены, `mvp-05` на ревью. Дальше строго по номеру: `mvp-06` начинается после принятия `mvp-05`.
+`mvp-01`…`mvp-04` выполнены, `mvp-05` на ревью, `mvp-06` в работе (ветка от `mvp-05` по решению владельца). Дальше строго
+по номеру до `mvp-10`.
 
 ## После MVP — мелкие изменения по волнам
 

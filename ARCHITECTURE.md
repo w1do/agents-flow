@@ -35,8 +35,8 @@ Novita, результат приходит как Merge Request в GitLab, ст
 | shared | `shared/` | Pydantic-модели и перечисления, общие для сервера и типов консоли | MVP |
 | migrations | `db/migrations` | Alembic. Схема меняется только миграциями | MVP |
 | bootstrap | `deploy/sandbox/bootstrap.sh` | Идемпотентная подготовка песочницы без секретов | MVP |
-| console | `apps/console` | React + shadcn/ui, вызывает те же инструменты MCP | позже |
-| shared-types | `packages/shared-types` | TS-типы для консоли, генерируются из `shared/` | позже |
+| console | `apps/console` | React + shadcn/ui; в MVP — REST `/api/console/*` над теми же сервисами, MCP — после `operator-tokens` (D-39) | MVP (`mvp-10`) |
+| shared-types | `packages/shared-types` | TS-типы для консоли, генерируются из `shared/` | MVP (`mvp-10`) |
 
 ## 2. Слои сервера
 
@@ -204,7 +204,7 @@ gitlab (base_url). Ключи с сегментами `token`/`tokens`, `key`, `
 | `CLAUDE_CODE_OAUTH_TOKEN` | Токен подписки Claude для Claude Code в песочнице (`claude setup-token`, срок ~1 год; передаётся только в exec, D-18). Секрет |
 | `AGENT_RUN_TIMEOUT_MIN`, `TESTS_TIMEOUT_MIN` | Лимит времени агента и гейта тестов (по умолчанию 60 и 15) |
 | `WORKER_POLL_INTERVAL_SEC` | Интервал опроса очереди worker, в секундах (по умолчанию 5) |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Консоль, после MVP (`ADMIN_PASSWORD` — секрет) |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Консоль, `mvp-10` (`ADMIN_PASSWORD` — секрет) |
 
 Новая переменная или сервис добавляется одним изменением в Compose, `.env.example` и эту таблицу.
 
@@ -214,7 +214,7 @@ Dokploy, два Compose-стека:
 
 - `deploy/db/docker-compose.yml` — Postgres отдельно; редеплой харнесса не трогает данные.
 - `docker-compose.yml` — `migrate` (одноразовый, `alembic upgrade head`) → `server` и `worker`
-  (`depends_on: service_completed_successfully`); `console` — после MVP.
+  (`depends_on: service_completed_successfully`); `console` — `mvp-10` (D-39).
 
 Все сервисы в внешней сети `dokploy-network`, наружу только `expose`, домен и HTTPS — в Dokploy.
 CI: `.gitlab-ci.yml`, стадии `check → build → deploy`; образы в GitLab Registry с тегами

@@ -1,6 +1,9 @@
 # Proposal: console-auth
 
 > Консоль: каркас и вход администратора. Волна 6 (после MVP), см. PLAN.md.
+> Каркас `apps/console`, `packages/shared-types`, admin из ENV, `reset-password` и сервис `console` в Compose
+> перенесены в MVP (`mvp-10-operator-console`, D-39). Здесь остаётся перевод панели с REST `/api/console/*` на MCP
+> с операторским токеном сессии.
 
 ## Why
 
