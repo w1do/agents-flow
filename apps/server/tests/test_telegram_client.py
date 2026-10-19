@@ -301,3 +301,54 @@ async def test_custom_base_url_error_contains_no_token_or_url() -> None:
     assert TOKEN not in str(info.value)
     assert PROXY not in str(info.value)
     assert TOKEN not in repr(info.value)
+
+
+@respx.mock
+async def test_base_url_path_prefix_is_kept_for_api_and_file_calls() -> None:
+    prefix = f"{PROXY}/tg"
+    api_route = respx.post(f"{prefix}/bot{TOKEN}/sendMessage").mock(
+        return_value=httpx.Response(200, json={"ok": True, "result": {"message_id": 6}})
+    )
+    file_route = respx.get(f"{prefix}/file/bot{TOKEN}/voice/file_2.oga").mock(
+        return_value=httpx.Response(200, content=b"OggS2")
+    )
+
+    async with httpx.AsyncClient() as http:
+        client = HttpxTelegramClient(TOKEN, http, base_url=prefix)
+        await client.send_message(CHAT_ID, "текст")
+        data = await client.download_file("voice/file_2.oga", max_bytes=1000)
+
+    assert api_route.called
+    assert file_route.called
+    assert data == b"OggS2"
+
+
+@respx.mock
+async def test_invalid_url_error_is_mapped_without_url() -> None:
+    respx.post(f"{BOT_URL}/sendMessage").mock(
+        side_effect=httpx.InvalidURL(f"bad url {BOT_URL}/sendMessage")
+    )
+
+    async with httpx.AsyncClient() as http:
+        client = _client(http)
+        with pytest.raises(TelegramError) as info:
+            await client.send_message(CHAT_ID, "текст")
+
+    assert info.value.error_code is None
+    assert str(info.value.description) == "InvalidURL"
+    assert TOKEN not in str(info.value)
+    assert TOKEN not in repr(info.value)
+
+
+@respx.mock
+async def test_download_invalid_url_is_mapped_without_url() -> None:
+    respx.get(f"{API}/file/bot{TOKEN}/voice/file_3.oga").mock(
+        side_effect=httpx.InvalidURL(f"bad url {API}/file/bot{TOKEN}/voice/file_3.oga")
+    )
+
+    async with httpx.AsyncClient() as http:
+        with pytest.raises(TelegramError) as info:
+            await _client(http).download_file("voice/file_3.oga", max_bytes=1000)
+
+    assert TOKEN not in str(info.value)
+    assert TOKEN not in repr(info.value)

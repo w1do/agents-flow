@@ -125,4 +125,21 @@ Job `deploy:dokploy` не добавляет `curl -v` и `--trace`: при ош
 
 ## Telegram за прокси (сервер в РФ)
 
-Если сервер в РФ не достаёт `api.telegram.org`, задайте `TELEGRAM_API_URL` на прокси Bot API (Cloudflare Worker владельца), например `https://<worker>`. Входящий webhook тоже идёт через прокси: `set-webhook` регистрирует адрес через тот же `TELEGRAM_API_URL`. Пустое значение = `https://api.telegram.org`.
+Сервер в РФ не достаёт `api.telegram.org`, поэтому трафик Telegram идёт через Cloudflare Worker владельца.
+Код Worker живёт вне репозитория, в аккаунте Cloudflare владельца. Он обслуживает два маршрута:
+
+- `/tg-webhook` — входящие апдейты: Telegram → Worker → `HARNESS_PUBLIC_URL/telegram/webhook`
+  (Worker пересылает POST вместе с заголовком `X-Telegram-Bot-Api-Secret-Token`);
+- `/bot<token>/<method>` и `/file/bot<token>/<path>` — исходящие вызовы Bot API и скачивание файлов:
+  сервер → Worker → `api.telegram.org`.
+
+Настройки сервера:
+
+- `TELEGRAM_API_URL=https://<worker>` — базовый адрес исходящих вызовов;
+- `TELEGRAM_WEBHOOK_URL=https://<worker>/tg-webhook` — адрес, который регистрирует `harness-server telegram set-webhook`.
+  Без него адрес собирается из `HARNESS_PUBLIC_URL`.
+
+Оба адреса: только `https://` строчными буквами, без пробелов, учётных данных, query и fragment.
+
+Безопасность: прокси видит токен бота в пути URL. Используйте только свой Worker. Не включайте в нём
+логирование URL и тел запросов. Секрет webhook проверяет сервер, а не Worker.

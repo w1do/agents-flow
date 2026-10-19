@@ -2,6 +2,7 @@
 
 import asyncio
 import inspect
+import json
 import logging
 from pathlib import Path
 
@@ -525,4 +526,43 @@ def test_set_webhook_goes_through_configured_telegram_api_url(
 
     assert result.exit_code == 0, result.output
     assert route.called
+    assert valid_env["TELEGRAM_BOT_TOKEN"] not in result.output
+
+
+def test_set_webhook_defaults_to_public_url_path(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HARNESS_PUBLIC_URL", "https://harness.example.com")
+    monkeypatch.setenv("TELEGRAM_API_URL", "https://tg-proxy.example.com")
+
+    with respx.mock(assert_all_called=True) as mock:
+        route = mock.post(
+            f"https://tg-proxy.example.com/bot{valid_env['TELEGRAM_BOT_TOKEN']}/setWebhook"
+        ).mock(return_value=httpx.Response(200, json={"ok": True, "result": True}))
+        result = runner.invoke(app, ["telegram", "set-webhook"])
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(route.calls.last.request.content)["url"] == (
+        "https://harness.example.com/telegram/webhook"
+    )
+
+
+def test_set_webhook_uses_telegram_webhook_url_override(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch
+) -> None:
+    # Апдейты идут через Worker владельца (D-61); HARNESS_PUBLIC_URL при этом не нужен.
+    monkeypatch.delenv("HARNESS_PUBLIC_URL", raising=False)
+    monkeypatch.setenv("TELEGRAM_WEBHOOK_URL", "https://tg-worker.example.com/tg-webhook")
+    monkeypatch.setenv("TELEGRAM_API_URL", "https://tg-proxy.example.com")
+
+    with respx.mock(assert_all_called=True) as mock:
+        route = mock.post(
+            f"https://tg-proxy.example.com/bot{valid_env['TELEGRAM_BOT_TOKEN']}/setWebhook"
+        ).mock(return_value=httpx.Response(200, json={"ok": True, "result": True}))
+        result = runner.invoke(app, ["telegram", "set-webhook"])
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(route.calls.last.request.content)["url"] == (
+        "https://tg-worker.example.com/tg-webhook"
+    )
     assert valid_env["TELEGRAM_BOT_TOKEN"] not in result.output
