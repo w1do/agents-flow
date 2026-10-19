@@ -67,6 +67,17 @@ class NotFound(DomainError):
         self.entity_id = entity_id
 
 
+class AlreadyResolved(DomainError):
+    """Действие уже выполнено: повторное нажатие кнопки уточнения."""
+
+    code = "already_resolved"
+
+    def __init__(self, entity: str, entity_id: object) -> None:
+        super().__init__(f"{entity} уже обработан(а): {entity_id}")
+        self.entity = entity
+        self.entity_id = entity_id
+
+
 class Forbidden(DomainError):
     """Действие запрещено текущему субъекту. Используется начиная с mvp-07."""
 

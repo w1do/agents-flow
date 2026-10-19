@@ -10,6 +10,7 @@ Pydantic-модели, которые видят внешние потребит
 | `harness_shared/health.py` | `HealthResponse` (`status: "ok"`), `ReadyResponse` (`status: "ready" \| "unavailable"`, `database: bool`) |
 | `harness_shared/tasks.py` | Перечисления `TaskKind`, `TaskStatus`, `TaskSource`, `TaskEventSource`, `TestsState`; DTO `TaskCreateIn`, `TaskOut`, `TaskEventOut`, `TaskDetailOut` |
 | `harness_shared/sandboxes.py` | Перечисления `SandboxStatus`, `AgentRole` |
+| `harness_shared/routing.py` | Перечисления `CommandClass`, `RoutingDecisionKind`; модели `WorkspaceCandidate`, `RoutingDecision` (ответ модели маршрутизатора, mvp-05) |
 
 ## Использование
 

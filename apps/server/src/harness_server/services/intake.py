@@ -6,12 +6,20 @@
 LOCKED`, создаёт задачу, отмечает апдейт обработанным и очищает payload, и только потом
 отправляет карточку. Ошибка Telegram при карточке не создаёт дубль задачи: карточку досылает
 `recover_pending` (D-27).
+
+Текст владельца сначала классифицируется маршрутизатором (D-31…D-33): задача создаётся
+только для класса `work` или по запасному пути; `status` и `unknown` отвечают без задачи,
+низкая уверенность спрашивает кнопкой.
 """
 
 import logging
+from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Final
+from uuid import UUID
 
+from harness_shared.routing import CommandClass, RoutingDecisionKind, WorkspaceCandidate
 from harness_shared.tasks import TaskEventSource, TaskKind, TaskSource, TaskStatus
 from sqlalchemy import select, update
 from sqlalchemy.dialects import postgresql
@@ -19,11 +27,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from harness_server.adapters.stt.protocol import SttError
 from harness_server.adapters.telegram.types import TelegramError
+from harness_server.config import WorkspaceConfig
 from harness_server.db.models import Task, TelegramMessage, TelegramUpdate
-from harness_server.domain.errors import DomainError, InvalidTransition, NotFound
+from harness_server.domain.errors import AlreadyResolved, DomainError, InvalidTransition, NotFound
 from harness_server.security.redaction import redact
 from harness_server.services.context import BotContext
-from harness_server.services.notify import append_stage, reply, send_task_card
+from harness_server.services.notify import (
+    append_stage,
+    close_prompt,
+    reply,
+    send_clarify,
+    send_task_card,
+)
+from harness_server.services.routing import (
+    RouteResult,
+    attach_task,
+    claim_clarification,
+    classify,
+    record_choice,
+    record_routing,
+)
+from harness_server.services.status_report import build_status_report
 from harness_server.services.tasks import change_status, create_task, select_workspace
 from harness_server.telegram.parse import (
     ButtonPress,
@@ -35,13 +59,20 @@ from harness_server.telegram.parse import (
     load_incoming,
 )
 from harness_server.telegram.render import (
+    CLARIFY_WORK,
+    TEXT_ALREADY_ANSWERED,
     TEXT_ALREADY_CHOSEN,
     TEXT_BAD_BUTTON,
+    TEXT_HELP,
     TEXT_STT_FAILED,
     TEXT_TASK_NOT_FOUND,
     TEXT_UNKNOWN_PROJECT,
+    clarify_closed_text,
+    is_clarify_callback,
     parse_callback_data,
+    parse_clarify_callback,
     planning_stage,
+    short_title,
 )
 
 logger = logging.getLogger(__name__)
@@ -54,6 +85,38 @@ STALE_AFTER: Final = timedelta(minutes=1)
 PAYLOAD_TTL: Final = timedelta(hours=24)
 _VOICE_FILENAME: Final = "voice.ogg"
 _VOICE_DEFAULT_MIME: Final = "audio/ogg"
+
+
+@dataclass(frozen=True, slots=True)
+class _CardReply:
+    """Карточка задачи с кнопками: workspaces — кандидаты маршрутизатора или все (D-13)."""
+
+    task: Task
+    workspaces: tuple[WorkspaceConfig, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _TextReply:
+    """Короткий ответ владельцу."""
+
+    text: str
+
+
+@dataclass(frozen=True, slots=True)
+class _StatusReply:
+    """Отчёт о состоянии; собирается после commit, чтобы не держать замок во время чтения."""
+
+
+@dataclass(frozen=True, slots=True)
+class _ClarifyReply:
+    """Вопрос «Сделать задачу / Показать статус» для записи routings с source_text."""
+
+    routing_id: UUID
+    title: str
+
+
+# Что отправить владельцу после выхода из замка апдейта (D-31…D-33).
+_Followup = _CardReply | _TextReply | _StatusReply | _ClarifyReply
 
 
 async def record_incoming(session: AsyncSession, incoming: Incoming) -> bool:
@@ -107,20 +170,20 @@ async def _process_locked(ctx: BotContext, kind: str, external_id: str) -> None:
             return
 
         incoming = load_incoming(row.payload)
-        created: Task | None = None
+        followup: _Followup | None = None
         stt_failed = False
         if incoming is None:
             logger.warning("telegram update without payload kind=%s id=%s", kind, external_id)
         elif isinstance(incoming, ButtonPress):
-            await choose_workspace(ctx, incoming)
+            await handle_button(ctx, incoming)
         elif isinstance(incoming, IncomingText):
-            created = await _create_choosing_task(ctx, incoming.text)
+            followup = await _route_text(ctx, incoming.text)
         elif isinstance(incoming, IncomingVoice):
             text = await _transcribe(ctx, incoming)
             if text is None:
                 stt_failed = True
             else:
-                created = await _create_choosing_task(ctx, text)
+                followup = await _route_text(ctx, text)
 
         # Апдейт помечается обработанным до отправки карточки: сбой Telegram не создаст дубль
         # задачи.
@@ -130,14 +193,132 @@ async def _process_locked(ctx: BotContext, kind: str, external_id: str) -> None:
 
     if stt_failed:
         await reply(ctx, TEXT_STT_FAILED)
-    if created is not None:
+    if followup is not None:
+        await _send_followup(ctx, followup)
+
+
+async def _route_text(ctx: BotContext, text: str) -> _Followup:
+    """Классифицирует текст владельца и делает решение: задача, статус, справка или уточнение.
+
+    Вызывается под замком апдейта: сеть к Polza идёт здесь, поэтому Polza не должна блокировать
+    другие апдейты дольше времени одного вызова (D-31). Сообщения уходят позже, в _send_followup.
+    """
+    safe_text = redact(text, ctx.secret_values)[:MAX_TASK_TEXT]
+    result = await classify(ctx, safe_text)
+    if result.decision is RoutingDecisionKind.CLARIFY:
+        routing_id = await _record(ctx, result, task_id=None, source_text=safe_text)
+        return _ClarifyReply(routing_id, short_title(safe_text))
+    if result.decision is RoutingDecisionKind.FALLBACK:
+        # Запасной путь: задача со всеми workspace, как в mvp-04 (D-13).
+        task = await _create_choosing_task(ctx, safe_text)
+        await _record(ctx, result, task_id=task.id)
+        return _CardReply(task, ctx.workspaces)
+    if result.command_class is CommandClass.STATUS:
+        await _record(ctx, result, task_id=None)
+        return _StatusReply()
+    if result.command_class is CommandClass.UNKNOWN:
+        await _record(ctx, result, task_id=None)
+        return _TextReply(TEXT_HELP)
+    task = await _create_choosing_task(ctx, safe_text)
+    await _record(ctx, result, task_id=task.id)
+    return _CardReply(task, _candidate_workspaces(ctx, result.candidates))
+
+
+async def _record(
+    ctx: BotContext,
+    result: RouteResult,
+    *,
+    task_id: UUID | None,
+    source_text: str | None = None,
+) -> UUID:
+    """Записывает решение маршрутизации в отдельной короткой транзакции и возвращает его id."""
+    async with ctx.session_factory() as session:
+        routing = await record_routing(session, result, task_id=task_id, source_text=source_text)
+    return routing.id
+
+
+def _candidate_workspaces(
+    ctx: BotContext, candidates: Sequence[WorkspaceCandidate]
+) -> tuple[WorkspaceConfig, ...]:
+    """Кнопки для кандидатов в порядке ранжирования; без известных кандидатов — все workspace."""
+    by_id = {workspace.id: workspace for workspace in ctx.workspaces}
+    chosen = tuple(by_id[c.id] for c in candidates if c.id in by_id)
+    return chosen or ctx.workspaces
+
+
+async def _send_followup(ctx: BotContext, followup: _Followup) -> None:
+    """Отправляет ответ после commit замка. Ошибки Telegram не пробрасываются (карточку досылает
+    recover_pending)."""
+    if isinstance(followup, _CardReply):
         try:
-            await send_task_card(ctx, created)
+            await send_task_card(ctx, followup.task, workspaces=followup.workspaces)
         except TelegramError as exc:
             # Карточку досылает recover_pending при старте worker.
             logger.warning(
-                "telegram %s failed task=%s: %s", exc.method, created.id, type(exc).__name__
+                "telegram %s failed task=%s: %s",
+                exc.method,
+                followup.task.id,
+                type(exc).__name__,
             )
+    elif isinstance(followup, _TextReply):
+        await reply(ctx, followup.text)
+    elif isinstance(followup, _StatusReply):
+        await reply(ctx, await build_status_report(ctx))
+    else:
+        await send_clarify(ctx, followup.routing_id, followup.title)
+
+
+async def handle_button(ctx: BotContext, press: ButtonPress) -> None:
+    """Нажатие кнопки: уточнение маршрутизации (rt:) или выбор проекта (ws:)."""
+    if is_clarify_callback(press.data):
+        await resolve_clarification(ctx, press)
+    else:
+        await choose_workspace(ctx, press)
+
+
+async def resolve_clarification(ctx: BotContext, press: ButtonPress) -> None:
+    """Нажатие «Сделать задачу» или «Показать статус» у вопроса уточнения (D-33).
+
+    Решение забирается под блокировкой: повторное нажатие получает «уже выбрано» и не создаёт
+    вторую задачу. Вопрос без кнопок заменяется текстом выбора, и только затем идёт действие.
+    """
+    parsed = parse_clarify_callback(press.data)
+    if parsed is None:
+        await _answer(ctx, press.callback_query_id, TEXT_BAD_BUTTON)
+        return
+    routing_id, action = parsed
+    try:
+        async with ctx.session_factory() as session:
+            claimed = await claim_clarification(session, routing_id)
+    except NotFound:
+        await _answer(ctx, press.callback_query_id, TEXT_BAD_BUTTON)
+        return
+    except AlreadyResolved:
+        await _answer(ctx, press.callback_query_id, TEXT_ALREADY_ANSWERED)
+        return
+
+    await _answer(ctx, press.callback_query_id, None)
+    await close_prompt(
+        ctx,
+        press.chat_id,
+        press.message_id,
+        clarify_closed_text(short_title(claimed.source_text), action),
+    )
+    if action == CLARIFY_WORK:
+        task = await _create_choosing_task(ctx, claimed.source_text)
+        async with ctx.session_factory() as session:
+            await attach_task(session, routing_id, task.id)
+        try:
+            await send_task_card(
+                ctx, task, workspaces=_candidate_workspaces(ctx, claimed.candidates)
+            )
+        except TelegramError as exc:
+            # Карточку досылает recover_pending при старте worker.
+            logger.warning(
+                "telegram %s failed task=%s: %s", exc.method, task.id, type(exc).__name__
+            )
+    else:
+        await reply(ctx, await build_status_report(ctx))
 
 
 async def _create_choosing_task(ctx: BotContext, text: str) -> Task:
@@ -225,6 +406,8 @@ async def choose_workspace(ctx: BotContext, press: ButtonPress) -> None:
         await _answer(ctx, press.callback_query_id, TEXT_ALREADY_CHOSEN)
         return
 
+    async with ctx.session_factory() as session:
+        await record_choice(session, task.id, workspace_id)
     await _answer(ctx, press.callback_query_id, None)
     await append_stage(ctx, task.id, planning_stage(workspace.name))
 

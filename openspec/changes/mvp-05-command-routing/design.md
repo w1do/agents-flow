@@ -243,7 +243,9 @@ class RoutingDecision(BaseModel):
 
     command_class: CommandClass = Field(alias="class")
     confidence: float = Field(ge=0.0, le=1.0)
-    workspaces: list[WorkspaceCandidate] = Field(default_factory=list, max_length=MAX_MODEL_CANDIDATES)
+    workspaces: list[WorkspaceCandidate] = Field(
+        default_factory=list, max_length=MAX_MODEL_CANDIDATES
+    )
     title: str = ""
 
     @field_validator("title")
@@ -514,7 +516,9 @@ Docstring у каждой публичной функции. Логгер `loggi
 ### 7. `services/status_report.py`
 
 ```python
-OPEN_STATUSES: Final = tuple(s for s in TaskStatus if s not in (TaskStatus.MERGED, TaskStatus.TRASH))
+OPEN_STATUSES: Final = tuple(
+    s for s in TaskStatus if s not in (TaskStatus.MERGED, TaskStatus.TRASH)
+)
 STATUS_FETCH_LIMIT: Final = 500
 
 
@@ -1091,6 +1095,26 @@ LIVE_POLZA_API_KEY=… LIVE_POLZA_MODEL=… uv run pytest -m live apps/server/te
 - [Отчёт `status` старше 500 задач неточен по счёту] → в MVP один владелец; полноценные команды статуса —
   `status-commands`.
 - [Перевод `routings.command_class` в VARCHAR(16)] → таблица пуста до mvp-05.
+
+### Известные ограничения из ревью (низкая важность, не исправляются в mvp-05)
+
+Кандидаты на последующие изменения; в mvp-05 не реализуются.
+
+1. `claim_clarification` сохраняет `resolved_at` и обнуляет `source_text` до создания задачи. Если сбой случится между
+   этими шагами, команда теряется, и владелец повторяет её. Кандидат: создавать задачу в той же транзакции.
+2. Docstring `routing.classify` говорит, что функция не бросает исключений, но перехватывается только `RouterError`.
+   Кандидат: привести docstring в соответствие с кодом или перехватывать шире.
+3. `RoutingDecision` в lax-режиме Pydantic принимает строку или bool для `confidence` и `score`, если значение в [0, 1].
+   Это расходится с текстом решения 3 («не число → невалид»), но безвредно. Кандидат: strict-режим для этих полей.
+4. Вызов Polza выполняется под замком строки `telegram_updates`, и обработка других апдейтов ждёт его завершения.
+   Худший случай: до ≈ 21 с при паузе 1 с (D-31) и до ≈ 25 с при `Retry-After` 5 с (решение 2). Кандидат: вынести
+   вызов модели из-под замка.
+5. Неразрешённые уточнения (`decision = clarify`) хранят redacted `source_text` бессрочно. Очистка по возрасту
+   не реализована; она относится к `routing-uncertainty`.
+6. Downgrade миграции `0003` удаляет строки `routings` с `task_id IS NULL` без сохранения. Кандидат: архивировать
+   строки перед удалением или запретить откат при наличии таких строк.
+7. `POLZA_AI_URL` проверяется только по схеме `https`. Hostname и userinfo не проверяются; URL задаёт оператор.
+   Кандидат: отклонять userinfo и неожиданный hostname в `_check_polza_ai_url`.
 
 ## Ordered implementation steps (Implementer)
 

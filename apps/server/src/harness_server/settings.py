@@ -50,7 +50,8 @@ class Settings(BaseSettings):
     polza_ai_url: str | None = None
     polza_ai_key: SecretStr | None = None
     polza_ai_model: str | None = None
-    routing_min_confidence: float = Field(default=0.7, ge=0.0, le=1.0)
+    # ниже порога — кнопки уточнения (D-33).
+    routing_min_confidence: float = Field(default=0.6, ge=0.0, le=1.0)
     # OpenAI-совместимый протокол; Whisper через Polza. Других провайдеров пока нет.
     stt_provider: Literal["openai"] | None = None
     stt_api_url: str | None = None
@@ -116,6 +117,14 @@ class Settings(BaseSettings):
                 "должен быть положительным числовым id личного чата владельца "
                 "(групповые чаты не поддерживаются, D-30)"
             )
+        return value
+
+    @field_validator("polza_ai_url")
+    @classmethod
+    def _check_polza_ai_url(cls, value: str | None) -> str | None:
+        # Текст владельца уходит во внешний сервис: только https, как у STT (D-31).
+        if value is not None and urlsplit(value).scheme != "https":
+            raise ValueError("должен начинаться с https://")
         return value
 
     @field_validator("stt_api_url")

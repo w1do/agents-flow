@@ -89,6 +89,34 @@ uv run pytest -m live apps/server/tests/test_telegram_live.py
 
 Результат прогона записать в PR. Чекбокс 4.3 закрывает владелец проекта после проверки.
 
+## Маршрутизация текста владельца (mvp-05)
+
+Каждый текст и голос владельца классифицируется вызовом Polza (`adapters/polza`, D-31): класс `work`, `status`
+или `unknown`, до трёх кандидатов workspace. При временной ошибке Polza выполняется один повтор, то есть не больше
+двух платных запросов на сообщение. Промпт — `src/harness_server/services/prompts/routing.md`
+(входит в wheel, проверяется командой сборки). Маршрутизатор включается только при заданных `POLZA_AI_KEY`
+и `POLZA_AI_MODEL`; модель в коде по умолчанию не задана и выбирается владельцем. Без них работает запасной путь
+mvp-04: задача со всеми workspace.
+
+- Порог `ROUTING_MIN_CONFIDENCE` (по умолчанию 0.6): ниже порога бот спрашивает «Сделать задачу / Показать статус»,
+  задача не создаётся до нажатия (D-33).
+- `status` отвечает списком открытых задач из БД, без LLM и песочниц (D-34).
+- Каждое решение пишется в `routings` (D-32), в том числе причина запасного пути и сырой ответ модели после redaction.
+
+### Живая проверка маршрутизатора (`-m live`)
+
+Тест `tests/test_polza_live.py` вызывает настоящий Polza. Нужны `LIVE_POLZA_API_KEY` и `LIVE_POLZA_MODEL`,
+необязательно `LIVE_POLZA_URL`. Без переменных тест пропускается.
+
+```bash
+LIVE_POLZA_API_KEY=… LIVE_POLZA_MODEL=… uv run pytest -m live apps/server/tests/test_polza_live.py
+```
+
+Ручной сценарий (задача 5.2 в OpenSpec `mvp-05-command-routing`, выполняет владелец проекта): 10 реальных фраз
+(5 работа, 3 статус, 2 мусор), часть голосом; для каждой фиксируются класс, уверенность и кандидаты. Таблица
+«фраза → класс, confidence, кандидаты» идёт в MR. Модель выбирает владелец: она должна поддерживать
+`response_format: json_object` и хорошо работать с русским. Чекбокс 5.2 закрывает владелец проекта после проверки.
+
 ## Структура
 
 ```
@@ -103,16 +131,20 @@ src/harness_server/
 ├── api/deps.py     # сессия БД, конфиг, HARNESS_ADMIN_TOKEN, секрет webhook, BotContext
 ├── services/tasks.py  # создание, смена статуса, выбор workspace, лента, очередь claim_next_task
 ├── services/intake.py # приём и обработка апдейтов, STT, выбор проекта, recover_pending при старте worker
-├── services/notify.py # одно обновляемое сообщение задачи, reply
+├── services/notify.py # одно обновляемое сообщение задачи, reply, вопрос уточнения (mvp-05)
+├── services/routing.py      # классификация Polza, уточнение, запись routings (mvp-05)
+├── services/status_report.py # ответ на запрос состояния из БД, без LLM (mvp-05)
+├── services/prompts/routing.md # системный промпт маршрутизатора (mvp-05)
 ├── services/webhook.py  # webhook_url, register_webhook (set-webhook)
 ├── services/context.py  # BotContext: фабрика сессий, адаптеры, workspace, владелец
 ├── telegram/parse.py    # update → IncomingText | IncomingVoice | ButtonPress, dedup_key (без I/O)
 ├── telegram/render.py   # тексты, карточка задачи, callback_data, клавиатура (без I/O)
 ├── adapters/telegram/   # Protocol TelegramClient, HttpxTelegramClient, FakeTelegramClient, ошибки без URL и токена
 ├── adapters/stt/        # Protocol SpeechToText, OpenAiCompatibleStt, FakeSpeechToText
+├── adapters/polza/      # Protocol Router, PolzaRouter (httpx, chat completions), FakeRouter (mvp-05)
 ├── security/redaction.py  # redact(): шаблоны токенов и точные значения секретов
 ├── domain/         # statuses.py (таблица переходов), errors.py (DomainError)
-├── db/             # base, ids (uuid7), session, models/ (ORM 9 таблиц), migrations/ (0001, 0002)
+├── db/             # base, ids (uuid7), session, models/ (ORM 9 таблиц), migrations/ (0001–0003)
 ├── worker.py       # start_worker (восстановление апдейтов, BotContext), цикл и обработка SIGTERM
 └── cli.py          # команды harness-server (typer), telegram set-webhook
 ```

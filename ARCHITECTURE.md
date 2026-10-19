@@ -50,10 +50,10 @@ apps/server/src/harness_server/
 ├── api/               # HTTP-входы: tasks (POST /tasks, GET /tasks/{id}), telegram_webhook (POST /telegram/webhook), deps (сессия, admin-токен, секрет webhook), health. Без бизнес-логики
 ├── mcp/               # MCP agents-flow: auth (токен задачи), tools. Без бизнес-логики
 ├── telegram/          # parse.py (update → IncomingText / IncomingVoice / ButtonPress, dedup_key), render.py (тексты, карточка, callback_data, клавиатура); без I/O
-├── services/          # ВСЯ бизнес-логика: tasks (mvp-03), intake (приём и восстановление апдейтов), notify (одно сообщение задачи), webhook (регистрация), context (BotContext); routing, spec, sandboxes, delivery
+├── services/          # ВСЯ бизнес-логика: tasks (mvp-03), intake (приём и восстановление апдейтов), notify (одно сообщение задачи), webhook (регистрация), context (BotContext); routing (классификация, уточнение, запись routings, mvp-05), status_report (ответ на запрос состояния, mvp-05), spec, sandboxes, delivery
 ├── domain/            # statuses.py (таблица переходов), errors.py (DomainError и коды), без I/O и sqlalchemy
 ├── db/                # base.py (Base, naming convention, enum-хелперы), ids.py (uuid7), session.py, models/ (9 таблиц)
-├── adapters/          # внешние API за интерфейсами (Protocol) и фейки: telegram (httpx, mvp-04), stt (OpenAI-совместимый, mvp-04), polza, novita, gitlab
+├── adapters/          # внешние API за интерфейсами (Protocol) и фейки: telegram (httpx, mvp-04), stt (OpenAI-совместимый, mvp-04), polza (Router/PolzaRouter/FakeRouter, OpenAI-совместимый chat completions, mvp-05), novita, gitlab
 ├── worker/            # dispatcher loop, pipelines plan/implement, gates
 └── security/          # redaction (фильтр секретов: шаблоны токенов и точные значения), task tokens
 ```
@@ -73,7 +73,7 @@ apps/server/src/harness_server/
 |---|---|---|
 | `tasks` | id, kind (`plan`/`implement`/`check`), workspace_id, parent_id, text, status, priority, source (`telegram`/`spec`/`mcp`/`api`), spec_item_id, branch, mr_url, result, tests_state, created_at, updated_at | Задача и канбан (представление по статусам) |
 | `task_events` | id, task_id, status, text, source (`telegram`/`agent`/`worker`/`api`), created_at | Лента этапов для Telegram и журнала |
-| `routings` | id, task_id, command_class, options (JSON), chosen_workspace_id, raw_response, confidence | Решение Polza и выбор пользователя |
+| `routings` | id, task_id (NULL для status, unknown и ожидающего уточнения), command_class (`work`/`status`/`unknown`), decision (`auto`/`clarify`/`fallback`), options (JSON), chosen_workspace_id, raw_response, confidence, error (причина запасного пути), source_text (до нажатия «Сделать задачу», затем NULL), resolved_at | Решение Polza и выбор пользователя (mvp-05, D-32, миграция `0003`) |
 | `spec_items` | id, workspace_id, plan_task_id, change_id, key, text, status, last_checkpoint_id; UNIQUE (workspace_id, change_id, key) | Зеркало пунктов OpenSpec |
 | `sandboxes` | id, provider_id, agent_type, status (`paused`/`active`/`error`), current_task_id, profile_version | Песочницы Novita |
 | `checkpoints` | id, task_id, summary, files (JSON), diff_redacted, next_step, status, tokens | Чекпоинты (MVP: от сервера после агента) |
@@ -115,9 +115,11 @@ implement:  backlog → active → testing → ready (MR создан) → merge
    (`processed_at IS NULL` и старше 1 мин); недостающую карточку задачи worker досылает там же. Необработанные апдейты
    старше 24 ч списываются без обработки только при старте worker (периодической очистки нет).
 2. **Классификация.** Polza (OpenAI-совместимый chat completions, JSON-ответ, Pydantic-валидация) возвращает
-   класс (`work` / `status` / `unknown`) и до 3 workspace. Невалидный ответ или недоступность → кнопки со всеми workspace.
-   В `mvp-04` классификации ещё нет: кнопки выбора проекта всегда показывают все workspace из `harness.yaml`
-   (поведение D-13 в минимальном виде); Polza подключается в `mvp-05`.
+   класс (`work` / `status` / `unknown`) и до 3 workspace (D-31, D-33). `work` с уверенностью ниже
+   `ROUTING_MIN_CONFIDENCE` (0.6) и любой класс с низкой уверенностью → вопрос «Сделать задачу / Показать статус»,
+   задача не создаётся до нажатия. `status` → список открытых задач из БД без LLM и без песочниц (D-34);
+   `unknown` → подсказка. Невалидный ответ, недоступность или отсутствие `POLZA_AI_KEY`/`POLZA_AI_MODEL` →
+   запасной путь: задача `choosing` и кнопки со всеми workspace (D-13). Каждое решение пишется в `routings`.
 3. **Выбор проекта.** Задача `plan` в `choosing`, бот присылает кнопки. Нажатие (дедуп по `callback_query.id`)
    → `planning`. Сообщение задачи одно, этапы дописываются через `editMessageText`.
 4. **Планировщик.** Worker берёт задачу (`FOR UPDATE SKIP LOCKED`), блокирует строку песочницы, возобновляет её,
@@ -163,6 +165,7 @@ implement:  backlog → active → testing → ready (MR создан) → merge
 | Дубли Telegram | Таблица `telegram_updates`, повторное нажатие не создаёт активацию (A4) |
 | Утечка токена бота | Токен — часть URL Bot API: ошибки адаптера Telegram без URL и текста исключения httpx; логгеры `httpx` и `httpcore` на WARNING (D-29) |
 | Утечка ключа STT | Ключ передаётся только заголовком `Authorization`; ошибки STT его не содержат |
+| Утечка ключа Polza и текста владельца наружу | Ключ только в заголовке `Authorization`; в Polza уходит `redact(text)` не больше 2000 символов, транспорт только `https://`; ответ модели валидируется, путь выбирает сервер (D-31, D-33) |
 | Персональные данные в очереди | В `payload` нет `from` и имён; `payload` обнуляется после обработки (D-27) |
 | Агент вызывает управление | Токен задачи, роль и проверка принадлежности задачи на каждом вызове (A2) |
 | Секреты в git/БД/Telegram | `security/redaction`: шаблоны + точные значения выданных кредов; блокирует коммит при находке (A3) |
@@ -193,7 +196,7 @@ gitlab (base_url). Ключи с сегментами `token`/`tokens`, `key`, `
 | `TELEGRAM_BOT_TOKEN` | **Обязательная.** Токен бота. Секрет |
 | `TELEGRAM_CHAT_ID` | **Обязательная.** Владелец бота: положительное целое число, id личного чата. Групповые чаты не поддерживаются (D-30) |
 | `TELEGRAM_WEBHOOK_SECRET` | **Обязательная.** Секрет webhook: от 32 до 256 символов `A-Za-z0-9_-` (`openssl rand -hex 32`), иначе сервер не стартует. Секрет |
-| `POLZA_AI_URL`, `POLZA_AI_KEY`, `POLZA_AI_MODEL`, `ROUTING_MIN_CONFIDENCE` | Классификация и порог уверенности (`POLZA_AI_KEY` — секрет) |
+| `POLZA_AI_URL`, `POLZA_AI_KEY`, `POLZA_AI_MODEL`, `ROUTING_MIN_CONFIDENCE` | Классификация и порог уверенности (mvp-05). `POLZA_AI_URL` по умолчанию `https://polza.ai/api/v1`, только `https://`; `POLZA_AI_KEY` — секрет; без ключа или модели маршрутизатор выключен (запасной путь); `ROUTING_MIN_CONFIDENCE` по умолчанию 0.6 (D-33) |
 | `STT_PROVIDER`, `STT_API_URL`, `STT_API_KEY`, `STT_MODEL` | Распознавание речи. `STT_PROVIDER` — только `openai` (OpenAI-совместимый протокол) или не задан; без `STT_API_URL`, `STT_API_KEY` и `STT_MODEL` голос не распознаётся, бот отвечает «пришлите текстом». Whisper через Polza по умолчанию; `STT_API_KEY` — секрет |
 | `VOICE_MAX_BYTES` | Лимит размера голосового файла в байтах: по умолчанию и максимум 20 МиБ (20971520), это лимит `getFile` Telegram. Больший файл не скачивается |
 | `NOVITA_API_KEY`, `NOVITA_DOMAIN` | Песочницы (`NOVITA_API_KEY` — секрет) |

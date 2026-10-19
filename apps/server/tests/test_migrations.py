@@ -66,3 +66,29 @@ def test_migrate_keeps_application_loggers_enabled(
     command.upgrade(_alembic_config(), "head")
 
     assert logger.disabled is False
+
+
+@pytest.mark.asyncio
+async def test_routings_schema_after_0003(migrated_database_url: str) -> None:
+    # Ревизия 0003 (mvp-05, D-32): решение без задачи, причина запасного пути, уточнение.
+    engine = create_async_engine(migrated_database_url)
+    try:
+        async with engine.connect() as connection:
+            columns, checks = await connection.run_sync(
+                lambda sync_conn: (
+                    inspect(sync_conn).get_columns("routings"),
+                    inspect(sync_conn).get_check_constraints("routings"),
+                )
+            )
+    finally:
+        await engine.dispose()
+
+    by_name = {column["name"]: column for column in columns}
+    assert by_name["task_id"]["nullable"] is True
+    assert by_name["decision"]["nullable"] is False
+    assert getattr(by_name["command_class"]["type"], "length", None) == 16
+    for name in ("error", "source_text", "resolved_at"):
+        assert name in by_name
+    check_names = {check["name"] for check in checks}
+    assert "ck_routings_decision" in check_names
+    assert "ck_routings_command_class" in check_names
