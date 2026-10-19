@@ -13,6 +13,9 @@
 | `harness-server worker` | Цикл опроса очереди задач. При старте восстанавливает апдейты Telegram: необработанные старше 1 мин обрабатываются заново, старше 24 ч списываются без обработки (payload очищается), недостающие карточки досылаются. Остановка по SIGTERM |
 | `harness-server migrate` | `alembic upgrade head`, нужен `DATABASE_URL` |
 | `harness-server telegram set-webhook` | Регистрирует webhook в Telegram: адрес `HARNESS_PUBLIC_URL` + `/telegram/webhook` (только https), секрет из `TELEGRAM_WEBHOOK_SECRET`. Выполняется после деплоя и при смене адреса; ошибки — код 1 без токена и секрета в выводе |
+| `harness-server sandbox status` | Строка песочницы из `harness.yaml`: статус и закреплённая задача (нужен `DATABASE_URL`) |
+| `harness-server sandbox bootstrap [--script deploy/sandbox/bootstrap.sh]` | Подготавливает песочницу скриптом: версии `claude`/`openspec`, каталоги, клоны. Нужны `NOVITA_API_KEY`, `GITLAB_TOKEN`; вывод проходит redaction |
+| `harness-server sandbox pause` / `resume` | Пауза и возобновление песочницы. Пауза отказывает (код 1), если за песочницей закреплена задача; `resume` сбрасывает `error` в `paused` после успешного connect, если за песочницей не закреплена задача; иначе — ручной разбор (см. [docs/deployment.md](../../docs/deployment.md)) |
 
 ## HTTP-эндпоинты задач
 
@@ -89,6 +92,19 @@ uv run pytest -m live apps/server/tests/test_telegram_live.py
 
 Результат прогона записать в PR. Чекбокс 4.3 закрывает владелец проекта после проверки.
 
+### Живая проверка песочницы (`-m live`)
+
+Тесты `tests/test_novita_live.py` работают с настоящей песочницей Novita и запускаются владельцем вручную.
+Нужны `LIVE_NOVITA_API_KEY`, `LIVE_NOVITA_SANDBOX_ID` и `LIVE_CLAUDE_CODE_OAUTH_TOKEN`; без них тесты
+пропускаются. Проверяют exec, запись и чтение файлов, pause/connect, многоходовой `claude -p` с
+`--max-turns 1` и изоляцию (hook из `.claude/settings.json` и сервер из `.mcp.json` worktree не срабатывают),
+а также отсутствие значения токена на диске песочницы (`grep -rF`).
+
+```bash
+LIVE_NOVITA_API_KEY=… LIVE_NOVITA_SANDBOX_ID=… LIVE_CLAUDE_CODE_OAUTH_TOKEN=… \
+  uv run pytest -m live apps/server/tests/test_novita_live.py
+```
+
 ## Маршрутизация текста владельца (mvp-05)
 
 Каждый текст и голос владельца классифицируется вызовом Polza (`adapters/polza`, D-31): класс `work`, `status`
@@ -136,6 +152,10 @@ src/harness_server/
 ├── services/status_report.py # ответ на запрос состояния из БД, без LLM (mvp-05)
 ├── services/prompts/routing.md # системный промпт маршрутизатора (mvp-05)
 ├── services/webhook.py  # webhook_url, register_webhook (set-webhook)
+├── services/sandboxes.py # токены задач, резервирование песочницы, активация, запуск и опрос агента, очистка, пауза (mvp-06)
+├── services/agent_result.py # parse_result (событие result потока), parse_exit_code, parse_pid (mvp-06)
+├── adapters/novita/     # protocol.py (SandboxProvider), client.py (NovitaSandboxProvider на AsyncSandbox), errors.py, fake.py (FakeSandbox) (mvp-06)
+├── worker/              # __init__.py (цикл worker), dispatcher.py (шаги песочницы), pipeline.py (контракт Pipeline, реестр пуст до mvp-08)
 ├── services/context.py  # BotContext: фабрика сессий, адаптеры, workspace, владелец
 ├── telegram/parse.py    # update → IncomingText | IncomingVoice | ButtonPress, dedup_key (без I/O)
 ├── telegram/render.py   # тексты, карточка задачи, callback_data, клавиатура (без I/O)

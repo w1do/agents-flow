@@ -81,19 +81,19 @@
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/polza/__init__.py",
-    "summary": "Пакет адаптера Polza: экспорт Router (Protocol), PolzaRouter и FakeRouter для сервисов маршрутизации.",
+    "summary": "Пакет адаптера Polza: реэкспорт Router, RouterReply, RouterError, PolzaRouter и FakeRouter; сервисы импортируют пакет, а не HTTP-клиент напрямую.",
     "role": "module",
     "contentHash": "f5555b4c4fb4f318976e0b57bb053a843751491307885e48372039727d958a5c",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.697Z"
+    "updatedAt": "2026-10-19T03:47:45.346Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/polza/client.py",
-    "summary": "PolzaRouter на httpx: POST {POLZA_AI_URL}/chat/completions, response_format json_object, дедлайн 10 с, максимум 2 запроса.",
+    "summary": "PolzaRouter: OpenAI-совместимый POST chat/completions, таймаут 10 с, одна повторная попытка при сбое, повтор без response_format после 400 (D-31).",
     "role": "module",
     "contentHash": "626a67b3066846bd0b15801193a12e87fdaf4fc218c67234974d10a6efce76d7",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.715Z"
+    "updatedAt": "2026-10-19T03:47:45.388Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/polza/fake.py",
@@ -105,11 +105,11 @@
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/polza/protocol.py",
-    "summary": "Protocol Router адаптера Polza: классификация текста задачи на work/status/unknown; сервисы зависят от этого Protocol, а не от SDK.",
+    "summary": "Protocol Router адаптера Polza: complete(system_prompt, user_text) возвращает непустой RouterReply; любая неудача — RouterError. Сервисы зависят от Protocol, не от SDK.",
     "role": "module",
     "contentHash": "06cc665e270812067a6f5aebd6cdd8820e7deb6c90b157816fb25cbcf968d0ef",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.706Z"
+    "updatedAt": "2026-10-19T03:47:45.366Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/stt/__init__.py",
@@ -281,11 +281,11 @@
   },
   {
     "relativePath": "apps/server/src/harness_server/db/models/planning.py",
-    "summary": "ORM-модели планирования: таблица routings (decision, task_id nullable, error, source_text, resolved_at) с CHECK, связь с задачами.",
+    "summary": "ORM Routing (таблица routings): решение маршрутизации по сообщению владельца, связь с задачей; записывается через services/routing.record_routing.",
     "role": "module",
     "contentHash": "e910c382e5b08a349948b408434c8beab0d0a68025ddbb0ec501a2552bcbbe30",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.588Z"
+    "updatedAt": "2026-10-19T03:47:45.482Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/db/models/sandboxes.py",
@@ -369,19 +369,19 @@
   },
   {
     "relativePath": "apps/server/src/harness_server/services/context.py",
-    "summary": "Сервис context: подготовка контекста (workspace-кандидаты, проекты) для маршрутизации и intake; изменён в mvp-05.",
+    "summary": "ServiceContext: поля router (адаптер Polza) и routing_min_confidence (ROUTING_MIN_CONFIDENCE); сервисы получают зависимости через этот контекст.",
     "role": "module",
     "contentHash": "c13b29ce3e5968a39663027b32f23c87aa12c993e9119d70251f91ce23fb104c",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.605Z"
+    "updatedAt": "2026-10-19T03:47:45.525Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/intake.py",
-    "summary": "Сервис intake: work → ранжированные кнопки workspace; confidence < ROUTING_MIN_CONFIDENCE → кнопки уточнения rt:<hex>:w|s; Polza недоступна → все workspace.",
+    "summary": "Приём апдейтов Telegram: _process_locked под замком telegram_updates; текст и голос идут в routing.classify, кнопки выбора workspace и уточнения rt обрабатываются здесь.",
     "role": "module",
     "contentHash": "47269f5f0416d1ded64d27bf6d9062fe695046ad80794a2de3ba641e58b07386",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.614Z"
+    "updatedAt": "2026-10-19T03:47:45.500Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/notify.py",
@@ -401,27 +401,27 @@
   },
   {
     "relativePath": "apps/server/src/harness_server/services/prompts/routing.md",
-    "summary": "Промпт классификации маршрутизации: work/status/unknown, требуемый JSON-ответ RoutingDecision для Polza с response_format json_object.",
-    "role": "doc",
+    "summary": "Системный промпт классификатора маршрутизации (дословно из design mvp-05); входит в wheel, его наличие проверяет команда сборки.",
+    "role": "config",
     "contentHash": "0275caa01c608767403a9fe9ac0d7018224c523605bbeb8e67f7bdfc1b249918",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.742Z"
+    "updatedAt": "2026-10-19T03:47:45.444Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/routing.py",
-    "summary": "Сервис routing: сборка промпта, извлечение JSON, валидация RoutingDecision, фильтр неизвестных id, ≤3 кандидата, запись routings, claim_clarification (FOR UPDATE).",
+    "summary": "Маршрутизация текста владельца: classify через Router, parse_decision, rank_candidates (≤3), record_routing, claim_clarification, attach_task, record_choice; пишет таблицу routings.",
     "role": "module",
     "contentHash": "9d1fdeaf20bbdb1d9388e0120b660e78d303f41992b0ce087dc2a29a3c5f7049",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.750Z"
+    "updatedAt": "2026-10-19T03:47:45.407Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/status_report.py",
-    "summary": "Ответ на команду status шаблоном из БД без LLM; текст проходит через security/redaction перед отправкой.",
+    "summary": "Отчёт по команде status: OPEN_STATUSES и выборка открытых задач владельца для ответа в Telegram; вызывается при классе status из маршрутизации.",
     "role": "module",
     "contentHash": "88be6d284f0541c2970dbe8176f8befc89a64c911bb9934e7e93b240dd562382",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.759Z"
+    "updatedAt": "2026-10-19T03:47:45.425Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/tasks.py",
@@ -441,11 +441,11 @@
   },
   {
     "relativePath": "apps/server/src/harness_server/settings.py",
-    "summary": "Настройки сервера: Polza (POLZA_AI_URL, ключ по ссылке из ENV) и ROUTING_MIN_CONFIDENCE (порог 0.6). Значения секретов в коде не хранятся.",
+    "summary": "Настройки маршрутизации mvp-05: ROUTING_MIN_CONFIDENCE в [0, 1] (по умолчанию 0.6), POLZA_AI_URL только https через _check_polza_ai_url; нарушение — SettingsError.",
     "role": "config",
-    "contentHash": "2ff09247fc09cbe5b29957f2d805725599b3f1d5d520e895f52a0b4effb8dc2e",
+    "contentHash": "f2a98c986f87a5df183cc62a2263900f7b607df83ba850d43caab6c94c8ea78c",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.631Z"
+    "updatedAt": "2026-10-19T03:47:45.542Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/telegram/__init__.py",
@@ -777,11 +777,11 @@
   },
   {
     "relativePath": "db/migrations/versions/20261018_0003_routing_decision.py",
-    "summary": "Миграция Alembic 0003 routing_decision: routings.task_id nullable, поля decision, error, source_text, resolved_at, CHECK на decision.",
-    "role": "config",
+    "summary": "Миграция ревизии 0003: создаёт таблицу routings для решений маршрутизации текста владельца; данных до mvp-05 в ней нет.",
+    "role": "module",
     "contentHash": "d2d8019fb8f34b9ac8d740fa842e5ffe340c6a4772b939b3fdc815fbd633c880",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.830Z"
+    "updatedAt": "2026-10-19T03:47:45.463Z"
   },
   {
     "relativePath": "deploy/db/docker-compose.yml",
@@ -809,11 +809,11 @@
   },
   {
     "relativePath": "docs/decisions.md",
-    "summary": "ADR-лог D-NN; mvp-06: D-35 async SDK Novita, D-36 изоляция hooks/MCP, D-37 auth-ENV и токен задачи, D-38 лимиты; D-39 веб-панель оператора в MVP (mvp-10).",
+    "summary": "Журнал решений D-NN проекта; новые записи по песочнице и провайдеру VPS (D-35…D-38, D-40) и уточнения D-16, D-17, D-31 по Polza и Novita.",
     "role": "doc",
-    "contentHash": "bbef47b915a8a5a505936290b4f0523d81b76822a3dd1355b69eb2c9f0df5bbd",
+    "contentHash": "2e2694350f6049e8aca64cfd4274ba0eb344c5a1e41d7ffd2a74883a606c4c31",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:01:10.875Z"
+    "updatedAt": "2026-10-19T03:48:17.046Z"
   },
   {
     "relativePath": "docs/deployment.md",
@@ -849,19 +849,19 @@
   },
   {
     "relativePath": "docs/novita.md",
-    "summary": "Итоги спайка Novita и Claude Code: возможности, лимиты, таблица; блок вывода запуска 4 помечен как text.",
+    "summary": "Результаты спайка Novita mvp-01: exec, файлы, пауза и возобновление, продление и таймаут, установка Claude Code; выводы для mvp-06 и ограничения паузы.",
     "role": "doc",
-    "contentHash": "8df17acbd040ee44f5bfaf1b7ab7c356be89fa44a144b9e7a7ec8cf99c4968aa",
+    "contentHash": "bca88d4e40b44d5fbf772bc8f8e68219bbe79917409f4ce14fe6aec7726dc952",
     "author": "agent",
-    "updatedAt": "2026-10-18T09:36:15.161Z"
+    "updatedAt": "2026-10-19T03:48:17.062Z"
   },
   {
     "relativePath": "docs/open-questions.md",
-    "summary": "Открытые вопросы ТЗ §17 (1–16) и раздел рисков: Postgres в общей dokploy-network с expose 5432, решение не принято.",
+    "summary": "Открытые вопросы ТЗ §17 (1–16) и раздел рисков; вопрос о Postgres в общей dokploy-network с expose 5432 не решён.",
     "role": "doc",
     "contentHash": "4f4d4113efdd6576939a88863e65db99f799395339af9d5f1adf6fcb4b80b3f6",
     "author": "agent",
-    "updatedAt": "2026-10-18T09:36:15.188Z"
+    "updatedAt": "2026-10-19T03:48:17.077Z"
   },
   {
     "relativePath": "docs/tz/tz-v5.md",
@@ -1753,27 +1753,27 @@
   },
   {
     "relativePath": "openspec/changes/mvp-06-sandbox-runtime/design.md",
-    "summary": "Дизайн OpenSpec mvp-06-sandbox-runtime: рантайм песочницы Novita, пауза/возобновление, таймауты, запуск Claude Code; приведён к итогам спайка mvp-01.",
+    "summary": "Design mvp-06-sandbox-runtime: одна песочница из config, диспетчер reserve/activate, реестр PIPELINES (пуст в mvp-06), токены задачи, решения 1–17, D-35…D-38.",
     "role": "doc",
-    "contentHash": "7520c18dccb6f69ef594f69a00ddc45e58fb9ccb438519dc36068bd1a8f06f76",
+    "contentHash": "eb442645055fa386a669607c0955ee574a9128236d72cbaf486989d9dce42bbd",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:27:10.178Z"
+    "updatedAt": "2026-10-19T03:46:40.239Z"
   },
   {
     "relativePath": "openspec/changes/mvp-06-sandbox-runtime/proposal.md",
-    "summary": "Предложение OpenSpec mvp-06-sandbox-runtime: рантайм песочницы Novita по итогам спайка mvp-01; цель, границы, открытые вопросы о цене паузы и многоходовом usage.",
+    "summary": "Proposal mvp-06-sandbox-runtime: SandboxProvider (Novita), bootstrap песочницы, activate/reserve под задачу с SKIP LOCKED, токены задачи, запуск агента exec.",
     "role": "doc",
-    "contentHash": "e5ae91f5ddab796969a2af85b0607d4ba3546c437890aea1502eb4c53f413074",
+    "contentHash": "de88c03166943ab6aae810df670a6b0e1fd6a0322d7825b347bc7c1bc1c91d18",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:27:10.186Z"
+    "updatedAt": "2026-10-19T03:46:40.222Z"
   },
   {
     "relativePath": "openspec/changes/mvp-06-sandbox-runtime/specs/sandbox-runtime/spec.md",
-    "summary": "Delta-спека sandbox-runtime (mvp-06-sandbox-runtime): требования и сценарии WHEN/THEN",
+    "summary": "Спецификация sandbox-runtime mvp-06: активация песочницы под задачу, занятость, ошибка песочницы, повторный bootstrap, очистка токенов и паузы.",
     "role": "doc",
-    "contentHash": "9de0d0d774711ec52c1b4d7d75df021906ff8a45c9c2b9c148e4a3c78f83b834",
+    "contentHash": "5dea9278f1ad4aabccfe5d77b2c9079eed11823ca0ff6c11178af764a9d8aa15",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.512Z"
+    "updatedAt": "2026-10-19T03:46:40.253Z"
   },
   {
     "relativePath": "openspec/changes/mvp-06-sandbox-runtime/tasks.md",
@@ -1782,6 +1782,38 @@
     "contentHash": "6886da887fcb3c05dc4bc50297f9616e10c7be62b709863d4b2eddd05bf8c6e3",
     "author": "agent",
     "updatedAt": "2026-10-18T08:27:10.195Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-06b-vps-provider/design.md",
+    "summary": "Design mvp-06b-vps-provider: sandbox-рантайм над Protocol SandboxProvider для VPS по SSH; раскладка ~/.harness/{bin,tasks,worktrees}, ~/work, запуск агента setsid nohup bash run.sh (D-35…D-38, D-40).",
+    "role": "doc",
+    "contentHash": "ff673a920bfbe01edd9ac5816c7f80dfe095f47821a0db589985f8e31711ddcd",
+    "author": "agent",
+    "updatedAt": "2026-10-19T03:48:17.028Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-06b-vps-provider/proposal.md",
+    "summary": "Proposal mvp-06b-vps-provider: провайдер песочницы VPS по SSH (D-40), вынос SandboxProvider в adapters/sandbox; начинается после принятия mvp-06.",
+    "role": "doc",
+    "contentHash": "3501982373b8468c28c09991a14d3e205c7a4b62628f171271ca22c5c06961da",
+    "author": "agent",
+    "updatedAt": "2026-10-19T03:48:16.954Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-06b-vps-provider/specs/sandbox-runtime/spec.md",
+    "summary": "Спецификация sandbox-runtime mvp-06b: требования к песочнице на VPS по SSH, запуску агента через setsid nohup и раскладке ~/.harness.",
+    "role": "doc",
+    "contentHash": "354b3ebe4ab6c682bdabced5924d50d9431d5b0c894b64b347e6dc62af83c937",
+    "author": "agent",
+    "updatedAt": "2026-10-19T03:48:16.991Z"
+  },
+  {
+    "relativePath": "openspec/changes/mvp-06b-vps-provider/tasks.md",
+    "summary": "Чек-лист mvp-06b-vps-provider: перенос SandboxProvider в adapters/sandbox (1.1), провайдер VPS по SSH, тесты на фейке; все задачи открыты.",
+    "role": "doc",
+    "contentHash": "a879c507041192d0dc12f0cf3b1f5adb87ba93b99724fde0844a40305cd601ba",
+    "author": "agent",
+    "updatedAt": "2026-10-19T03:48:17.009Z"
   },
   {
     "relativePath": "openspec/changes/mvp-07-agents-flow-mcp/.openspec.yaml",
@@ -2657,11 +2689,11 @@
   },
   {
     "relativePath": "shared/src/harness_shared/routing.py",
-    "summary": "Pydantic-модель RoutingDecision и кандидатов маршрутизации в harness_shared: общий тип для MCP, API и консоли, без дублирования.",
+    "summary": "Общие модели маршрутизации mvp-05: CommandClass (work/status/unknown), RoutingDecisionKind (auto/clarify/fallback), WorkspaceCandidate, RoutingDecision и валидация JSON ответа модели.",
     "role": "module",
     "contentHash": "1922ba0a6862d8c990d783191f17c2d5e7f5e947ed8e7156b524d16e15263372",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.840Z"
+    "updatedAt": "2026-10-19T03:47:45.325Z"
   },
   {
     "relativePath": "shared/src/harness_shared/sandboxes.py",

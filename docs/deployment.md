@@ -44,5 +44,26 @@ Job `deploy:dokploy` не добавляет `curl -v` и `--trace`: при ош
    `TELEGRAM_WEBHOOK_SECRET`. Запускается в контейнере `server` после деплоя и при каждой смене `HARNESS_PUBLIC_URL`
    или секрета. `HARNESS_PUBLIC_URL` должен быть https без учётных данных, иначе команда завершится с кодом 1 и
    понятным сообщением. Вывод команды токен и секрет не содержат.
-3. Создать песочницу в Novita вручную, выполнить в ней `deploy/sandbox/bootstrap.sh`, записать id в `harness.yaml`.
+3. Создать песочницу в Novita вручную, записать id в `harness.yaml` (`sandbox.provider_id`), затем выполнить
+   `harness-server sandbox bootstrap`: команда загружает `deploy/sandbox/bootstrap.sh` и запускает его с версиями
+   из конфига и парами `<workspace_id>=<clone_url>`. Скрипт идемпотентен: повторный запуск безопасен.
 4. `harness-server sandbox pause` — песочница уходит в простой до первой задачи.
+
+### Песочница в `error` с закреплённой задачей
+
+`sandbox resume` отвечает «занята», если за песочницей закреплена задача. Владелец проверяет состояние
+(`harness-server sandbox status`, событие задачи через `GET /tasks/{id}` с `HARNESS_ADMIN_TOKEN`), убеждается,
+что агент в песочнице не работает, и затем вручную в БД сбрасывает `current_task_id` и статус песочницы.
+Это разовое действие владельца, не команда CLI; SQL с конкретными значениями в документацию не добавляется.
+
+## Песочница: токены, изоляция и allowlist (mvp-06)
+
+- Токен подписки `CLAUDE_CODE_OAUTH_TOKEN` и `GITLAB_TOKEN` живут только в ENV Dokploy. Агент получает их
+  в env одной команды запуска, в файлы песочницы они не пишутся (проверяется тестами и live-тестом).
+- Ротация `CLAUDE_CODE_OAUTH_TOKEN` не реже 90 дней и сразу при подозрении на утечку (`claude setup-token`
+  заново, затем обновить ENV и перезапустить worker).
+- Рекомендуется отдельный аккаунт или подписка под харнесс: токен доступен процессу агента, а исходящий HTTPS открыт.
+- Исходящий allowlist Novita (`network.allow_out`, IP/CIDR) рекомендуется ограничить адресами GitLab, Telegram,
+  Anthropic и Novita. Код не применяет его в MVP: песочница создаётся вручную (D-38).
+- Claude Code в песочнице запускается с `--setting-sources user` и `--strict-mcp-config`: hooks и MCP-серверы
+  репозитория задачи не выполняются (D-36). Bootstrap не кладёт hooks и plugins в профиль песочницы.

@@ -10,7 +10,7 @@
 |---|---|
 | Окружение Alembic (async engine, URL из `DATABASE_URL`) | `db/migrations/env.py` |
 | Шаблон ревизии | `db/migrations/script.py.mako` |
-| Ревизии | `db/migrations/versions/`: `0001_initial` (9 таблиц MVP), `0002` (`telegram_updates.payload`), `0003` (`routings`, mvp-05) |
+| Ревизии | `db/migrations/versions/`: `0001_initial` (9 таблиц MVP), `0002` (`telegram_updates.payload`), `0003` (`routings`, mvp-05), `0004` (`sandboxes.agent_started_at`, `sandboxes.agent_pid`, mvp-06) |
 | Конфиг | `alembic.ini` в корне |
 
 Применить миграции до head:
@@ -58,6 +58,15 @@ testcontainers или берут `TEST_DATABASE_URL` и применяют ми�
 Откат: `uv run alembic downgrade 0002` удаляет колонки `decision`, `error`, `source_text`, `resolved_at` и строки
 `routings` без задачи (решения status/unknown и ожидающие уточнения тексты). Перед откатом учтите, что эти строки
 удаляются без сохранения.
+
+## Ревизия 0004 (mvp-06)
+
+Миграция `20261019_0004_sandbox_agent_run.py`, ручная, без импорта кода приложения (D-41). Добавляет в `sandboxes`
+две nullable-колонки без server_default: `agent_started_at` (TIMESTAMPTZ) и `agent_pid` (INTEGER). Серверный учёт
+запуска агента: таймаут и kill работают по ним, файлам песочницы не доверяем.
+
+Откат: `uv run alembic downgrade 0003` удаляет обе колонки. Сохранённое время запуска и pid теряются; перед откатом
+агент в песочнице должен быть завершён или очищен задачей.
 
 ## Локальный Postgres
 

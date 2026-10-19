@@ -104,13 +104,22 @@ def parse_exit_code(status_text: str) -> int | None:
     return code
 
 
+LINUX_PID_MAX = 2**22
+
+
 def parse_pid(pid_text: str) -> int | None:
-    """pid из файла pid. Пустой или нечисловой файл — None (процесс считается не запущенным)."""
+    """pid из файла pid или stdout команды запуска. Пустое, нечисловое или вне диапазона — None.
+
+    Только ASCII-цифры: str.isdigit() пропускает, например, «²», и int() на нём падает. Верхняя
+    граница — максимум pid Linux (2**22): большее не влезает в колонку Integer и не может быть pid.
+    pid ≤ 1 отвергается: `kill -0 -- -1` проверяет все процессы пользователя и всегда успешен,
+    а 0 — группа самого вызывающего. Такой pid не может быть группой агента.
+    """
     stripped = pid_text.strip()
-    if not stripped.isdigit():
+    if not (stripped.isascii() and stripped.isdigit()):
         return None
     value = int(stripped)
-    return value if value > 0 else None
+    return value if 2 <= value <= LINUX_PID_MAX else None
 
 
 def truncate_log_text(text: str) -> str:

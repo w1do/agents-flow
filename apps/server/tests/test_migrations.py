@@ -92,3 +92,20 @@ async def test_routings_schema_after_0003(migrated_database_url: str) -> None:
     check_names = {check["name"] for check in checks}
     assert "ck_routings_decision" in check_names
     assert "ck_routings_command_class" in check_names
+
+
+@pytest.mark.asyncio
+async def test_sandboxes_agent_columns_after_0004(migrated_database_url: str) -> None:
+    # Ревизия 0004 (mvp-06, D-41): серверный учёт запуска агента — время и pid, оба nullable.
+    engine = create_async_engine(migrated_database_url)
+    try:
+        async with engine.connect() as connection:
+            columns = await connection.run_sync(
+                lambda sync_conn: inspect(sync_conn).get_columns("sandboxes")
+            )
+    finally:
+        await engine.dispose()
+
+    by_name = {column["name"]: column for column in columns}
+    assert by_name["agent_started_at"]["nullable"] is True
+    assert by_name["agent_pid"]["nullable"] is True
