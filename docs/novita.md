@@ -59,7 +59,7 @@ SIGTERM обрабатывается как завершение с `finally`, �
 | Создание | `Sandbox.create(template=None, timeout=..., metadata={...}, envs=..., lifecycle=...)` | `timeout` в секундах, по умолчанию 300 (по docstring). `template=None` — шаблон SDK (node и npm есть) |
 | Exec переднего плана | `sbx.commands.run(cmd, envs=..., timeout=60)` → `CommandResult` | Поля `stdout`, `stderr`, `exit_code`, `error`. `timeout` — таймаут соединения в секундах, `0` без лимита |
 | Ненулевой код | исключение `CommandExitException` | Подтверждено: `exit_code=3`, `stderr` заполнен. Подкласс `SandboxException`, это исключение, а не возврат кода |
-| Фоновый процесс | `sbx.commands.run("nohup ... &  echo $! > pid")` | Подтверждено. Шаг 1.3 использует обычный `run` с pid-файлом, потому что `background=True` не даёт pid-файла |
+| Фоновый процесс | `sbx.commands.run("nohup ... &  echo $! > pid")` | Подтверждено. `background=True` возвращает `CommandHandle` с `pid`, но handle теряется при рестарте worker, поэтому mvp-06 пишет pid-файл (D-35) |
 | Запись файла | `sbx.files.write(path, data)` → `WriteInfo` | Подтверждено: файл читается обратно после resume |
 | Чтение файла | `sbx.files.read(path)` → `str` | Подтверждено. Нет файла → исключение, поэтому чтение в проверках обёрнуто |
 | Пауза | `sbx.pause()` → `None` | Подтверждено. `beta_pause()` — устаревший алиас. Docstring врёт про «возвращает Sandbox ID» |
@@ -184,7 +184,7 @@ cleanup: OK remaining=0
 | node и npm в шаблоне по умолчанию | да | `node -v`, `npm -v` | Установка claude через npm прошла без кастомного образа |
 | Лимит vCPU команды | да | ошибка 429 при create | Квота команды 10 vCPU. Занято рабочей песочницей оркестратора 8 vCPU, спайковой 2 vCPU. Для задач свободно примерно 2 vCPU |
 | Установка claude | да | `npm install -g @anthropic-ai/claude-code@2.1.292` | Прошла в запуске 3 |
-| `--max-turns` | частично | `claude -p ... --max-turns 1` | Не виден в `claude --help` (2.1.292 и 2.1.302 локально), но принимается: `max_turns_accepted=yes`, exit 0. Соблюдение лимита (`error_max_turns`) не проверено |
+| `--max-turns` | частично | `claude -p ... --max-turns 1` | Не виден в `claude --help` (2.1.292 и 2.1.302 локально), но задокументирован в cli-reference («Exits with an error when the limit is reached») и принимается: `max_turns_accepted=yes`, exit 0. Соблюдение лимита (`error_max_turns`) живьём не проверено |
 | `--bare` | частично | флаг виден в `--help` | По документации `--bare` не читает OAuth-токен. Живьём с токеном не проверено. Спайк запускает без `--bare` |
 | `stream-json` | частично | `claude -p ... --output-format stream-json --verbose` | Один ход: событий 4, сообщений 1, `result=yes`. Многоходовой вывод не проверен |
 | `stream-json` без `--verbose` | да, падает | `--output-format stream-json` без `--verbose` | `exit_code=1`, stderr упоминает `verbose`. `--verbose` обязателен |
@@ -227,11 +227,19 @@ cleanup: OK remaining=0
   не читает OAuth-токен. Поэтому запуск без `--bare`. Живьём с токеном `--bare` не проверяли.
 - **Приоритет `ANTHROPIC_API_KEY`.** По документации Claude Code этот ключ имеет приоритет над OAuth-токеном.
   Поэтому в песочнице он не задаётся. Спайком не проверялось.
-- **stream-json.** По документации: одно сообщение может дать несколько событий `assistant` с одним
-  `message.id`, поэтому дедуплицировать по `message.id` и брать последнее вхождение. Сумма input по уникальным id
+- **stream-json.** Предположение спайка: одно сообщение может дать несколько событий `assistant` с одним
+  `message.id`, поэтому дедуплицировать по `message.id` и брать последнее вхождение. Исследование mvp-06: в Python SDK
+  `message_id` описан как общий для всех сообщений одного хода, поэтому итог берётся из `result.usage` (D-37), а
+  поведение `message.id` фиксирует live-тест mvp-06. Сумма input по уникальным id
   сверяется с `usage` события `result`. Подтверждено на одном ходе, многоходовой вывод не проверен.
 - **Флаги.** `--output-format stream-json` требует `--verbose` (подтверждено). `--max-turns` не виден в
-  `--help`, принимается, соблюдение лимита не проверено.
+  `--help`, но задокументирован в cli-reference; соблюдение лимита не проверено.
+- **Изоляция.** Без `--bare` режим `-p` выполняет hooks из `.claude/settings.json` и подключает `.mcp.json` рабочего
+  каталога без диалога доверия (документация headless). Запуск — с `--setting-sources user` и `--strict-mcp-config` (D-36).
+- **Приоритет auth** (документация authentication): облачный провайдер, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_API_KEY`,
+  `apiKeyHelper`, `CLAUDE_CODE_OAUTH_TOKEN`. `run.sh` делает `unset` первых двух (D-37).
+- **Исходящий трафик.** Novita поддерживает `network={allow_out, deny_out}` при создании и `set_network` (IP и CIDR;
+  доменные имена в core SDK не подтверждены). Рекомендация — в `docs/deployment.md` (D-38).
 
 ## Не проверено живьём
 
