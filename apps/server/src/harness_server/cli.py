@@ -15,11 +15,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from harness_server import wiring
 from harness_server.adapters.novita import SandboxError, SandboxProvider
 from harness_server.adapters.telegram import TelegramError
+from harness_server.adapters.vault import VaultError
 from harness_server.app import create_app
 from harness_server.config import ConfigError, HarnessConfig, load_config
 from harness_server.db.session import create_engine, create_session_factory
 from harness_server.security.redaction import redact
 from harness_server.services import sandboxes
+from harness_server.services import secrets as secret_refs
 from harness_server.services.webhook import register_webhook, webhook_url
 from harness_server.settings import Settings, SettingsError, load_settings
 from harness_server.worker import serve_worker
@@ -216,16 +218,14 @@ def sandbox_resume() -> None:
 
 @sandbox_app.command("bootstrap")
 def sandbox_bootstrap(script: Path = Path("deploy/sandbox/bootstrap.sh")) -> None:
-    """Подготавливает песочницу скриптом bootstrap.sh: версии, каталоги, клоны репозиториев.
+    """Подготавливает песочницу скриптом bootstrap.sh: версии, каталоги, клоны и память.
 
-    Токен GitLab передаётся только в env команды; вывод проходит redaction.
+    Ключи GitLab и embeddings берутся из vault по ссылкам harness.yaml (или GITLAB_TOKEN из ENV) и
+    передаются только в env команды; вывод проходит redaction, в том числе по значениям из vault.
     """
     settings, config = _load_or_exit()
     _configure_logging()
     provider = _provider_or_exit(settings)
-    if settings.gitlab_token is None:
-        typer.echo("Ошибка конфигурации: GITLAB_TOKEN: не задан", err=True)
-        raise typer.Exit(code=1)
     try:
         text = script.read_text(encoding="utf-8")
     except OSError:
@@ -237,6 +237,32 @@ def sandbox_bootstrap(script: Path = Path("deploy/sandbox/bootstrap.sh")) -> Non
     except sandboxes.SandboxBusy as exc:
         typer.echo(f"Ошибка: песочница занята задачей {exc.task_id}", err=True)
         raise typer.Exit(code=1) from None
+    vault = wiring.build_vault(settings)
+    try:
+        gitlab_key = asyncio.run(
+            secret_refs.resolve(
+                vault,
+                config.gitlab.access_ref,
+                fallback=settings.gitlab_token,
+            )
+        )
+        memory = config.sandbox.memory
+        embedding_key = (
+            asyncio.run(secret_refs.resolve(vault, memory.embedding_ref, fallback=None))
+            if memory is not None
+            else None
+        )
+    except VaultError as exc:
+        # Строка песочницы не меняется: ошибка до любого вызова провайдера.
+        typer.echo(f"Ошибка vault: {exc.reason}", err=True)
+        raise typer.Exit(code=1) from None
+    if gitlab_key is None:
+        typer.echo("Ошибка конфигурации: нужен gitlab.access_ref или GITLAB_TOKEN", err=True)
+        raise typer.Exit(code=1)
+    # Значения из vault известны только здесь: redaction вывода покрывает их вместе с ENV.
+    vault_values = tuple(
+        value.get_secret_value() for value in (gitlab_key, embedding_key) if value is not None
+    )
     try:
         result = asyncio.run(
             sandboxes.bootstrap(
@@ -244,14 +270,18 @@ def sandbox_bootstrap(script: Path = Path("deploy/sandbox/bootstrap.sh")) -> Non
                 config.sandbox.provider_id,
                 config,
                 script=text,
-                gitlab_token=settings.gitlab_token,
+                gitlab_token=gitlab_key,
+                memory_version=memory.version if memory is not None else None,
+                embedding_key=embedding_key,
             )
         )
     except SandboxError as exc:
         typer.echo(f"Ошибка песочницы: {type(exc).__name__}", err=True)
         raise typer.Exit(code=1) from None
     if result.exit_code != 0:
-        detail = redact(result.stderr, extra_values=wiring.secret_values(settings))
+        detail = redact(
+            result.stderr, extra_values=(*wiring.secret_values(settings), *vault_values)
+        )
         typer.echo(f"bootstrap завершился с кодом {result.exit_code}\n{detail[-2000:]}", err=True)
         raise typer.Exit(code=1)
     typer.echo("bootstrap выполнен")

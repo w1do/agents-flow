@@ -945,3 +945,147 @@ async def test_resume_active_without_task_repairs(committed_session_factory: Fac
     async with committed_session_factory() as session:
         row = await sandboxes.sandbox_status(session, PROVIDER_ID)
     assert row is not None and row.status == SandboxStatus.PAUSED
+
+
+# --- sandbox-profile: память проекта, extra_envs, bootstrap с памятью (design 3, 4) ---
+
+EMBEDDING = "emb-test-value-0123456789abcdef"
+
+
+async def test_activate_runs_memory_sync_with_envs_and_detached_default_branch() -> None:
+    task = _orphan_task()
+    fake = _fake()
+
+    await sandboxes.activate(
+        fake,
+        PROVIDER_ID,
+        task,
+        base_ref="main",
+        timeout_min=60,
+        gitlab_token=SecretStr(GITLAB),
+        default_branch="develop",
+        memory_envs={"EMBEDDING_API_KEY": EMBEDDING},
+    )
+
+    memory = [e for e in fake.journal if e.cmd and "memory sync" in e.cmd]
+    assert len(memory) == 1
+    cmd = memory[0].cmd or ""
+    assert f"{HOME}/.harness/memory/demo.ready" in cmd
+    assert "origin/develop" in cmd
+    assert "checkout --quiet --detach --force" in cmd
+    assert memory[0].env_keys == ("EMBEDDING_API_KEY",)
+    assert EMBEDDING not in cmd
+    assert fake.received_env("EMBEDDING_API_KEY") == EMBEDDING
+    assert fake.files_containing(EMBEDDING) == []
+    # Память идёт после fetch и до worktree add.
+    order = [e.cmd or "" for e in fake.journal]
+    assert order.index(cmd) > next(i for i, c in enumerate(order) if "fetch origin" in c)
+    assert next(i for i, c in enumerate(order) if "worktree add" in c) > order.index(cmd)
+
+
+async def test_activate_without_memory_envs_skips_memory_step() -> None:
+    fake = _fake()
+
+    await sandboxes.activate(
+        fake,
+        PROVIDER_ID,
+        _orphan_task(),
+        base_ref="main",
+        timeout_min=60,
+        gitlab_token=SecretStr(GITLAB),
+    )
+
+    assert not [e for e in fake.journal if e.cmd and "memory" in e.cmd]
+
+
+async def test_failed_memory_sync_does_not_fail_activation() -> None:
+    task = _orphan_task()
+    fake = _fake()
+    fake.respond("if [ -f", exit_code=1, stderr="memory failed")
+
+    await sandboxes.activate(
+        fake,
+        PROVIDER_ID,
+        task,
+        base_ref="main",
+        timeout_min=60,
+        gitlab_token=SecretStr(GITLAB),
+        memory_envs={},
+    )
+
+    assert [e for e in fake.journal if e.cmd and "worktree add -B" in e.cmd]
+
+
+async def test_run_agent_passes_extra_envs_and_memory_project_to_launch_only(
+    committed_session_factory: Factory,
+) -> None:
+    task = await _task(committed_session_factory)
+    fake = _fake()
+
+    await _start_with(committed_session_factory, fake, task, memory_enabled=True)
+
+    launch = [e for e in fake.journal if e.cmd and "setsid nohup" in e.cmd]
+    assert launch[0].env_keys == (
+        "AGENTS_FLOW_TOKEN",
+        "AGENTS_FLOW_URL",
+        "CLAUDE_CODE_OAUTH_TOKEN",
+        "HARNESS_MEMORY_PROJECT",
+    )
+    assert fake.received_env("HARNESS_MEMORY_PROJECT") == REPO
+    assert fake.files_containing(OAUTH) == []
+
+
+async def test_run_agent_without_memory_has_no_memory_project_env(
+    committed_session_factory: Factory,
+) -> None:
+    task = await _task(committed_session_factory)
+    fake = _fake()
+
+    await _start_with(committed_session_factory, fake, task, extra={"EXTRA_VAR": "x-value"})
+
+    launch = [e for e in fake.journal if e.cmd and "setsid nohup" in e.cmd]
+    assert "HARNESS_MEMORY_PROJECT" not in launch[0].env_keys
+    assert "EXTRA_VAR" in launch[0].env_keys
+
+
+async def test_bootstrap_with_memory_keeps_embedding_key_off_disk() -> None:
+    fake = FakeSandbox(sandbox_id=PROVIDER_ID)
+
+    await sandboxes.bootstrap(
+        fake,
+        PROVIDER_ID,
+        CONFIG,
+        script="echo\n",
+        gitlab_token=SecretStr(GITLAB),
+        memory_version="1.2.3",
+        embedding_key=SecretStr(EMBEDDING),
+    )
+
+    assert fake.files_containing(EMBEDDING) == []
+    assert EMBEDDING not in " ".join(e.cmd or "" for e in fake.journal)
+
+
+async def _start_with(
+    factory: Factory,
+    fake: FakeSandbox,
+    task: Task,
+    *,
+    memory_enabled: bool = False,
+    extra: dict[str, str] | None = None,
+) -> sandboxes.AgentStart:
+    await _ensure(factory)
+    async with factory() as session:
+        return await sandboxes.run_agent(
+            session,
+            fake,
+            PROVIDER_ID,
+            task,
+            prompt="сделай задачу",
+            max_turns=50,
+            timeout_min=60,
+            secret_key=SecretStr(SECRET_KEY),
+            oauth_token=SecretStr(OAUTH),
+            agents_flow_url="https://harness.example/mcp",
+            extra_envs=extra,
+            memory_enabled=memory_enabled,
+        )

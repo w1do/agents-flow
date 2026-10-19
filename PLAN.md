@@ -17,6 +17,11 @@
   APPROVED. Открыто: задача 5.2 (live-проверка 10 фраз; модель выбирает владелец, чекбокс закрывает владелец) и 6.1
   (project-memory). Низкие находки ревью зафиксированы как известные ограничения в `design.md` (Risks).
   Статус `done` после подтверждения 5.2 и архивации.
+- На ревью: `sandbox-profile` (6c, ветка `sandbox-profile`). Разделы 1–3 OpenSpec реализованы, проверки зелёные
+  (`./tools/harness check`: ruff, format, mypy strict, shellcheck, pytest 814 passed / 10 deselected live;
+  `openspec validate --strict` и `--all` 51/51), ревью и security review APPROVED после одного цикла исправлений.
+  Вопросы 1–2 `proposal.md` закрыты владельцем (D-50); вопрос 3 (ресурсы) открыт до live 5.3. Задача 4.1 (project
+  memory) сделана. Следующий шаг — live раздел 5. Статус `done` после live-проверок и архивации.
 - В работе: `mvp-06-sandbox-runtime` (ветка `mvp-06-sandbox-runtime` от `mvp-05`, решение владельца). OpenSpec
   уточнён (D-35…D-38), идёт реализация.
 - Решение 2026-10-19 (D-39): веб-панель оператора входит в MVP как `mvp-10-operator-console` после `mvp-09`.
@@ -37,7 +42,7 @@ MR создан → сообщение в Telegram. Тот же поток ви�
 | 4 | [`mvp-04-telegram-intake`](openspec/changes/archive/2026-10-18-mvp-04-telegram-intake/) | Webhook, голос→текст, кнопки проекта, одно сообщение | telegram-bot, speech-to-text | mvp-03 | done |
 | 5 | [`mvp-05-command-routing`](openspec/changes/mvp-05-command-routing/) | Polza: классы work/status, кандидаты, запасной путь | command-routing | mvp-04 | review |
 | 6 | [`mvp-06-sandbox-runtime`](openspec/changes/mvp-06-sandbox-runtime/) | Адаптер Novita, bootstrap, запуск агента, очистка, пауза | sandbox-runtime | mvp-01, mvp-03 | review |
-| 6c | [`sandbox-profile`](openspec/changes/sandbox-profile/) | Bootstrap без участия владельца: Node 22, Docker, memory-agent, ключи из vault, память проекта (D-43…D-45, D-47, D-48) | sandbox-profile, sandbox-runtime | mvp-06 | todo |
+| 6c | [`sandbox-profile`](openspec/changes/sandbox-profile/) | Bootstrap без участия владельца: Node 22, Docker, memory-agent, ключи из vault, память проекта (D-43…D-45, D-47, D-48). Код и тесты разделов 1–3 готовы; live-раздел 5 ждёт ответов владельца (вопросы 1–2 в `proposal.md`) | sandbox-profile, sandbox-runtime | mvp-06 | review |
 | 6d | [`integrations-mcp-config`](openspec/changes/integrations-mcp-config/) | Раздел MCP на платформе, генерация `mcp.json` агента на каждый запуск, CLI `harness-server mcp` (D-46) | integrations, sandbox-runtime | sandbox-profile | todo |
 | 7 | [`mvp-07-agents-flow-mcp`](openspec/changes/mvp-07-agents-flow-mcp/) | MCP: токен задачи, report_task, sync_spec, create_task | agents-flow-mcp | mvp-03, mvp-06 | todo |
 | 8 | [`mvp-08-spec-planning`](openspec/changes/mvp-08-spec-planning/) | Планировщик OpenSpec → задачи в backlog | spec-planning | mvp-05, mvp-06, mvp-07 | todo |

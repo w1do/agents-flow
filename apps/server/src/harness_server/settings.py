@@ -72,6 +72,9 @@ class Settings(BaseSettings):
     worker_poll_interval_sec: float = Field(default=5.0, gt=0)
     # Интервал опроса агента в песочнице (mvp-06, D-38): реже очереди, агент работает минуты.
     agent_poll_interval_sec: float = Field(default=15.0, gt=0)
+    # Vault с ключами владельца (D-45): MCP-сервер по Streamable HTTP. Оба поля нужны вместе.
+    vault_mcp_url: str | None = None
+    vault_mcp_token: SecretStr | None = None
 
     @field_validator("harness_secret_key")
     @classmethod
@@ -125,6 +128,14 @@ class Settings(BaseSettings):
     @classmethod
     def _check_polza_ai_url(cls, value: str | None) -> str | None:
         # Текст владельца уходит во внешний сервис: только https, как у STT (D-31).
+        if value is not None and urlsplit(value).scheme != "https":
+            raise ValueError("должен начинаться с https://")
+        return value
+
+    @field_validator("vault_mcp_url")
+    @classmethod
+    def _check_vault_mcp_url(cls, value: str | None) -> str | None:
+        # Токен vault и ответы с секретами не должны уходить по открытому каналу (D-45).
         if value is not None and urlsplit(value).scheme != "https":
             raise ValueError("должен начинаться с https://")
         return value

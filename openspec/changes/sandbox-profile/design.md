@@ -61,6 +61,8 @@ vault и не пишутся на диск песочницы; у агента �
 - `settings.py`: `vault_mcp_url: str | None` (валидатор: только `https://`), `vault_mcp_token: SecretStr | None`.
   `wiring.build_vault(settings) -> SecretVault | None` — `None`, если URL или токен не задан.
 - Доступ сервера к vault — без подтверждения (решение владельца). Кэша нет: запрос на каждую команду, которой ключ нужен.
+- Отклонение при реализации: `httpx2==2.14.0` объявлен в `apps/server/pyproject.toml` напрямую (закреплённая версия,
+  а не только транзитивная зависимость `mcp`); `mcp==2.3.0` точный (D-45).
 - `async resolve(vault: SecretVault | None, ref: str | None, *, fallback: SecretStr | None) -> SecretStr | None` в новом
   `services/secrets.py`: `ref is None` → `fallback`; ссылка есть, а `vault is None` → `VaultError("not_configured")`;
   иначе `vault.get(parse_vault_ref(ref))`.
@@ -114,6 +116,12 @@ vault и не пишутся на диск песочницы; у агента �
      `memory init --path ~/work/<id>`; после успеха `mkdir -p ~/.harness/memory && touch ~/.harness/memory/<id>.ready`.
      `EMBEDDING_API_KEY` приходит только в env команды bootstrap; в `global.env` и `.memory/.env` скрипт его не пишет.
 
+Отклонения при реализации (2026-10-19, приняты ревью):
+- перед установками apt выполняется `apt-get update`;
+- ключи `GITLAB_TOKEN` и `EMBEDDING_API_KEY` сохраняются в обычные shell-переменные (не экспортируются) и снимаются
+  (`unset`) в начале скрипта; каждая команда получает их только через свой env;
+- `ensure_acl` — отдельный шаг: ACL на `/var/run/docker.sock` выставляется им, а не внутри старта демона.
+
 `services/sandboxes.bootstrap(...)` — новые kw-параметры `memory_version: str | None = None`,
 `embedding_key: SecretStr | None = None`; при `memory_version` добавить `--memory-version V` перед парами; env
 команды: `GITLAB_TOKEN`, `GIT_TERMINAL_PROMPT=0` и `EMBEDDING_API_KEY`, если ключ есть. Таймаут —
@@ -138,6 +146,11 @@ vault и не пишутся на диск песочницы; у агента �
   `memory sync` переиндексирует изменённые файлы (принятый риск).
 - Ключ embeddings — только env: `memory init` (bootstrap), `memory sync` (активация), позже MCP агента.
 - RAM: 2 ГБ, требование заранее не повышается; live 5.3. Провал → открытый вопрос 3.
+
+Отклонения при реализации (2026-10-19, приняты ревью):
+- `HARNESS_MEMORY_PROJECT` добавляется в env запуска только при включённой памяти (`memory_enabled` kw у `run_agent`);
+  без `sandbox.memory` переменной нет.
+- Шаг памяти в `activate` выполняется только при `memory_envs is not None`; без него шага нет.
 
 ### 5. Skills и агенты (D-48)
 
@@ -220,3 +233,14 @@ live), `secrets.resolve`, конфиг, `bootstrap` (аргументы, env, т
 - **Индекс по базе, а не по worktree.**
 - **2 ГБ RAM** — live 5.3.
 - **Docker после паузы Novita** — `ensure-docker.sh` при активации.
+- **Ключи apt NodeSource и Docker — без закреплённых отпечатков.** Ключи подписи скачиваются по TLS по процедуре
+  вендора; отпечатки не закреплены в скрипте. Принятый риск; возможное усиление позже (отпечатки не выдумываем, их
+  сверяет владелец по документации вендора).
+- **ACL на `docker.sock` даёт пользователю песочницы права, эквивалентные root.** При passwordless sudo модель доверия
+  не меняется: пользователь песочницы не является границей привилегий. Изоляция D-36 касается конфигурации агента
+  (`--strict-mcp-config`, hooks), а не привилегий пользователя.
+- **Секреты в bootstrap — только в командах, которым они нужны.** Скрипт снимает `GITLAB_TOKEN` и
+  `EMBEDDING_API_KEY` из env сразу после старта; `GITLAB_TOKEN` получают только git-команды (askpass читает его из
+  env git), `EMBEDDING_API_KEY` — только `memory init`. Установки apt и npm (включая lifecycle-скрипты) их не видят.
+- **Главный ключ GitLab — админский токен владельца (D-50).** Компрометация песочницы даёт доступ ко всему GitLab;
+  риск принят владельцем, пересмотреть при появлении нескольких проектов или пользователей.

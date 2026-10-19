@@ -11,8 +11,15 @@
 1. **Адрес и авторизация vault MCP для сервера.** Заложено: ENV `VAULT_MCP_URL` (https) и `VAULT_MCP_TOKEN`, заголовок
    `Authorization: Bearer <token>`, транспорт Streamable HTTP. Если авторизация другая — меняется только
    `adapters/vault/mcp_client.py`. Имя поля с секретом в ответе `get_credential` (заложено `secret`).
+   Ответ владельца 2026-10-19: URL `https://safe.w1do.ru/mcp` (сервер `project-vault 1.0.0`). Streamable HTTP и
+   `Authorization: Bearer <VAULT_MCP_TOKEN>` подтверждены проверкой (initialize и list_tools прошли); инструмент
+   `get_credential(project, service, name)` подтверждён. Имя поля `secret` в ответе ещё не подтверждено: проверяется в live 5.x.
 2. **Ссылки на ключи в vault** (`<project>/<service>/<name>`): главный ключ GitLab, ключ embeddings Polza для memory-agent.
+   Ответ владельца 2026-10-19: главный ключ GitLab — `vault:Workflow/Gitlab/админский` (админский токен; владелец принял
+   риск, D-50); ключ embeddings — `vault:Сервисы/Polza/EmbeddingsMemory` (отдельный ключ Polza для песочницы). Эти ссылки
+   идут в боевой `harness.yaml`, не в `config/harness.example.yaml`.
 3. **Ресурсы.** Если live-проверка 5.3 («memory-agent + агент в 2 ГБ») не пройдёт — какой размер песочницы брать.
+   Ответ: открыт, зависит от live 5.3.
 
 ## Why
 

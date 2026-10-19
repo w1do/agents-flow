@@ -13,6 +13,8 @@ from urllib.parse import urlsplit
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
+from harness_server.vault_ref import is_vault_ref
+
 
 class ConfigError(Exception):
     """Ошибка harness.yaml. Сообщение содержит путь к полю, но не значения."""
@@ -57,6 +59,22 @@ class WorkspaceConfig(BaseModel):
     agent_max_turns: int = Field(default=50, ge=1, le=500)
 
 
+class SandboxMemoryConfig(BaseModel):
+    """Память проекта в песочнице (memory-agent, D-47). Нет блока — память выключена."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # Версия пакета project-memory: закреплена, как версии claude и openspec (D-38).
+    version: str = Field(pattern=_SEMVER_PATTERN)
+    # Ключ embeddings — только ссылка vault:…; без неё поиск лексический.
+    embedding_ref: str | None = None
+
+    @field_validator("embedding_ref")
+    @classmethod
+    def _check_embedding_ref(cls, value: str | None) -> str | None:
+        return _check_vault_ref(value, "embedding_ref")
+
+
 class SandboxConfig(BaseModel):
     """Песочница. В MVP — одна, созданная вручную; id выдаёт провайдер."""
 
@@ -66,14 +84,22 @@ class SandboxConfig(BaseModel):
     # Версии ставятся в песочницу bootstrap-скриптом и закреплены здесь, а не «latest» (D-38).
     claude_code_version: str = Field(default="2.1.292", pattern=_SEMVER_PATTERN)
     openspec_version: str = Field(default="1.14.3", pattern=_SEMVER_PATTERN)
+    memory: SandboxMemoryConfig | None = None
 
 
 class GitLabConfig(BaseModel):
-    """Адрес GitLab. Токен задаётся в ENV (GITLAB_TOKEN), не здесь."""
+    """Адрес GitLab. Токен — ссылка на vault (access_ref) или ENV GITLAB_TOKEN, но не значение."""
 
     model_config = ConfigDict(extra="forbid")
 
     base_url: str = Field(min_length=1)
+    # Главный ключ GitLab из vault (D-45). Без него сервер берёт GITLAB_TOKEN из ENV.
+    access_ref: str | None = None
+
+    @field_validator("access_ref")
+    @classmethod
+    def _check_access_ref(cls, value: str | None) -> str | None:
+        return _check_vault_ref(value, "access_ref")
 
     @field_validator("base_url")
     @classmethod
@@ -110,6 +136,16 @@ class HarnessConfig(BaseModel):
                 raise ValueError(f"повторяющийся workspace id: {workspace.id}")
             seen.add(workspace.id)
         return self
+
+
+def _check_vault_ref(value: str | None, field: str) -> str | None:
+    """Поле с секретом допускает только ссылку vault:<project>/<service>/<name>.
+
+    Значение секрета в YAML запрещено (D-20): ошибка называет поле, но не текст значения.
+    """
+    if value is not None and not is_vault_ref(value):
+        raise ValueError(f"{field}: ожидается ссылка vault:<project>/<service>/<name>")
+    return value
 
 
 def load_config(path: Path) -> HarnessConfig:

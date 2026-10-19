@@ -19,6 +19,14 @@ sandbox:
   # Версии, закреплённые для bootstrap песочницы (D-38); меняются только вместе с кодом.
   claude_code_version: "2.1.292"
   openspec_version: "1.14.3"
+  # Память проекта в песочнице (D-47). Блок не задан — память выключена.
+  # memory:
+  #   # Точная версия пакета project-memory.
+  #   version: "X.Y.Z"
+  #   # Ключ embeddings из vault; без поля поиск лексический.
+  #   embedding_ref: vault:CHANGE_ME/CHANGE_ME/CHANGE_ME
 
 gitlab:
   base_url: https://gitlab.com
+  # Главный ключ GitLab из vault (D-45): ссылка vault:<project>/<service>/<name>. Без поля — ENV GITLAB_TOKEN.
+  # access_ref: vault:CHANGE_ME/CHANGE_ME/CHANGE_ME

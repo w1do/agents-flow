@@ -14,6 +14,7 @@ from harness_server.adapters.novita import NovitaSandboxProvider, SandboxProvide
 from harness_server.adapters.polza import POLZA_API_URL, PolzaRouter, Router
 from harness_server.adapters.stt import OpenAiCompatibleStt, SpeechToText
 from harness_server.adapters.telegram import HttpxTelegramClient, TelegramClient
+from harness_server.adapters.vault import McpSecretVault, SecretVault
 from harness_server.config import HarnessConfig
 from harness_server.services.context import BotContext
 from harness_server.settings import Settings
@@ -71,6 +72,16 @@ def build_sandbox_provider(settings: Settings) -> SandboxProvider | None:
         api_key=settings.novita_api_key.get_secret_value(),
         domain=settings.novita_domain,
     )
+
+
+def build_vault(settings: Settings) -> SecretVault | None:
+    """Vault из настроек; None, если VAULT_MCP_URL или VAULT_MCP_TOKEN не заданы.
+
+    Без vault ссылки vault:… в harness.yaml не разрешаются: сервис получает not_configured.
+    """
+    if settings.vault_mcp_url is None or settings.vault_mcp_token is None:
+        return None
+    return McpSecretVault(settings.vault_mcp_url, settings.vault_mcp_token)
 
 
 def secret_values(settings: Settings) -> tuple[str, ...]:

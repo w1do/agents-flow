@@ -6,17 +6,22 @@
 
 import asyncio
 import json
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import pytest
 from harness_server.adapters.novita import ExecResult, FakeSandbox
-from harness_server.config import HarnessConfig, load_config
+from harness_server.adapters.vault import FakeVault, McpSecretVault, VaultError
+from harness_server.config import HarnessConfig, SandboxMemoryConfig, load_config
 from harness_server.db.models import Task, TaskToken
+from harness_server.db.session import create_engine, create_session_factory
 from harness_server.services import sandboxes
 from harness_server.services.tasks import create_task, get_task, list_task_events
-from harness_server.worker.dispatcher import DispatchContext, dispatch_once
+from harness_server.settings import Settings, load_settings
+from harness_server.vault_ref import VaultRef
+from harness_server.worker.dispatcher import DispatchContext, build_dispatch_context, dispatch_once
 from harness_server.worker.pipeline import AgentRunner, Outcome
 from harness_shared.sandboxes import AgentRole, SandboxStatus
 from harness_shared.tasks import TaskKind, TaskSource, TaskStatus
@@ -34,6 +39,8 @@ HOME = "/home/sbx"
 SECRET_KEY = "test-secret-key-0123456789abcdef0123"
 OAUTH = "oauth-test-value-0123456789abcdef"
 GITLAB = "glpat-test-token-0123456789abcdef"
+# Движок без подключения: сборка контекста не ходит в БД.
+UNREACHABLE_DATABASE_URL = "postgresql+asyncpg://u:p@127.0.0.1:1/x"
 
 
 async def _no_sleep(_seconds: float) -> None:
@@ -459,3 +466,156 @@ async def test_recovery_after_cancel_revokes_tokens_on_cleanup(
     assert stored and all(token.revoked_at is not None for token in stored)
     assert await _sandbox_row(committed_session_factory) == (SandboxStatus.PAUSED, None)
     assert fake.paused
+
+
+# --- sandbox-profile: ключи из vault и память в диспетчере (design 6) ---
+
+VAULT_GITLAB = "glpat-vault-value-0123456789abcdef"
+VAULT_EMBEDDING = "emb-vault-value-0123456789abcdef"
+GITLAB_REF = "vault:demo/gitlab/main"
+EMBEDDING_REF = "vault:demo/polza/embeddings"
+
+
+def _vault_config(*, memory: bool) -> HarnessConfig:
+    """Конфиг с ссылками на vault; memory — блок памяти с ключом embeddings из vault."""
+    gitlab = CONFIG.gitlab.model_copy(update={"access_ref": GITLAB_REF})
+    sandbox_update: dict[str, Any] = {}
+    if memory:
+        sandbox_update["memory"] = SandboxMemoryConfig(version="1.2.3", embedding_ref=EMBEDDING_REF)
+    sandbox = CONFIG.sandbox.model_copy(update=sandbox_update)
+    return CONFIG.model_copy(update={"gitlab": gitlab, "sandbox": sandbox})
+
+
+async def test_gitlab_key_comes_from_vault_and_env_is_not_needed(
+    committed_session_factory: Factory,
+) -> None:
+    task = await _prepare(committed_session_factory)
+    fake = _fake()
+    pipeline = _Pipeline(fake, agent_finishes=True)
+    vault = FakeVault({VaultRef("demo", "gitlab", "main"): VAULT_GITLAB})
+    ctx = replace(
+        _ctx(committed_session_factory, fake),
+        config=_vault_config(memory=False),
+        gitlab_token=None,
+        vault=vault,
+    )
+
+    await dispatch_once(ctx, {TaskKind.IMPLEMENT: pipeline})
+
+    assert vault.requested == [VaultRef("demo", "gitlab", "main")]
+    assert fake.received_env("GITLAB_TOKEN") == VAULT_GITLAB
+    assert await _task_status(committed_session_factory, task.id) == TaskStatus.ACTIVE
+    assert await _sandbox_row(committed_session_factory) == (SandboxStatus.PAUSED, None)
+
+
+async def test_vault_failure_marks_task_error_and_cleans_up(
+    committed_session_factory: Factory,
+) -> None:
+    task = await _prepare(committed_session_factory)
+    fake = _fake()
+    pipeline = _Pipeline(fake, agent_finishes=True)
+    vault = FakeVault(fail=VaultError("unavailable", ref="gitlab/main"))
+    ctx = replace(
+        _ctx(committed_session_factory, fake), config=_vault_config(memory=False), vault=vault
+    )
+
+    await dispatch_once(ctx, {TaskKind.IMPLEMENT: pipeline})
+
+    assert await _task_status(committed_session_factory, task.id) == TaskStatus.ERROR
+    assert await _sandbox_row(committed_session_factory) == (SandboxStatus.PAUSED, None)
+    assert not [e for e in fake.journal if e.cmd and "worktree add" in e.cmd]
+    async with committed_session_factory() as session:
+        events = await list_task_events(session, task.id)
+    assert any(e.text and "vault" in e.text for e in events)
+    assert all(e.text is None or "gitlab/main" not in e.text for e in events)
+
+
+async def test_memory_embedding_key_goes_to_sync_env_and_is_redacted(
+    committed_session_factory: Factory,
+) -> None:
+    task = await _prepare(committed_session_factory)
+    fake = _fake()
+    pipeline = _Pipeline(fake, agent_finishes=False)
+    await _reserve_for_pipeline(committed_session_factory, pipeline)
+    await _set_agent_run(committed_session_factory, started_at=datetime.now(UTC), pid=AGENT_PID)
+    vault = FakeVault(
+        {
+            VaultRef("demo", "gitlab", "main"): VAULT_GITLAB,
+            VaultRef("demo", "polza", "embeddings"): VAULT_EMBEDDING,
+        }
+    )
+    await _seed_agent(fake, task, status_exit=1, stderr=f"эхо ключа {VAULT_EMBEDDING}")
+    ctx = replace(
+        _ctx(committed_session_factory, fake),
+        config=_vault_config(memory=True),
+        vault=vault,
+    )
+
+    await dispatch_once(ctx, {TaskKind.IMPLEMENT: pipeline})
+
+    sync = [e for e in fake.journal if e.cmd and "memory sync" in e.cmd]
+    assert sync and sync[0].env_keys == ("EMBEDDING_API_KEY",)
+    async with committed_session_factory() as session:
+        events = await list_task_events(session, task.id)
+    assert all(e.text is None or VAULT_EMBEDDING not in e.text for e in events)
+    assert all(e.text is None or VAULT_GITLAB not in e.text for e in events)
+
+
+# --- sandbox-profile: сборка контекста диспетчера (tasks 2.3, пункт 5 ревью) ---
+
+
+def _dispatch_settings(
+    valid_env: dict[str, str], monkeypatch: pytest.MonkeyPatch, *, gitlab_env: bool
+) -> Settings:
+    """Settings для build_dispatch_context: ENV агента заданы, GITLAB_TOKEN — по флагу."""
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", OAUTH)
+    monkeypatch.setenv("HARNESS_PUBLIC_URL", "https://harness.example.com")
+    if gitlab_env:
+        monkeypatch.setenv("GITLAB_TOKEN", GITLAB)
+    else:
+        monkeypatch.delenv("GITLAB_TOKEN", raising=False)
+    return load_settings()
+
+
+async def test_build_context_takes_vault_and_no_gitlab_env_when_access_ref_set(
+    valid_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("VAULT_MCP_URL", "https://vault.example/mcp")
+    monkeypatch.setenv("VAULT_MCP_TOKEN", "vault-token-test-0123456789abcdef")
+    settings = _dispatch_settings(valid_env, monkeypatch, gitlab_env=False)
+    factory = create_session_factory(create_engine(UNREACHABLE_DATABASE_URL))
+
+    ctx = build_dispatch_context(
+        settings, _vault_config(memory=False), factory, FakeSandbox(sandbox_id=PROVIDER_ID)
+    )
+
+    assert ctx is not None
+    assert isinstance(ctx.vault, McpSecretVault)
+    assert ctx.gitlab_token is None
+
+
+async def test_build_context_without_access_ref_or_token_returns_none(
+    valid_env: dict[str, str], monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    settings = _dispatch_settings(valid_env, monkeypatch, gitlab_env=False)
+    factory = create_session_factory(create_engine(UNREACHABLE_DATABASE_URL))
+
+    ctx = build_dispatch_context(settings, CONFIG, factory, FakeSandbox(sandbox_id=PROVIDER_ID))
+
+    assert ctx is None
+    assert "GITLAB_TOKEN" in caplog.text
+    assert "vault" not in caplog.text.lower()
+
+
+async def test_build_context_without_access_ref_uses_env_token(
+    valid_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings = _dispatch_settings(valid_env, monkeypatch, gitlab_env=True)
+    factory = create_session_factory(create_engine(UNREACHABLE_DATABASE_URL))
+
+    ctx = build_dispatch_context(settings, CONFIG, factory, FakeSandbox(sandbox_id=PROVIDER_ID))
+
+    assert ctx is not None
+    assert ctx.vault is None
+    assert ctx.gitlab_token is not None
+    assert ctx.gitlab_token.get_secret_value() == GITLAB

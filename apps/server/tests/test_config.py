@@ -325,3 +325,86 @@ def test_sandbox_version_must_be_semver(tmp_path: Path, version: str) -> None:
         load_config(_write(tmp_path, body))
 
     assert "sandbox.claude_code_version" in str(info.value)
+
+
+WORKSPACE_ONLY = (
+    "workspaces:\n"
+    "  - id: demo\n"
+    "    name: Demo\n"
+    "    voice_aliases: []\n"
+    "    gitlab_project: group/demo\n"
+)
+
+
+def test_gitlab_access_ref_accepts_vault_reference(tmp_path: Path) -> None:
+    body = WORKSPACE_ONLY + TAIL + "  access_ref: vault:demo/gitlab/main\n"
+
+    config = load_config(_write(tmp_path, body))
+
+    assert config.gitlab.access_ref == "vault:demo/gitlab/main"
+
+
+def test_gitlab_access_ref_must_be_vault_reference(tmp_path: Path) -> None:
+    body = WORKSPACE_ONLY + TAIL + "  access_ref: glpat-plain\n"
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "access_ref" in str(info.value)
+    assert "glpat-plain" not in str(info.value)
+
+
+def test_memory_block_is_optional_and_parsed(tmp_path: Path) -> None:
+    plain = load_config(_write(tmp_path, WORKSPACE_ONLY + TAIL))
+    assert plain.sandbox.memory is None
+
+    body = (
+        WORKSPACE_ONLY
+        + "sandbox:\n"
+        + "  provider_id: sbx-1\n"
+        + "  memory:\n"
+        + "    version: 1.2.3\n"
+        + "    embedding_ref: vault:demo/polza/embeddings\n"
+        + "gitlab:\n"
+        + "  base_url: https://gitlab.example.com\n"
+    )
+    config = load_config(_write(tmp_path, body))
+
+    assert config.sandbox.memory is not None
+    assert config.sandbox.memory.version == "1.2.3"
+    assert config.sandbox.memory.embedding_ref == "vault:demo/polza/embeddings"
+
+
+def test_memory_version_must_be_semver(tmp_path: Path) -> None:
+    body = (
+        WORKSPACE_ONLY
+        + "sandbox:\n"
+        + "  provider_id: sbx-1\n"
+        + "  memory:\n"
+        + "    version: latest\n"
+        + "gitlab:\n"
+        + "  base_url: https://gitlab.example.com\n"
+    )
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "memory.version" in str(info.value)
+
+
+def test_memory_embedding_ref_must_be_vault_reference(tmp_path: Path) -> None:
+    body = (
+        WORKSPACE_ONLY
+        + "sandbox:\n"
+        + "  provider_id: sbx-1\n"
+        + "  memory:\n"
+        + "    version: 1.2.3\n"
+        + "    embedding_ref: sk-plain-key-value\n"
+        + "gitlab:\n"
+        + "  base_url: https://gitlab.example.com\n"
+    )
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "sk-plain-key-value" not in str(info.value)
