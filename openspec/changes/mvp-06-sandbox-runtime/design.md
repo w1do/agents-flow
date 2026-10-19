@@ -54,7 +54,10 @@
    читает. `run.sh` по завершении атомарно (`tmp` + `mv`) пишет `status.json`:
    `{"exit_code": N, "finished_at": "..."}`. Итог хода (`subtype`, `is_error`, `num_turns`, `session_id`, `usage`)
    сервер берёт из последнего события `type == "result"` в `stream.jsonl` (`tail -n 200`), чистая функция
-   `services/agent_result.py::parse_result(lines) -> AgentResult | None`. Worker опрашивает раз в
+   `services/agent_result.py::parse_result(lines) -> AgentResult | None`. Итог с исчерпанным лимитом подписки
+   (`result` с одним ходом или с `is_error`, текст не длиннее 300 символов (`LIMIT_TEXT_MAX_LEN`), «You've hit your …»
+   или маркер `LIMIT_MARKERS`) даёт `limit_reached`: `AgentRun.succeeded` ложь, `reason = "usage_limit"` (ставит
+   `sandboxes.wait_agent`), задача в `error` без автоповтора (D-54). Worker опрашивает раз в
    `AGENT_POLL_INTERVAL_SEC` (по умолчанию 15). Альтернатива — держать exec до конца: обрыв соединения и
    `timeout=60` по умолчанию у foreground `run` убивают отслеживание.
 4. **Команда агента** (в `run.sh`):

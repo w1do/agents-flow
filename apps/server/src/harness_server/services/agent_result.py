@@ -9,10 +9,24 @@ import json
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any
+from typing import Any, Final
 
 # Лимит текста из песочницы в лог и БД (design 14): хвост stderr и текст события не длиннее.
 LOG_TEXT_LIMIT = 2000
+
+# Итог Claude Code при исчерпанном лимите подписки (mvp-06, D-54): запуск завершается кодом 0 и
+# subtype success, но работы не сделано, поэтому без распознавания задача стала бы готовой.
+# Сравнение без регистра; префикс — начало итога после strip; «’» приводится к ASCII-апострофу.
+# Длиннее LIMIT_TEXT_MAX_LEN символов итог не лимит: это сводка работы, а не сообщение CLI.
+LIMIT_TEXT_MAX_LEN: Final = 300
+LIMIT_TEXT_PREFIX: Final = "you've hit your"
+LIMIT_MARKERS: Final = (
+    "hit your session limit",
+    "hit your usage limit",
+    "usage limit reached",
+)
+# Машинная причина для задачи. Текст итога из песочницы в неё не попадает.
+USAGE_LIMIT_REASON: Final = "usage_limit"
 
 
 class AgentState(StrEnum):
@@ -33,6 +47,8 @@ class AgentResult:
     num_turns: int | None
     session_id: str | None
     usage: dict[str, Any] | None = None
+    # Исчерпан лимит подписки: см. LIMIT_MARKERS и _is_limit_result (D-54).
+    limit_reached: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,12 +64,13 @@ class AgentRun:
 
     @property
     def succeeded(self) -> bool:
-        """Агент завершился кодом 0 и итог хода не помечен ошибкой."""
+        """Агент завершился кодом 0; итог хода без ошибки и без признака исчерпанного лимита."""
         return (
             self.state is AgentState.FINISHED
             and self.exit_code == 0
             and self.result is not None
             and not self.result.is_error
+            and not self.result.limit_reached
         )
 
 
@@ -81,13 +98,35 @@ def _build_result(event: dict[str, Any]) -> AgentResult:
     num_turns = event.get("num_turns")
     session_id = event.get("session_id")
     usage = event.get("usage")
+    text = event.get("result")
+    is_error = event.get("is_error") is True
+    turns = num_turns if isinstance(num_turns, int) else None
     return AgentResult(
         subtype=subtype if isinstance(subtype, str) else None,
-        is_error=event.get("is_error") is True,
-        num_turns=num_turns if isinstance(num_turns, int) else None,
+        is_error=is_error,
+        num_turns=turns,
         session_id=session_id if isinstance(session_id, str) else None,
         usage=usage if isinstance(usage, dict) else None,
+        limit_reached=isinstance(text, str) and _is_limit_result(text, turns, is_error),
     )
+
+
+def _is_limit_result(text: str, num_turns: int | None, is_error: bool) -> bool:
+    """Лимит — только у короткого итога (один ход) или у итога с ошибкой. Длинный успешный ответ,
+    который обсуждает лимиты, отказом агента не считается."""
+    if not (is_error or (num_turns is not None and num_turns <= 1)):
+        return False
+    return _is_limit_text(text)
+
+
+def _is_limit_text(text: str) -> bool:
+    stripped = text.strip()
+    if len(stripped) > LIMIT_TEXT_MAX_LEN:
+        return False
+    lowered = stripped.replace("’", "'").lower()
+    if lowered.startswith(LIMIT_TEXT_PREFIX) and "limit" in lowered:
+        return True
+    return any(marker in lowered for marker in LIMIT_MARKERS)
 
 
 def parse_exit_code(status_text: str) -> int | None:

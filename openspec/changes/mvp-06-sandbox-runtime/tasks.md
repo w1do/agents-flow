@@ -56,6 +56,12 @@
   проверка: тесты «Агент завершился», «Превышено время», «Агент пропал без статуса», «Секрет в выводе агента»
 - [x] 3.7 `cleanup` + `pause` после успеха; `error` песочницы при неудаче — проверка: тесты «Очистка не удалась»,
   «Успешная очистка»
+- [x] 3.8 Лимит подписки Claude (D-54): `LIMIT_MARKERS`, `LIMIT_TEXT_MAX_LEN` (300), `AgentResult.limit_reached`,
+  `AgentRun.succeeded` ложь при лимите, `services/sandboxes.wait_agent` ставит `reason = "usage_limit"`;
+  `worker/dispatcher.py` ставит задачу в `error` с этой причиной без автоповтора — проверка: новый файл
+  `tests/test_agent_result.py` (лимит при одном ходе и при `is_error`; длинный одноходовой итог и многоходовой текст
+  не лимит; «rate limit» без маркера не лимит), `test_sandbox_service.py::test_wait_agent_marks_usage_limit_reason`,
+  `test_dispatcher.py::test_usage_limit_result_marks_task_error_without_retry`
 
 ## 4. Worker и CLI
 
