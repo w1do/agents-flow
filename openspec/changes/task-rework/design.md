@@ -118,13 +118,17 @@
     Ошибка GitLab → замечание сохраняется как `pending`, бот отвечает «не удалось проверить MR, повторите позже»,
     статус не меняется. Отвергнуто: доработка в старой ветке после мерджа — MR из влитой ветки показывает уже влитые
     коммиты и конфликтует с основной веткой.
-11. **Вопрос агента не блокирует прогон (вариант по умолчанию вопроса 5).** `ask_owner` пишет реплику `question`
+11. **Вопрос агента не блокирует прогон (ответ владельца на вопрос 5, 2026-10-19).** `ask_owner` пишет реплику `question`
     (`open`) и событие, сразу возвращает `{question_id}`. Промпт велит агенту закоммитить работу и завершить прогон.
     После прогона worker видит открытые вопросы и вызывает `pause_for_owner`: гейты `commit_check` (WIP-коммит
-    сервера «<ref>: WIP до ответа владельца», если есть незакоммиченное), `secret_scan`, `push` без MR; затем
+    сервера «<ref>: WIP до ответа владельца», если есть незакоммиченное), затем все базовые гейты безопасности
+    D-58 (`secret_scan` → `path_policy` → `diff_limits` → `branch_guard`), затем `push` без `--force` и без MR;
+    гейты качества проекта (`tests`) и `merge_request` не выполняются; затем
     cleanup, пауза песочницы, задача `active → paused` (`plan`: `planning → paused`). Если ответы на все вопросы
     пришли раньше конца прогона, задача сразу идёт `paused → backlog`. Отвергнуто: блокирующий вызов с ожиданием —
-    держит песочницу и очередь, MCP-обработчик не должен блокироваться (CLAUDE.md §3).
+    держит песочницу и очередь, MCP-обработчик не должен блокироваться (CLAUDE.md §3). Отвергнуто: WIP-push только
+    после `secret_scan` — запрещённый путь или огромный diff попал бы в удалённый репозиторий до проверки (владелец:
+    при паузе — все защитные гейты ядра).
 12. **Агент сдал работу при открытом вопросе.** Гейты идут как обычно, вопрос остаётся `open`. Поздний ответ на
     него принимается как замечание (без оценки ясности) по правилам статуса задачи. Отвергнуто: отменять вопрос —
     владелец уже мог начать отвечать.
@@ -655,10 +659,14 @@ TaskKind.IMPLEMENT: {
   `consume_for_run(rework=False)`.
 - После прогона: `open_question_count > 0` → `pause_for_owner(task)` вместо гейтов: `commit_check` в режиме WIP
   (сообщение коммита `f"{ref}: WIP до ответа владельца"`, нет изменений относительно `run_base_sha` — push не нужен),
-  `secret_scan`, `push` (без MR). Затем cleanup, пауза песочницы, `change_status(active → paused | planning →
+  затем базовые гейты D-58 в том же порядке и с той же базой diff, что в mvp-09 (`secret_scan` → `path_policy` →
+  `diff_limits` → `branch_guard`; список берётся из `CORE_GATES`, а не дублируется), затем `push` явным refspec
+  `HEAD:refs/heads/task/<id>` без `--force` (без MR, без `tests`). Затем cleanup, пауза песочницы, `change_status(active → paused | planning →
   paused, source=worker, text=STAGE_WAITING_OWNER)`. Если ответы уже пришли (`open_question_count == 0` к моменту
   перехода — проверка под замком задачи), сразу `paused → backlog | planning` с `STAGE_RESUMED`.
-  Упал `secret_scan` → `error` с причиной, как в mvp-09.
+  Упал любой базовый гейт (`secret_scan`, `path_policy`, `diff_limits`, `branch_guard`) → push не выполняется,
+  задача `error` с причиной гейта (без значений), как в mvp-09; события гейтов пишутся как обычно (решение 9), так
+  что следующий прогон проверяет их заново.
 - Гейты: условие пропуска шага (решение 9); `commit_check` — сравнение с `run_base_sha`; `push` — без `--force`,
   отказ non-fast-forward → `error` «ветка расходится с GitLab». При цикле доработки (`cycle is not None`) после
   `merge_request`: `add_mr_note(project, mr_iid, f"Доработка {cycle}: {short_title(текст замечания)}")` (redact),
@@ -739,7 +747,8 @@ WIP) → `paused` → владелец отвечает reply'ем «ISO 8601» 
   уходят diff, код и вопросы агента.
 - Замечание владельца уходит в промпт агента и в заметку MR только после `redact`. Заметка MR — краткое название
   (≤ 40 символов), а не полный текст.
-- WIP-push при паузе проходит `secret_scan` (решение 11). Ключ записи по-прежнему у сервера (D-18, D-56).
+- WIP-push при паузе проходит все базовые гейты безопасности D-58: `secret_scan`, `path_policy`, `diff_limits`,
+  `branch_guard` (решение 11); только ветка `task/<id>`, никогда `--force`, без MR. Ключ записи по-прежнему у сервера (D-18, D-56).
 - Логи: класс, решение, `outcome`, id задачи и реплики — без текстов.
 
 ## Backward compatibility
@@ -777,8 +786,11 @@ WIP) → `paused` → владелец отвечает reply'ем «ISO 8601» 
   `test_feedback_no_candidates_falls_to_clarify`, `test_unknown_task_refs_dropped`, `test_prompt_contains_tasks_block`.
 - `test_ask_owner_tool.py`: `test_ask_owner_implementer_ok`, `test_ask_owner_other_task_forbidden`.
 - `test_rework_pipeline.py`: `test_rework_uses_existing_branch`, `test_gates_scoped_to_run`,
-  `test_rework_no_new_commits_error`, `test_rework_same_mr_note_added`, `test_pause_for_owner_pushes_after_secret_scan`,
-  `test_pause_for_owner_secret_found_error`, `test_followup_branch_from_default`.
+  `test_rework_no_new_commits_error`, `test_rework_same_mr_note_added`, `test_pause_for_owner_runs_core_gates_then_pushes`
+  (порядок событий `secret_scan` → `path_policy` → `diff_limits` → `branch_guard` → `push`, нет `tests` и
+  `merge_request`), `test_pause_for_owner_secret_found_error`, `test_pause_for_owner_denied_path_error`,
+  `test_pause_for_owner_diff_limits_error`, `test_pause_for_owner_push_no_force_refspec_task_branch`,
+  `test_followup_branch_from_default`.
 - `test_migration_task_dialog.py`: upgrade/downgrade на пустой БД и с карточкой в `telegram_messages` (перенос в ссылки).
 - Live (маркер `live`, по умолчанию не запускается): `test_polza_feedback_live` — 4 фразы класса `feedback` + 10 фраз mvp-05.
 
@@ -801,7 +813,7 @@ WIP) → `paused` → владелец отвечает reply'ем «ISO 8601» 
 `feedback`/`bound`). Старый код не знает переходов из `paused` и `ready → backlog`. Поэтому **до** отката, пока
 этот код работает, задачи в `paused` выводятся из паузы: владелец отвечает на вопросы reply'ем (хотя бы
 «продолжай без ответа»), задачи уходят `paused → backlog`. Перед `downgrade` в `paused` не должно остаться задач.
-Ветки `task/<id>` с WIP-коммитами в GitLab остаются, их удаление — ручное.
+Ветки `task/<id>` с WIP-коммитами в удалённом репозитории остаются, их удаление — ручное.
 
 ## Разрешённые для изменения файлы
 
@@ -824,8 +836,8 @@ openspec validate --all
 
 - [Polza ошибочно привязала свободный текст к задаче] → автопривязка только при явном лидере (решение 5), бот
   отвечает с `#ref` и названием. Владелец видит, к чему привязано.
-- [WIP-ветка в GitLab до тестов] → только при паузе, только после `secret_scan`. Отступление от D-56, ждёт решения
-  владельца (вопрос 5).
+- [WIP-ветка в удалённом репозитории до тестов] → только при паузе, только после всех базовых гейтов D-58, без MR.
+  Отступление от D-56 принято владельцем 2026-10-19 (вопрос 5, уточнение D-57).
 - [Повторная отправка вопроса после обрыва] → принято (решение 13).
 - [Потеря замечания при обрыве между commit апдейта и обработкой] → принято, как потеря карточки в mvp-04.
 - [Агент переписал историю ветки] → push без force отклоняется, задача `error`. Промпт запрещает rebase.

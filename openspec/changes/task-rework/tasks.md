@@ -51,7 +51,8 @@
 - [ ] 5.2 `GitProvider.get_mr_state`, `add_mr_note` + фейк + respx — проверка: контрактные тесты адаптера
 - [ ] 5.3 Активация на существующей ветке, `run_base_sha`, `consume_for_run` в пайплайнах `implement` и `plan`,
   `deliver_owner_questions` в `dispatch_once` — проверка: `test_rework_uses_existing_branch`, `test_followup_branch_from_default`
-- [ ] 5.4 `pause_for_owner`, гейты по прогону, push без force, заметка MR, строки этапов доработки,
+- [ ] 5.4 `pause_for_owner` (WIP-коммит → все базовые гейты D-58 из `CORE_GATES` → push `task/<id>` без force,
+  без `tests` и MR; отказ гейта → `error`), гейты по прогону, push без force, заметка MR, строки этапов доработки,
   `send_rework_done`, `requeue_if_pending` — проверка: остальные тесты `test_rework_pipeline.py`
 - [ ] 5.5 `settings.task_rework_max`, поля `BotContext` (`rework_max`, `git`), wiring — проверка: `test_settings.py`, `test_wiring_*`
 
