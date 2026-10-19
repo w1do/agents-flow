@@ -1,5 +1,3 @@
-.memory/*
-!.memory/annotations.json
 .env
 .env.*
 !.env.example
@@ -12,3 +10,6 @@ node_modules/
 dist/
 config/harness.yaml
 .uv-cache/
+.memory/*
+!.memory/annotations.json
+.idea/

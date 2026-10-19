@@ -43,7 +43,7 @@ Novita, результат приходит как Merge Request в GitLab, ст
 ```
 apps/server/src/harness_server/
 ├── app.py             # create_app(): FastAPI + смонтированный MCP, lifespan
-├── cli.py             # harness-server: serve | worker | migrate | check-config | telegram set-webhook | sandbox pause|resume | reset-password
+├── cli.py             # harness-server: serve | worker | migrate | check-config | telegram set-webhook | sandbox status|pause|resume|bootstrap | reset-password
 ├── settings.py        # pydantic-settings: ENV, путь к config/harness.yaml
 ├── config.py          # загрузка и валидация config/harness.yaml (workspaces, sandbox, gitlab)
 ├── wiring.py          # композиционный корень бота: httpx-клиент, BotAdapters, BotContext (D-29)
@@ -54,7 +54,7 @@ apps/server/src/harness_server/
 ├── domain/            # statuses.py (таблица переходов), errors.py (DomainError и коды), без I/O и sqlalchemy
 ├── db/                # base.py (Base, naming convention, enum-хелперы), ids.py (uuid7), session.py, models/ (9 таблиц)
 ├── adapters/          # внешние API за интерфейсами (Protocol) и фейки: telegram (httpx, mvp-04), stt (OpenAI-совместимый, mvp-04), polza (Router/PolzaRouter/FakeRouter, OpenAI-совместимый chat completions, mvp-05), novita, gitlab
-├── worker/            # dispatcher loop, pipelines plan/implement, gates
+├── worker/            # __init__.py (цикл worker, API не меняется), dispatcher.py (восстановление → reserve → activate → run → cleanup → pause), pipeline.py (контракт Pipeline; реестр PIPELINES пуст до mvp-08/09), gates (mvp-09)
 └── security/          # redaction (фильтр секретов: шаблоны токенов и точные значения), task tokens
 ```
 
@@ -75,7 +75,7 @@ apps/server/src/harness_server/
 | `task_events` | id, task_id, status, text, source (`telegram`/`agent`/`worker`/`api`), created_at | Лента этапов для Telegram и журнала |
 | `routings` | id, task_id (NULL для status, unknown и ожидающего уточнения), command_class (`work`/`status`/`unknown`), decision (`auto`/`clarify`/`fallback`), options (JSON), chosen_workspace_id, raw_response, confidence, error (причина запасного пути), source_text (до нажатия «Сделать задачу», затем NULL), resolved_at | Решение Polza и выбор пользователя (mvp-05, D-32, миграция `0003`) |
 | `spec_items` | id, workspace_id, plan_task_id, change_id, key, text, status, last_checkpoint_id; UNIQUE (workspace_id, change_id, key) | Зеркало пунктов OpenSpec |
-| `sandboxes` | id, provider_id, agent_type, status (`paused`/`active`/`error`), current_task_id, profile_version | Песочницы Novita |
+| `sandboxes` | id, provider_id, agent_type, status (`paused`/`active`/`error`), current_task_id, profile_version, agent_started_at (время запуска агента, NULL — не запускался), agent_pid (pid группы агента, NULL — неизвестен) | Песочницы Novita; колонки агента — серверный учёт запуска, файлам песочницы не доверяем (D-41, миграция `0004`) |
 | `checkpoints` | id, task_id, summary, files (JSON), diff_redacted, next_step, status, tokens | Чекпоинты (MVP: от сервера после агента) |
 | `telegram_messages` | task_id, chat_id, message_id, lines (JSON) | Одно обновляемое сообщение на задачу |
 | `telegram_updates` | kind (`update`/`callback`) + external_id (составной PK), received_at, processed_at, payload (JSONB NULL) | Идемпотентность входа (A4). `payload` — нормализованный апдейт владельца (текст, голос или нажатие кнопки, без имён и `from`) до обработки; после обработки обнуляется (D-27) |
@@ -84,6 +84,11 @@ apps/server/src/harness_server/
 Схема создаётся миграцией `0001` (mvp-03, `db/migrations/versions/`); миграция `0002` (mvp-04) добавляет
 аддитивную nullable-колонку `telegram_updates.payload`. Перечисления — `VARCHAR(16)` с именованным
 CHECK `ck_<таблица>_<колонка>` (D-22); первичные ключи — UUIDv7 из `db/ids.py` (D-21).
+
+Команда `harness-server sandbox resume` (design 8, mvp-06) действует по статусу строки `sandboxes`: закреплена задача
+(`current_task_id`) — отказ `SandboxBusy` до любых вызовов провайдера; `paused` — без действий, провайдер не вызывается;
+`error` или `active` без задачи — `connect`, затем `pause`, затем статус `paused` и сброс `agent_started_at`/`agent_pid`.
+Ошибка провайдера не меняет строку.
 
 Workspace и агенты в MVP берутся из `config/harness.yaml`; таблицы `workspaces`, `agents`, `skills`,
 `integrations`, `mcp_servers`, `sandbox_profiles`, `processes`, `sessions`, `operator_tokens`,
@@ -148,7 +153,9 @@ implement:  backlog → active → testing → ready (MR создан) → merge
 ## 7. Песочница
 
 - MVP: одна песочница, созданная вручную, её id в `config/harness.yaml`. Адаптер `SandboxProvider`
-  (`exec`, `write_file`, `read_file`, `pause`, `resume`, `extend_timeout`) скрывает Novita SDK.
+  (`connect`, `exec`, `write_file`, `read_file`, `pause`, `extend_timeout`) скрывает Novita SDK
+  (`adapters/novita`, нативный async `AsyncSandbox`, D-35). Песочница берёт одну задачу: резервирование
+  `FOR UPDATE SKIP LOCKED` (`services/sandboxes.reserve`).
 - Bootstrap (`deploy/sandbox/bootstrap.sh`): pinned `claude`, `git`, `openspec`, клон репозиториев,
   `.mcp.json` с `${AGENTS_FLOW_TOKEN}` (значение приходит в env exec-команды). Секретов в файле нет. Идемпотентен.
 - Креды (`CLAUDE_CODE_OAUTH_TOKEN`, `GITLAB_TOKEN`, токен задачи) передаются только в env конкретной exec-команды
@@ -203,6 +210,7 @@ gitlab (base_url). Ключи с сегментами `token`/`tokens`, `key`, `
 | `GITLAB_URL`, `GITLAB_TOKEN` | Push и MR (`GITLAB_TOKEN` — секрет) |
 | `CLAUDE_CODE_OAUTH_TOKEN` | Токен подписки Claude для Claude Code в песочнице (`claude setup-token`, срок ~1 год; передаётся только в exec, D-18). Секрет |
 | `AGENT_RUN_TIMEOUT_MIN`, `TESTS_TIMEOUT_MIN` | Лимит времени агента и гейта тестов (по умолчанию 60 и 15) |
+| `AGENT_POLL_INTERVAL_SEC` | Пауза между опросами итога агента в worker, секунды, > 0 (по умолчанию 15; D-38) |
 | `WORKER_POLL_INTERVAL_SEC` | Интервал опроса очереди worker, в секундах (по умолчанию 5) |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Консоль, `mvp-10` (`ADMIN_PASSWORD` — секрет) |
 

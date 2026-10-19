@@ -48,8 +48,10 @@
    `setsid nohup bash run.sh >/dev/null 2>&1 & echo $! > pid` с env-кредами и сразу возвращается. `CommandHandle.pid`
    из `background=True` не используется: handle теряется при рестарте worker, pid-файл — нет. `setsid` делает pid
    лидером группы, чтобы kill по таймауту остановил и дочерние процессы (`kill -TERM -- -<pid>`, через 10 с
-   `kill -KILL -- -<pid>`). `run.json` (пишет сервер до запуска): `started_at` (UTC ISO), `max_turns`, `role` — нужен
-   для таймаута после рестарта. `run.sh` по завершении атомарно (`tmp` + `mv`) пишет `status.json`:
+   `kill -KILL -- -<pid>`). Команда запуска печатает pid и в stdout, сервер сохраняет его в
+   `sandboxes.agent_pid`, а время запуска — в `sandboxes.agent_started_at` (п. 18, D-41). `run.json` (пишет сервер до
+   запуска): `started_at` (UTC ISO), `max_turns`, `role`, `task_id` — только для разбора человеком, сервер его не
+   читает. `run.sh` по завершении атомарно (`tmp` + `mv`) пишет `status.json`:
    `{"exit_code": N, "finished_at": "..."}`. Итог хода (`subtype`, `is_error`, `num_turns`, `session_id`, `usage`)
    сервер берёт из последнего события `type == "result"` в `stream.jsonl` (`tail -n 200`), чистая функция
    `services/agent_result.py::parse_result(lines) -> AgentResult | None`. Worker опрашивает раз в
@@ -59,11 +61,12 @@
    ```
    unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
    cd <worktree>
-   claude -p "$(cat <dir>/prompt.md)" --output-format stream-json --verbose --max-turns <N> \
-     --permission-mode bypassPermissions --strict-mcp-config --mcp-config ~/.harness/mcp.json \
-     --setting-sources user > <dir>/stream.jsonl 2> <dir>/stderr.log
+   claude -p --output-format stream-json --verbose --max-turns <N> \
+     --permission-mode bypassPermissions --strict-mcp-config --mcp-config "$HOME/.harness/mcp.json" \
+     --setting-sources user < <dir>/prompt.md > <dir>/stream.jsonl 2> <dir>/stderr.log
    ```
-   `--verbose` обязателен для `stream-json` (mvp-01); `--max-turns` задокументирован в cli-reference (по достижении —
+   Промпт идёт через stdin, а не аргументом: текст задачи, начинающийся с `-`, иначе разбирается как флаг CLI, и
+   текст промпта не виден в `ps`. `--verbose` обязателен для `stream-json` (mvp-01); `--max-turns` задокументирован в cli-reference (по достижении —
    выход с ошибкой, `subtype: error_max_turns`). `--bare` не используется: он не читает `CLAUDE_CODE_OAUTH_TOKEN`
    (D-18). `unset` — защита от перекрытия токена подписки: по документации Claude Code `ANTHROPIC_AUTH_TOKEN` и
    `ANTHROPIC_API_KEY` имеют приоритет над `CLAUDE_CODE_OAUTH_TOKEN` (D-37).
@@ -82,16 +85,28 @@
    `create(envs=)` песочницы не используется: такие env живут всю жизнь песочницы. Персистентность command-env на
    диске документацией не описана — это проверяет live-тест «Проверка диска» (`grep -rF` значения в `~` и worktree,
    исключая `/proc`).
-7. **Токен задачи** (`security/tokens.py`): `generate() -> str` (`secrets.token_urlsafe(32)`), `hash_token(token,
+7. **Токен задачи** (`security/tokens.py`): `generate() -> str` (`"aft_" + secrets.token_urlsafe(32)`, префикс — для
+   шаблона redaction, D-42), `hash_token(token,
    key) -> str` (HMAC-SHA256 с `HARNESS_SECRET_KEY`, hex, 64 символа). Сервис `services/sandboxes.issue_task_token`
    пишет `task_tokens` (роль `planner` для `plan`, `implementer` для `implement`, `expires_at = now +
    AGENT_RUN_TIMEOUT_MIN + 10 мин`) и возвращает значение один раз; `revoke_task_tokens(task_id)` ставит
    `revoked_at` всем активным токенам задачи. Токен выдаётся в `run_agent` (непосредственно перед запуском), а не
    в `activate`: значение не хранится, и после рестарта worker повторная активация иначе не смогла бы его
-   передать. Проверка токена — `mvp-07`.
+   передать. Проверка токена — `mvp-07`: хешируется значение целиком, вместе с префиксом; формат токена сервер нигде
+   не разбирает. Отзыв — только в `cleanup` (п. 12); при отмене worker токен не отзывается (D-41): агент
+   продолжает работать, после рестарта worker не перезапускается и новый токен получить не может, поэтому
+   отзыв при отмене оставил бы восстановленному агенту мёртвый токен. Срок жизни токена ограничен `expires_at`.
 8. **Строка песочницы.** `services/sandboxes.ensure_sandbox(config)` — upsert строки по `provider_id` из конфига
    (`agent_type = "claude-code"`, `status = paused`) при старте worker и в CLI. Песочница в `error` задачи не берёт,
-   пока оператор не сделает `sandbox resume` (сбрасывает в `paused` после успешного `connect`).
+   пока оператор не сделает `sandbox resume`. `resume_sandbox` по статусу строки: закреплена задача
+   (`current_task_id` не пуст) — `SandboxBusy` до любых вызовов провайдера, нужен ручной разбор (п. 12:
+   `current_task_id` остаётся для разбора); `paused` без задачи — пустая операция, провайдер не вызывается (лишний
+   `connect` будил бы песочницу, а Novita по таймауту её уничтожает, D-19); `error` или `active` без задачи
+   (`active` без задачи — рассинхрон, `reserve` и `release_sandbox` меняют оба поля вместе) — `connect` (проверка,
+   что песочница жива), затем `pause`, затем `status = paused`, `agent_started_at = agent_pid = NULL`, один commit;
+   ошибка провайдера — строка не меняется, исключение уходит в CLI. `paused` в БД значит «свободна и на паузе у
+   провайдера». Новой команды CLI для такого разбора в
+   mvp-06 нет, путь в CLI — отдельное изменение OpenSpec.
 9. **Резервирование песочницы и задачи одной транзакцией.** `services/sandboxes.reserve(session, pipeline)`:
    `SELECT sandboxes … WHERE current_task_id IS NULL AND status = 'paused' FOR UPDATE SKIP LOCKED`; нет строки — `None`,
    задача остаётся в очереди (сценарий «Песочница занята»). Иначе выбор задачи — та же выборка, что у
@@ -104,9 +119,17 @@
 10. **Идемпотентная активация.** `activate(task, base_ref)`: `connect`, `extend_timeout((AGENT_RUN_TIMEOUT_MIN + 10) *
     60)`, `git fetch origin` в `~/work/<workspace_id>`, и если worktree `~/.harness/worktrees/<task_id>` уже есть
     на ветке `task/<task_id>` — шаг пропускается, иначе `git worktree add -B task/<task_id> <path> <base_ref>`.
-    `run_agent` идемпотентен: есть `status.json` — возвращает «уже завершён», есть `pid` и процесс жив
-    (`kill -0`) — «уже идёт», агент второй раз не запускается. `pid` есть, а процесса и `status.json` нет — агент
-    умер без итога: `AgentRun(exit_code=None, reason="агент завершился без статуса")` → задача `error`.
+    `run_agent` идемпотентен по `sandboxes.agent_started_at` (п. 18): если поле заполнено, агент второй раз не
+    запускается. Pid берётся из `sandboxes.agent_pid`; если он пуст (worker упал между запуском и записью pid),
+    pid читается из файла `pid` через `parse_pid` и записывается в `agent_pid`. Группа жива (`kill -0 -- -<pid>`, по
+    группе — согласовано с `setsid` и kill группы из п. 3 и 13) — `ALREADY_RUNNING`; группы нет и есть
+    `status.json` — `ALREADY_FINISHED`; иначе (группы нет, pid нет или он невалиден) — `DIED`, повторного запуска
+    нет. Итог во всех случаях определяет `wait_agent`: группа жива — `RUNNING` (даже если `status.json` уже есть);
+    группы нет и есть `status.json` → `FINISHED`; нет ни того, ни другого → `DIED` с
+    `reason="агент завершился без статуса"` → задача `error`. `parse_pid` принимает только целое > 1:
+    `kill -0 -- -1` проверяет все процессы пользователя и всегда «жив», `0` — своя группа сервера. Ограничение для потребителей
+    (mvp-07/08): на `DIED` из `run_agent` вызывающий код обязан идти в `wait_agent`, а не сразу в `error` — между
+    чтением `status.json` и `kill -0` агент мог завершиться штатно, и `wait_agent` тогда вернёт `FINISHED`.
 11. **Каркас пайплайна** (`worker/` становится пакетом: `worker.py` → `worker/__init__.py` без изменения импортов
     `harness_server.worker`, плюс `worker/dispatcher.py`, `worker/pipeline.py`). `Pipeline` (Protocol): `kind`,
     `from_status`, `to_status | None`, `role`, `base_ref(task, config) -> str`, `async run(ctx, task) -> Outcome`.
@@ -115,15 +138,25 @@
     `reserve` → `activate` → `pipeline.run` (внутри `ctx.run_agent` + `ctx.wait_agent`) → `cleanup` → `pause`.
     Исключение пайплайна или таймаут → задача `error` через `services.tasks.change_status` (если переход разрешён,
     иначе только событие) с причиной, затем `cleanup`. Новых статусов нет.
-12. **Порядок в конце:** `cleanup` (`git worktree remove --force`, `git branch -D task/<id>` локально, удаление
-    `~/.harness/tasks/<id>/` кроме копии итога в БД, `revoke_task_tokens`) → успех → `pause` и `current_task_id =
-    NULL`, `status = paused`. Ошибка очистки (ненулевой код любой git-команды) → песочница `error`, причина в лог
-    (после redaction), `pause` не вызывается, `current_task_id` остаётся для разбора.
-13. **Таймаут агента** `AGENT_RUN_TIMEOUT_MIN`: отсчёт от `run.json.started_at`. По истечении — kill группы, задача
+12. **Порядок в конце:** `cleanup` (`revoke_task_tokens` первым шагом — отзыв не зависит от исхода очистки;
+    `git worktree remove --force`, `git branch -D task/<id>` локально, удаление `~/.harness/tasks/<id>/` кроме копии
+    итога в БД) → успех → `pause` и `current_task_id = NULL`, `status = paused`. Токены задачи отзываются также при
+    отмене worker. Очистка идемпотентна (активация могла упасть до `worktree add`): отсутствие worktree или ветки
+    `task/<id>` — не ошибка (`worktree remove --force || { [ ! -e WT ] && git worktree prune; }`,
+    `branch -D || ! git show-ref --verify --quiet refs/heads/task/<id>`). Каталог задачи `~/.harness/tasks/<id>/`
+    удаляется всегда, даже если у задачи нет workspace (активация упала на `no_workspace`): git-шаги выполняются
+    только при `workspace_id`, `rm -rf` каталога задачи — в любом случае. Любая другая ошибка (ненулевой код
+    команды) → `CleanupFailed`, песочница `error`, причина в лог (после redaction), `pause` не вызывается,
+    `current_task_id` остаётся для разбора. Отмена worker (`CancelledError` и прочие `BaseException`) очистку не
+    выполняет и токены не отзывает (п. 7, D-41): следующий `_recover` продолжает задачу, `cleanup` в конце
+    отзывает токены.
+13. **Таймаут агента** `AGENT_RUN_TIMEOUT_MIN`: отсчёт от `sandboxes.agent_started_at` (БД, п. 18), а не от файла
+    в песочнице. По истечении — kill группы, задача
     `error` с причиной «превышено время» (лимит в MVP — сигнал, а не баг, ТЗ §16.0).
 14. **Всё, что читается из песочницы** (`stderr.log`, хвост `stream.jsonl`, stdout/stderr exec), проходит
     `redact(text, extra_values=[CLAUDE_CODE_OAUTH_TOKEN, GITLAB_TOKEN, токен задачи, NOVITA_API_KEY])` до лога, БД
-    и Telegram. В лог — не больше 2000 символов. Вывод `env`, `printenv`, `/proc/*/environ` не запрашивается.
+    и Telegram. Значение токена задачи известно только процессу, который его выдал; после рестарта worker его
+    закрывает шаблон `aft_[A-Za-z0-9_-]{40,}` в `security/redaction._PATTERNS` (D-42). В лог — не больше 2000 символов. Вывод `env`, `printenv`, `/proc/*/environ` не запрашивается.
 15. **Лимиты (D-38):** `AGENT_RUN_TIMEOUT_MIN=60` (ENV, есть), `workspaces[].agent_max_turns: int = 50` (1…500) в
     `harness.yaml`, pinned версии в `sandbox`: `claude_code_version: "2.1.292"`, `openspec_version: "1.14.3"`.
     Новый ENV `AGENT_POLL_INTERVAL_SEC` (по умолчанию 15, > 0), `AGENTS_FLOW_URL` берётся из `HARNESS_PUBLIC_URL`
@@ -140,6 +173,20 @@
 17. **Исходящий allowlist.** Novita поддерживает `network.allow_out/deny_out` и `set_network` (IP/CIDR; доменные
     имена в core SDK не подтверждены). В MVP песочница создаётся вручную, поэтому ограничение — рекомендация в
     `docs/deployment.md` и пункт live-проверки, а не код. Код создания песочниц — `sandbox-pool`.
+18. **Доверие к файлам песочницы (D-41).** Агент работает под тем же пользователем песочницы и может переписать
+    любой файл каталога задачи. Поэтому то, от чего зависит контроль, хранится на сервере: колонки
+    `sandboxes.agent_started_at TIMESTAMPTZ NULL` и `sandboxes.agent_pid INTEGER NULL` (миграция `0004`). Запись:
+    `run_agent` коммитит `agent_started_at` вместе с выдачей токена до команды запуска (сбой после запуска не теряет
+    отсчёт таймаута), `agent_pid` — отдельным commit сразу после запуска (pid из stdout команды запуска, через
+    `parse_pid`; невалидный — `SandboxStepError("launch_pid")`). Сброс в `NULL`: `reserve` (вместе с
+    `current_task_id`), `release_sandbox`, `resume_sandbox` (п. 8). После рестарта worker значения в БД сохраняются,
+    поэтому таймаут и kill работают по ним. `status.json` и событие `result` — подсказка агента, а не доказательство:
+    `FINISHED` наступает только когда серверный pid мёртв, а результат работы проверяют гейты `mvp-08/09`, а не
+    код выхода. Подмена pid-файла влияет только на запасной путь из п. 10 (пустой `agent_pid`), и `parse_pid`
+    принимает только ASCII-цифры в диапазоне `2…2**22`. Запасной путь оставлен сознательно: без него агент, запущенный
+    перед падением worker, потерялся бы. Подменённый pid направит `kill` только на группу процессов внутри песочницы,
+    которой агент и так управляет (`bypassPermissions`), — это принятый риск. Очистка убивает группу по `agent_pid`,
+    если он записан (п. 12).
 
 ## Risks / Trade-offs
 
@@ -165,4 +212,9 @@
   не читает.
 - [Лимиты подписки по окнам использования; `total_cost_usd` условен] → бюджет задач (`task-limits`) учитывает
   токены из `usage`, а не только USD (вопрос 8).
+- [Агент может подделать `status.json`, `stream.jsonl` и pid-файл] → время запуска и pid хранит сервер (п. 18),
+  `FINISHED` — только при мёртвой группе; итог агента для решений о задаче проверяют гейты. Остаточный риск:
+  pid-файл читается, только если worker упал между запуском и записью `agent_pid`.
+- [Отменённый worker не отзывает токен (D-41)] → токен истекает по `expires_at` (лимит агента + 10 мин) и
+  отзывается в `cleanup` после восстановления.
 - [Сигнатуры async `connect`/`pause`/`set_timeout` не сверены] → решение 1: точечный fallback на `to_thread`.

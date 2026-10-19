@@ -17,6 +17,7 @@ _PATTERNS: Final[tuple[tuple[re.Pattern[str], str], ...]] = (
     (re.compile(r"(?<!\d)\d{6,12}:[A-Za-z0-9_-]{30,}"), REDACTED),  # токен Telegram-бота
     (re.compile(r"\bglpat-[A-Za-z0-9_-]{20,}"), REDACTED),  # GitLab PAT
     (re.compile(r"\bsk-ant-[A-Za-z0-9_-]{20,}"), REDACTED),  # Anthropic
+    (re.compile(r"\baft_[A-Za-z0-9_-]{40,}"), REDACTED),  # токен задачи агента (D-42)
     # Схема авторизации остаётся, чтобы текст было понятно читать; сам токен заменяется.
     (re.compile(r"(?i)\b(bearer)\s+[A-Za-z0-9._~+/=-]{16,}"), rf"\1 {REDACTED}"),
 )

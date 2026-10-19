@@ -5,6 +5,7 @@
 открытой транзакции. Ошибка пайплайна, исключение или таймаут переводят задачу в error (если переход
 разрешён таблицей) с причиной; очистка и пауза выполняются в любом случае, кроме ошибки очистки.
 Часы и пауза между опросами инъецируются: тесты не ждут реального времени.
+Отмена worker (BaseException) очистку не выполняет и токены задачи не отзывает (D-41).
 """
 
 import asyncio
@@ -106,10 +107,15 @@ class _Runner:
 
     async def wait_agent(self) -> AgentRun:
         while True:
+            # Время и pid читаются из БД на каждом опросе: после рестарта worker они те же (D-41).
+            async with self._ctx.session_factory() as session:
+                info = await sandboxes.agent_run_info(session, self._provider_id)
             run = await sandboxes.wait_agent(
                 self._ctx.provider,
                 self._provider_id,
                 self._task,
+                started_at=info.started_at,
+                pid=info.pid,
                 timeout_min=self._ctx.timeout_min,
                 now=self._ctx.clock(),
                 secrets=self.secrets,
@@ -169,6 +175,8 @@ async def _run_reserved(ctx: DispatchContext, pipeline: Pipeline, reservation: R
     task = reservation.task
     provider_id = reservation.provider_id
     runner = _Runner(ctx, pipeline, provider_id, task)
+    # Отмена worker (BaseException) пробрасывается без очистки и без отзыва токенов: агент
+    # продолжает работать, _recover продолжит задачу, а cleanup отзовёт токены (D-41).
     try:
         await sandboxes.activate(
             ctx.provider,

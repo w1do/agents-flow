@@ -30,6 +30,15 @@ def test_generated_tokens_are_random_and_url_safe() -> None:
     assert re.fullmatch(r"[A-Za-z0-9_-]+", first)
 
 
+def test_generated_token_has_prefix() -> None:
+    # Префикс нужен шаблону redaction (D-42): без него токен после рестарта worker не закроется.
+    token = tokens.generate()
+
+    assert token.startswith("aft_")
+    assert len(token) >= 44
+    assert re.fullmatch(r"aft_[A-Za-z0-9_-]{40,}", token)
+
+
 def test_hash_is_hex_hmac_and_depends_on_key() -> None:
     token = tokens.generate()
 

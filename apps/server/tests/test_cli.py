@@ -1,13 +1,22 @@
-"""CLI harness-server через CliRunner: help, check-config, отказ при неполных ENV."""
+"""CLI harness-server через CliRunner: help, check-config, отказ при неполных ENV, песочница."""
 
+import asyncio
 import inspect
 import logging
+from pathlib import Path
 
 import pytest
 from harness_server import wiring
+from harness_server.adapters.novita import FakeSandbox
 from harness_server.adapters.telegram import FakeTelegramClient, TelegramError
 from harness_server.cli import _configure_logging, app
+from harness_server.config import load_config
+from harness_server.services import sandboxes
+from harness_server.services.tasks import create_task
 from harness_server.wiring import BotAdapters
+from harness_shared.tasks import TaskKind, TaskSource, TaskStatus
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from typer.testing import CliRunner
 
 MonkeyPatch = pytest.MonkeyPatch
@@ -181,3 +190,117 @@ def test_commands_fail_fast_on_missing_config_file(
 
     assert result.exit_code != 0
     assert "/nonexistent/harness.yaml" in result.output
+
+
+class _Stage:
+    """Пайплайн для резервирования: реализация из backlog в active."""
+
+    kind = TaskKind.IMPLEMENT
+    from_status = TaskStatus.BACKLOG
+    to_status: TaskStatus | None = TaskStatus.ACTIVE
+
+
+async def _occupy_sandbox(url: str, provider_id_source: Path) -> None:
+    """Закрепляет песочницу за задачей настоящими коммитами (как worker)."""
+    config = load_config(provider_id_source)
+    engine = create_async_engine(url)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await sandboxes.ensure_sandbox(session, config)
+        async with factory() as session:
+            await create_task(
+                session,
+                kind=TaskKind.IMPLEMENT,
+                text="занятая задача",
+                source=TaskSource.API,
+                known_workspace_ids=["demo"],
+                workspace_id="demo",
+            )
+        async with factory() as session:
+            reservation = await sandboxes.reserve(session, _Stage())
+        assert reservation is not None
+    finally:
+        await engine.dispose()
+
+
+async def _truncate(url: str) -> None:
+    engine = create_async_engine(url)
+    try:
+        async with engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "TRUNCATE TABLE telegram_updates, telegram_messages, task_tokens, sandboxes, "
+                    "spec_items, checkpoints, routings, task_events, tasks CASCADE"
+                )
+            )
+    finally:
+        await engine.dispose()
+
+
+def test_sandbox_pause_refuses_busy_sandbox(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch, migrated_database_url: str
+) -> None:
+    """Пауза занятой песочницы: код 1, понятное сообщение, песочница не паузится (design 9, 4.2)."""
+    monkeypatch.setenv("DATABASE_URL", migrated_database_url)
+    config_path = Path(valid_env["HARNESS_CONFIG"])
+    fake = FakeSandbox(sandbox_id=load_config(config_path).sandbox.provider_id)
+    monkeypatch.setattr(wiring, "build_sandbox_provider", lambda settings: fake)
+    asyncio.run(_occupy_sandbox(migrated_database_url, config_path))
+    try:
+        result = runner.invoke(app, ["sandbox", "pause"])
+    finally:
+        asyncio.run(_truncate(migrated_database_url))
+
+    assert result.exit_code == 1, result.output
+    assert "занята" in result.output
+    assert not fake.paused
+
+
+@pytest.mark.parametrize(("command", "done"), [("pause", "на паузе"), ("resume", "возобновлена")])
+def test_sandbox_command_registers_missing_row(
+    valid_env: dict[str, str],
+    monkeypatch: MonkeyPatch,
+    migrated_database_url: str,
+    command: str,
+    done: str,
+) -> None:
+    """Строки песочницы ещё нет (worker не стартовал): команда создаёт её и не падает (design 8)."""
+    monkeypatch.setenv("DATABASE_URL", migrated_database_url)
+    config_path = Path(valid_env["HARNESS_CONFIG"])
+    fake = FakeSandbox(sandbox_id=load_config(config_path).sandbox.provider_id)
+    monkeypatch.setattr(wiring, "build_sandbox_provider", lambda settings: fake)
+    asyncio.run(_truncate(migrated_database_url))
+    try:
+        result = runner.invoke(app, ["sandbox", command])
+    finally:
+        asyncio.run(_truncate(migrated_database_url))
+
+    assert result.exit_code == 0, result.output
+    assert done in result.output
+    assert "sandbox_not_registered" not in result.output
+
+
+def test_sandbox_bootstrap_refuses_busy_sandbox(
+    valid_env: dict[str, str],
+    monkeypatch: MonkeyPatch,
+    migrated_database_url: str,
+    tmp_path: Path,
+) -> None:
+    """Bootstrap во время активной задачи не выполняется: код 1, понятная ошибка (пункт I)."""
+    monkeypatch.setenv("DATABASE_URL", migrated_database_url)
+    monkeypatch.setenv("GITLAB_TOKEN", "glpat-test-token-0123456789abcdef")
+    config_path = Path(valid_env["HARNESS_CONFIG"])
+    fake = FakeSandbox(sandbox_id=load_config(config_path).sandbox.provider_id)
+    monkeypatch.setattr(wiring, "build_sandbox_provider", lambda settings: fake)
+    script = tmp_path / "bootstrap.sh"
+    script.write_text("#!/usr/bin/env bash\necho ok\n", encoding="utf-8")
+    asyncio.run(_occupy_sandbox(migrated_database_url, config_path))
+    try:
+        result = runner.invoke(app, ["sandbox", "bootstrap", "--script", str(script)])
+    finally:
+        asyncio.run(_truncate(migrated_database_url))
+
+    assert result.exit_code == 1, result.output
+    assert "занята" in result.output
+    assert fake.journal == []

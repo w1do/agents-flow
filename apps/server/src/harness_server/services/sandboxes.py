@@ -29,6 +29,7 @@ from harness_server.domain.errors import UnknownWorkspace, UnsupportedKind
 from harness_server.security import tokens
 from harness_server.security.redaction import redact
 from harness_server.services.agent_result import (
+    LOG_TEXT_LIMIT,
     AgentRun,
     AgentState,
     parse_exit_code,
@@ -153,6 +154,8 @@ SHORT_TIMEOUT_SEC: Final = 60
 KILL_GRACE_SEC: Final = 10
 # Сколько последних событий потока читается для итога хода (design 3).
 STREAM_TAIL_LINES: Final = 200
+# Хвост stderr читается байтами: символ UTF-8 занимает до 4 байт, поэтому запас по лимиту текста.
+STDERR_TAIL_BYTES: Final = 4 * LOG_TEXT_LIMIT
 CLAUDE_CODE_AGENT_TYPE: Final = "claude-code"
 
 
@@ -181,11 +184,20 @@ class CleanupFailed(Exception):
 
 
 class AgentStartState(StrEnum):
-    """Итог run_agent: запущен сейчас или уже был запущен раньше (идемпотентность, design 10)."""
+    """Итог run_agent: запущен сейчас или уже был запущен раньше (идемпотентность, design 10).
+
+    DIED — запуск записан на сервере, процесс мёртв, status.json нет (либо файлы есть без
+    серверной записи): агент умер без итога. Повторно не запускается; итог выдаёт wait_agent
+    (AgentState.DIED), а не «уже идёт».
+
+    Вызывающий код на DIED обязан вызвать wait_agent, а не переводить задачу в error сразу: между
+    проверками агент мог завершиться штатно, и wait_agent вернёт FINISHED (design 10).
+    """
 
     STARTED = "started"
     ALREADY_RUNNING = "already_running"
     ALREADY_FINISHED = "already_finished"
+    DIED = "died"
 
 
 @dataclass(frozen=True, slots=True)
@@ -195,6 +207,14 @@ class AgentStart:
 
     state: AgentStartState
     token: SecretStr | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class AgentRunInfo:
+    """Серверная запись запуска агента: время и pid из БД, а не из файлов песочницы (D-41)."""
+
+    started_at: datetime | None
+    pid: int | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -276,6 +296,36 @@ async def _locked_sandbox(session: AsyncSession, provider_id: str) -> Sandbox:
     return row
 
 
+async def agent_run_info(session: AsyncSession, provider_id: str) -> AgentRunInfo:
+    """Время запуска и pid агента из строки песочницы. Нет строки — SandboxStepError.
+
+    Транзакция завершается commit до возврата: exec с агентом идёт вне открытой транзакции (D-24).
+    """
+    row = await sandbox_status(session, provider_id)
+    if row is None:
+        raise SandboxStepError("sandbox_not_registered")
+    info = AgentRunInfo(started_at=row.agent_started_at, pid=row.agent_pid)
+    await session.commit()
+    return info
+
+
+async def record_agent_pid(session: AsyncSession, provider_id: str, pid: int) -> None:
+    """Сохраняет pid агента: сразу после запуска или найденный в файле при восстановлении."""
+    row = await _locked_sandbox(session, provider_id)
+    row.agent_pid = pid
+    await session.commit()
+
+
+async def _record_agent_started(
+    session: AsyncSession, provider_id: str, started_at: datetime
+) -> None:
+    """Время запуска пишется до команды: сбой после неё не теряет отсчёт таймаута (design 18)."""
+    row = await _locked_sandbox(session, provider_id)
+    row.agent_started_at = started_at
+    row.agent_pid = None
+    await session.commit()
+
+
 async def reserve(session: AsyncSession, pipeline: QueuePipeline) -> Reservation | None:
     """Закрепляет свободную песочницу и задачу очереди одной транзакцией (design 9, D-24).
 
@@ -308,6 +358,8 @@ async def reserve(session: AsyncSession, pipeline: QueuePipeline) -> Reservation
 
     sandbox.current_task_id = task.id
     sandbox.status = SandboxStatus.ACTIVE
+    sandbox.agent_started_at = None
+    sandbox.agent_pid = None
     await session.commit()
     logger.info("sandbox reserved provider_id=%s task=%s", sandbox.provider_id, task.id)
     return Reservation(provider_id=sandbox.provider_id, task=task)
@@ -414,15 +466,17 @@ def _run_script(directory: str, worktree: str, max_turns: int) -> str:
     stderr = shlex.quote(f"{directory}/stderr.log")
     status = shlex.quote(f"{directory}/status.json")
     tmp = shlex.quote(f"{directory}/status.tmp")
+    # Промпт идёт через stdin, а не аргументом: текст задачи, начинающийся с «-», не разбирается
+    # как флаг claude.
     return (
         "#!/usr/bin/env bash\n"
         "# Запуск агента в фоне. Переменные авторизации Anthropic сбрасываются (D-37).\n"
         "unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN\n"
         f"cd {shlex.quote(worktree)} || exit 1\n"
-        f'claude -p "$(cat {prompt})" --output-format stream-json --verbose '
+        "claude -p --output-format stream-json --verbose "
         f"--max-turns {max_turns} --permission-mode bypassPermissions "
         '--strict-mcp-config --mcp-config "$HOME/.harness/mcp.json" --setting-sources user '
-        f"> {stream} 2> {stderr}\n"
+        f"< {prompt} > {stream} 2> {stderr}\n"
         "code=$?\n"
         f'printf \'{{"exit_code": %d, "finished_at": "%s"}}\\n\' "$code" '
         '"$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
@@ -444,26 +498,50 @@ async def run_agent(
     agents_flow_url: str,
     now: datetime | None = None,
 ) -> AgentStart:
-    """Запускает агента в фоне и сразу возвращается (design 3–6, 10).
+    """Запускает агента в фоне и сразу возвращается (design 3–6, 10, 18).
 
-    Идемпотентно: есть status.json — уже завершён; есть pid — уже запущен; второй запуск не
-    делается.
-    Токен задачи выдаётся непосредственно перед запуском (D-37). Креды передаются только в env
-    команды запуска; в файлы попадают только prompt, run.json и run.sh без значений.
+    Идемпотентно по серверной записи agent_started_at (D-41): запуск есть в БД — второй не делается.
+    Файлы песочницы без серверной записи (status.json, pid) агента не запускают: итог DIED,
+    повторного запуска нет. Токен задачи выдаётся непосредственно перед запуском (D-37). Креды
+    передаются только в env команды запуска; в файлы попадают только prompt, run.json и run.sh без
+    значений.
     """
     home = await _home(provider, provider_id)
     directory = task_dir(home, task.id)
-    if await provider.read_file(provider_id, f"{directory}/status.json") is not None:
-        return AgentStart(AgentStartState.ALREADY_FINISHED)
-    if await provider.read_file(provider_id, f"{directory}/pid") is not None:
-        return AgentStart(AgentStartState.ALREADY_RUNNING)
+    info = await agent_run_info(session, provider_id)
+    if info.started_at is not None:
+        # Запуск уже был. Pid берём из БД; если его нет (сбой между запуском и записью), из файла.
+        pid = info.pid
+        if pid is None:
+            pid_text = await provider.read_file(provider_id, f"{directory}/pid")
+            pid = parse_pid(pid_text) if pid_text is not None else None
+            if pid is not None:
+                await record_agent_pid(session, provider_id, pid)
+        if pid is not None and await _is_alive(provider, provider_id, pid):
+            return AgentStart(AgentStartState.ALREADY_RUNNING)
+        if await provider.read_file(provider_id, f"{directory}/status.json") is not None:
+            return AgentStart(AgentStartState.ALREADY_FINISHED)
+        return AgentStart(AgentStartState.DIED)
 
+    # Серверной записи нет, но файлы остались: их не доверяем и агента повторно не запускаем (D-41).
+    leftovers = (
+        await provider.read_file(provider_id, f"{directory}/status.json") is not None
+        or await provider.read_file(provider_id, f"{directory}/pid") is not None
+    )
+    if leftovers:
+        return AgentStart(AgentStartState.DIED)
+
+    role = _ROLE_BY_KIND.get(task.kind)
+    if role is None:
+        raise UnsupportedKind(task.kind)
     started_at = now if now is not None else datetime.now(UTC)
     await _exec_ok(provider, provider_id, f"mkdir -p {shlex.quote(directory)}", reason="mkdir")
     await provider.write_file(provider_id, f"{directory}/prompt.md", prompt)
+    # run.json только для разбора человеком: сервер его не читает (D-41).
     run_info = {
         "started_at": started_at.isoformat(),
         "max_turns": max_turns,
+        "role": str(role),
         "task_id": str(task.id),
     }
     await provider.write_file(provider_id, f"{directory}/run.json", json.dumps(run_info))
@@ -480,11 +558,14 @@ async def run_agent(
         agent_run_timeout_min=timeout_min,
         now=started_at,
     )
+    # Время запуска пишется до команды: сбой после неё не теряет отсчёт таймаута (D-41).
+    await _record_agent_started(session, provider_id, started_at)
+    # pid возвращается в stdout и сохраняется сервером; файл pid — запасной путь при восстановлении.
     launch = (
         f"setsid nohup bash {shlex.quote(f'{directory}/run.sh')} >/dev/null 2>&1 < /dev/null & "
-        f"echo $! > {shlex.quote(f'{directory}/pid')}"
+        f'pid=$!; echo "$pid" > {shlex.quote(f"{directory}/pid")}; echo "$pid"'
     )
-    await _exec_ok(
+    launched = await _exec_ok(
         provider,
         provider_id,
         launch,
@@ -495,18 +576,31 @@ async def run_agent(
             "AGENTS_FLOW_URL": agents_flow_url,
         },
     )
+    pid = parse_pid(launched.stdout)
+    if pid is None:
+        raise SandboxStepError("launch_pid")
+    await record_agent_pid(session, provider_id, pid)
     logger.info("agent started task=%s", task.id)
     return AgentStart(AgentStartState.STARTED, token=SecretStr(token))
 
 
 async def _is_alive(provider: SandboxProvider, provider_id: str, pid: int) -> bool:
-    """Процесс с pid жив: kill -0 возвращает 0."""
-    result = await provider.exec(provider_id, f"kill -0 {pid}", timeout_s=SHORT_TIMEOUT_SEC)
+    """Группа процессов агента жива: kill -0 -- -<pid> возвращает 0.
+
+    Проверяется группа, а не сам pid: setsid делает run.sh лидером группы, и агент живёт в ней
+    вместе со своими дочерними процессами (как и kill по таймауту, design 3).
+    """
+    if pid <= 1:
+        # kill -0 -- -1 проверяет все процессы пользователя; такой pid из БД не должен дойти (N1).
+        return False
+    result = await provider.exec(provider_id, f"kill -0 -- -{pid}", timeout_s=SHORT_TIMEOUT_SEC)
     return result.exit_code == 0
 
 
 async def _kill_group(provider: SandboxProvider, provider_id: str, pid: int) -> None:
     """SIGTERM группе процессов агента, через KILL_GRACE_SEC — SIGKILL (design 3, 13)."""
+    if pid <= 1:
+        return
     await provider.exec(
         provider_id,
         f"kill -TERM -- -{pid} 2>/dev/null; sleep {KILL_GRACE_SEC}; "
@@ -520,24 +614,35 @@ async def wait_agent(
     provider_id: str,
     task: Task,
     *,
+    started_at: datetime | None,
+    pid: int | None,
     timeout_min: int,
     now: datetime,
     secrets: Sequence[str],
 ) -> AgentRun:
-    """Один опрос агента: статус, итог хода, таймаут и пропажа процесса (design 10, 13, 14).
+    """Один опрос агента: состояние, итог хода, таймаут и пропажа процесса (design 10, 13, 14, 18).
+
+    started_at и pid — из серверной записи (D-41); run.json и файл pid песочницы не читаются.
+    Файлы песочницы — подсказка: status.json и событие result дают итог, но FINISHED наступает
+    только когда группа процессов агента мертва. started_at None — агент не запускался: exec не
+    делается.
 
     Вызывается циклом worker с интервалом AGENT_POLL_INTERVAL_SEC. Текст из песочницы проходит
     redaction с точными значениями secrets; в AgentRun попадает хвост stderr не длиннее 2000
     символов.
     """
+    if started_at is None:
+        return AgentRun(state=AgentState.DIED, reason="агент не запущен")
     home = await _home(provider, provider_id)
     directory = task_dir(home, task.id)
-    run_text = await provider.read_file(provider_id, f"{directory}/run.json")
-    if run_text is None:
-        return AgentRun(state=AgentState.DIED, reason="агент не запущен")
-    started_at = _parse_started_at(run_text)
 
-    stderr_text = await provider.read_file(provider_id, f"{directory}/stderr.log") or ""
+    # Хвост, а не файл целиком: stderr агента может быть большим (design 14).
+    stderr_result = await provider.exec(
+        provider_id,
+        f"tail -c {STDERR_TAIL_BYTES} {shlex.quote(f'{directory}/stderr.log')} 2>/dev/null",
+        timeout_s=SHORT_TIMEOUT_SEC,
+    )
+    stderr_text = stderr_result.stdout if stderr_result.exit_code == 0 else ""
     stderr_tail = truncate_log_text(redact(stderr_text, extra_values=secrets))
     tail = await provider.exec(
         provider_id,
@@ -546,6 +651,20 @@ async def wait_agent(
     )
     lines = redact(tail.stdout, extra_values=secrets).splitlines() if tail.exit_code == 0 else []
     result = parse_result(lines)
+
+    # Группа жива — агент работает, даже если status.json уже записан: итог не доверяем, пока
+    # процессы не завершились (D-41).
+    if pid is not None and await _is_alive(provider, provider_id, pid):
+        if now - started_at > timedelta(minutes=timeout_min):
+            await _kill_group(provider, provider_id, pid)
+            logger.warning("agent timed out task=%s", task.id)
+            return AgentRun(
+                state=AgentState.TIMED_OUT,
+                result=result,
+                reason="превышено время",
+                stderr_tail=stderr_tail,
+            )
+        return AgentRun(state=AgentState.RUNNING)
 
     status_text = await provider.read_file(provider_id, f"{directory}/status.json")
     if status_text is not None:
@@ -558,21 +677,6 @@ async def wait_agent(
             reason=reason,
             stderr_tail=stderr_tail,
         )
-
-    pid_text = await provider.read_file(provider_id, f"{directory}/pid")
-    pid = parse_pid(pid_text) if pid_text is not None else None
-    if now - started_at > timedelta(minutes=timeout_min):
-        if pid is not None:
-            await _kill_group(provider, provider_id, pid)
-        logger.warning("agent timed out task=%s", task.id)
-        return AgentRun(
-            state=AgentState.TIMED_OUT,
-            result=result,
-            reason="превышено время",
-            stderr_tail=stderr_tail,
-        )
-    if pid is not None and await _is_alive(provider, provider_id, pid):
-        return AgentRun(state=AgentState.RUNNING)
     logger.warning("agent vanished without status task=%s", task.id)
     return AgentRun(
         state=AgentState.DIED,
@@ -580,18 +684,6 @@ async def wait_agent(
         reason="агент завершился без статуса",
         stderr_tail=stderr_tail,
     )
-
-
-def _parse_started_at(run_text: str) -> datetime:
-    """started_at из run.json. Битый файл — SandboxStepError: время таймаута неизвестно."""
-    try:
-        value = json.loads(run_text)["started_at"]
-        started = datetime.fromisoformat(value)
-    except (ValueError, KeyError, TypeError):
-        raise SandboxStepError("run_json") from None
-    if started.tzinfo is None:
-        raise SandboxStepError("run_json")
-    return started
 
 
 async def cleanup_task(
@@ -604,34 +696,52 @@ async def cleanup_task(
 ) -> None:
     """Очистка после задачи: worktree, локальная ветка, каталог задачи, отзыв токенов (design 12).
 
+    Токены отзываются первым шагом: отзыв не зависит от исхода очистки (пункт B). Очистка
+    идемпотентна: отсутствие worktree или ветки (активация упала до worktree add) — не ошибка.
     Ненулевой код любой команды — песочница в error, current_task_id сохраняется, CleanupFailed.
-    Причина в лог проходит redaction. Успех — токены задачи отозваны (revoke_task_tokens).
+    Причина в лог проходит redaction.
     """
-    if task.workspace_id is not None:
-        home = await _home(provider, provider_id)
-        repo = f"{home}/work/{task.workspace_id}"
-        commands = (
-            f"git -C {shlex.quote(repo)} worktree remove --force "
-            f"{shlex.quote(worktree_dir(home, task.id))}",
-            f"git -C {shlex.quote(repo)} branch -D {shlex.quote(f'task/{task.id}')}",
-            f"rm -rf {shlex.quote(task_dir(home, task.id))}",
-        )
-        for cmd in commands:
-            result = await provider.exec(provider_id, cmd, timeout_s=GIT_TIMEOUT_SEC)
-            if result.exit_code != 0:
-                detail = truncate_log_text(redact(result.stderr, extra_values=secrets))
-                logger.error(
-                    "sandbox cleanup failed sandbox=%s task=%s code=%s stderr=%s",
-                    provider_id,
-                    task.id,
-                    result.exit_code,
-                    detail,
-                )
-                row = await _locked_sandbox(session, provider_id)
-                row.status = SandboxStatus.ERROR
-                await session.commit()
-                raise CleanupFailed("command")
     await revoke_task_tokens(session, task.id)
+    # Агент мог запуститься до сбоя (например, БД упала после launch): его группа должна умереть
+    # до удаления каталога и worktree. Живость проверяется до kill: у мёртвой группы _kill_group
+    # ждал бы KILL_GRACE_SEC впустую.
+    row = await sandbox_status(session, provider_id)
+    pid = row.agent_pid if row is not None else None
+    if pid is not None and await _is_alive(provider, provider_id, pid):
+        await _kill_group(provider, provider_id, pid)
+    home = await _home(provider, provider_id)
+    commands: list[str] = []
+    if task.workspace_id is not None:
+        repo = shlex.quote(f"{home}/work/{task.workspace_id}")
+        worktree = shlex.quote(worktree_dir(home, task.id))
+        branch = f"task/{task.id}"
+        commands += [
+            # worktree remove на отсутствующем каталоге падает; тогда допустим только отсутствующий
+            # каталог, и stale-запись убирает prune.
+            f"git -C {repo} worktree remove --force {worktree} "
+            f"|| {{ [ ! -e {worktree} ] && git -C {repo} worktree prune; }}",
+            # branch -D на отсутствующей ветке падает; тогда допустимо только её отсутствие.
+            f"git -C {repo} branch -D {shlex.quote(branch)} "
+            f"|| ! git -C {repo} show-ref --verify --quiet {shlex.quote(f'refs/heads/{branch}')}",
+        ]
+    # Каталог задачи удаляется всегда, даже без workspace: активация могла упасть до git
+    # (design 12).
+    commands.append(f"rm -rf {shlex.quote(task_dir(home, task.id))}")
+    for cmd in commands:
+        result = await provider.exec(provider_id, cmd, timeout_s=GIT_TIMEOUT_SEC)
+        if result.exit_code != 0:
+            detail = truncate_log_text(redact(result.stderr, extra_values=secrets))
+            logger.error(
+                "sandbox cleanup failed sandbox=%s task=%s code=%s stderr=%s",
+                provider_id,
+                task.id,
+                result.exit_code,
+                detail,
+            )
+            row = await _locked_sandbox(session, provider_id)
+            row.status = SandboxStatus.ERROR
+            await session.commit()
+            raise CleanupFailed("command")
     logger.info("task cleanup done task=%s", task.id)
 
 
@@ -651,8 +761,21 @@ async def release_sandbox(
         raise
     row.current_task_id = None
     row.status = SandboxStatus.PAUSED
+    row.agent_started_at = None
+    row.agent_pid = None
     await session.commit()
     logger.info("sandbox released provider_id=%s", provider_id)
+
+
+async def assert_not_busy(session: AsyncSession, provider_id: str) -> None:
+    """Отказ SandboxBusy, если за песочницей закреплена задача. Нет строки — не занята.
+
+    Для bootstrap: скрипт меняет окружение, которым пользуется активная задача (пункт I).
+    Блокировки нет: проверка защищает от типичной ошибки оператора, не от гонки.
+    """
+    row = await sandbox_status(session, provider_id)
+    if row is not None and row.current_task_id is not None:
+        raise SandboxBusy(row.current_task_id)
 
 
 async def pause_sandbox(session: AsyncSession, provider: SandboxProvider, provider_id: str) -> None:
@@ -669,15 +792,26 @@ async def pause_sandbox(session: AsyncSession, provider: SandboxProvider, provid
 async def resume_sandbox(
     session: AsyncSession, provider: SandboxProvider, provider_id: str
 ) -> None:
-    """Возобновление (CLI): connect, затем статус paused. error с закреплённой задачей не
-    сбрасывается.
+    """Возобновление (CLI) по статусу строки (design 8).
 
-    Такая задача требует разбора; сброс current_task_id вручную здесь не делается (design 8, 12).
+    Закреплена задача — SandboxBusy до любых вызовов провайдера: такая задача требует разбора, а
+    current_task_id здесь не сбрасывается (design 12). paused без задачи — пустая операция: лишний
+    connect разбудил бы песочницу. error или active без задачи (рассинхрон) — connect, pause, статус
+    paused и обнуление колонок агента; ошибка провайдера пробрасывается, строка не меняется.
     """
     row = await _locked_sandbox(session, provider_id)
     if row.current_task_id is not None:
         raise SandboxBusy(row.current_task_id)
+    if row.status == SandboxStatus.PAUSED:
+        logger.info("sandbox resume skipped: already paused provider_id=%s", provider_id)
+        await session.commit()
+        return
+    if row.status == SandboxStatus.ACTIVE:
+        logger.warning("sandbox desync: active without task provider_id=%s", provider_id)
     await provider.connect(provider_id)
+    await provider.pause(provider_id)
     row.status = SandboxStatus.PAUSED
+    row.agent_started_at = None
+    row.agent_pid = None
     await session.commit()
     logger.info("sandbox resumed provider_id=%s", provider_id)

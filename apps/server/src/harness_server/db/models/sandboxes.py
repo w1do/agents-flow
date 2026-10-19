@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 
 from harness_shared.sandboxes import AgentRole, SandboxStatus
-from sqlalchemy import DateTime, ForeignKey, Index, String, UniqueConstraint, Uuid, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from harness_server.db.base import Base, TimestampMixin, enum_check, enum_type
@@ -12,7 +12,11 @@ from harness_server.db.ids import uuid7
 
 
 class Sandbox(TimestampMixin, Base):
-    """Песочница, созданная вручную; provider_id выдаёт провайдер (Novita)."""
+    """Песочница, созданная вручную; provider_id выдаёт провайдер (Novita).
+
+    agent_started_at и agent_pid — серверный учёт запуска агента, файлам песочницы не доверяем
+    (D-41).
+    """
 
     __tablename__ = "sandboxes"
     __table_args__ = (
@@ -28,6 +32,10 @@ class Sandbox(TimestampMixin, Base):
         Uuid(as_uuid=True), ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True
     )
     profile_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    agent_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    agent_pid: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class TaskToken(Base):

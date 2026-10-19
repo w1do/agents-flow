@@ -32,6 +32,7 @@ curl -fsS localhost:8000/health/ready # в другом терминале: 200 
 [deployment.md](deployment.md).
 
 Webhook Telegram локально — через публичный туннель на `/telegram/webhook`; адрес в `HARNESS_PUBLIC_URL`.
+Пошаговая работа без веб-панели (Telegram и CLI, проверка, частые проблемы): [operating-without-ui.md](operating-without-ui.md).
 
 ## Тесты
 

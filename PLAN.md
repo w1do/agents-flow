@@ -33,13 +33,13 @@ MR создан → сообщение в Telegram. Тот же поток ви�
 | 3 | [`mvp-03-task-store`](openspec/changes/archive/2026-10-18-mvp-03-task-store/) | Схема БД, статусы, очередь, POST/GET /tasks | task-lifecycle | mvp-02 | done |
 | 4 | [`mvp-04-telegram-intake`](openspec/changes/archive/2026-10-18-mvp-04-telegram-intake/) | Webhook, голос→текст, кнопки проекта, одно сообщение | telegram-bot, speech-to-text | mvp-03 | done |
 | 5 | [`mvp-05-command-routing`](openspec/changes/mvp-05-command-routing/) | Polza: классы work/status, кандидаты, запасной путь | command-routing | mvp-04 | review |
-| 6 | [`mvp-06-sandbox-runtime`](openspec/changes/mvp-06-sandbox-runtime/) | Адаптер Novita, bootstrap, запуск агента, очистка, пауза | sandbox-runtime | mvp-01, mvp-03 | todo |
+| 6 | [`mvp-06-sandbox-runtime`](openspec/changes/mvp-06-sandbox-runtime/) | Адаптер Novita, bootstrap, запуск агента, очистка, пауза | sandbox-runtime | mvp-01, mvp-03 | review |
 | 7 | [`mvp-07-agents-flow-mcp`](openspec/changes/mvp-07-agents-flow-mcp/) | MCP: токен задачи, report_task, sync_spec, create_task | agents-flow-mcp | mvp-03, mvp-06 | todo |
 | 8 | [`mvp-08-spec-planning`](openspec/changes/mvp-08-spec-planning/) | Планировщик OpenSpec → задачи в backlog | spec-planning | mvp-05, mvp-06, mvp-07 | todo |
 | 9 | [`mvp-09-delivery-mr`](openspec/changes/mvp-09-delivery-mr/) | Исполнитель, гейты, MR в GitLab, итог в Telegram | delivery-gates | mvp-08 | todo |
 | 10 | [`mvp-10-operator-console`](openspec/changes/mvp-10-operator-console/) | Веб-панель: вход, канбан, карточка и создание задачи, песочница и логи агента | operator-console | mvp-06, mvp-09 | todo |
 
-`mvp-01`…`mvp-04` выполнены, `mvp-05` на ревью, `mvp-06` в работе (ветка от `mvp-05` по решению владельца). Дальше строго
+`mvp-01`…`mvp-04` выполнены, `mvp-05` на ревью, `mvp-06` на ревью (ветка от `mvp-05` по решению владельца). Дальше строго
 по номеру до `mvp-10`.
 
 ## После MVP — мелкие изменения по волнам

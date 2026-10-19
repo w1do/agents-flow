@@ -1,5 +1,6 @@
 """Фильтр секретов: шаблоны токенов и точные значения из настроек."""
 
+from harness_server.security import tokens
 from harness_server.security.redaction import REDACTED, redact
 
 TELEGRAM_TOKEN = "123456:TEST-TOKEN-abcdefghijklmnopqrstuvwxyz0123"
@@ -26,6 +27,15 @@ def test_redacts_gitlab_token() -> None:
 
 def test_redacts_anthropic_key() -> None:
     assert redact(f"key={ANTHROPIC_KEY}") == f"key={REDACTED}"
+
+
+def test_redacts_task_token_without_extra_values() -> None:
+    # Токен задачи закрывает шаблон формата: после рестарта worker точного значения уже нет (D-42).
+    assert redact(f"err {tokens.generate()} end") == f"err {REDACTED} end"
+
+
+def test_short_aft_word_is_kept() -> None:
+    assert redact("aft_short") == "aft_short"
 
 
 def test_redacts_bearer_keeps_scheme() -> None:
