@@ -70,6 +70,8 @@ class Settings(BaseSettings):
     admin_password: SecretStr | None = None
     # Интервал опроса очереди worker; новая переменная mvp-02, нужна только worker.
     worker_poll_interval_sec: float = Field(default=5.0, gt=0)
+    # Интервал опроса агента в песочнице (mvp-06, D-38): реже очереди, агент работает минуты.
+    agent_poll_interval_sec: float = Field(default=15.0, gt=0)
 
     @field_validator("harness_secret_key")
     @classmethod

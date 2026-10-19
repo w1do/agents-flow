@@ -10,6 +10,7 @@ import httpx
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from harness_server.adapters.novita import NovitaSandboxProvider, SandboxProvider
 from harness_server.adapters.polza import POLZA_API_URL, PolzaRouter, Router
 from harness_server.adapters.stt import OpenAiCompatibleStt, SpeechToText
 from harness_server.adapters.telegram import HttpxTelegramClient, TelegramClient
@@ -59,6 +60,17 @@ def build_adapters(settings: Settings, http: httpx.AsyncClient) -> BotAdapters:
             http,
         )
     return BotAdapters(telegram=telegram, stt=stt, router=router)
+
+
+def build_sandbox_provider(settings: Settings) -> SandboxProvider | None:
+    """Провайдер песочницы Novita из настроек; None, если NOVITA_API_KEY не задан (песочница не
+    настроена)."""
+    if settings.novita_api_key is None:
+        return None
+    return NovitaSandboxProvider(
+        api_key=settings.novita_api_key.get_secret_value(),
+        domain=settings.novita_domain,
+    )
 
 
 def secret_values(settings: Settings) -> tuple[str, ...]:
