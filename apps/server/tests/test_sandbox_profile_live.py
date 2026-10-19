@@ -261,9 +261,8 @@ async def prepared(live_env: LiveEnv) -> AsyncIterator[Prepared]:
         embedding_key=embedding,
     )
     output = _safe(result.stdout + result.stderr, values)
-    assert result.exit_code == 0, (
-        f"первый bootstrap завершился с кодом {result.exit_code}\n{output}"
-    )
+    code = result.exit_code
+    assert code == 0, f"первый bootstrap завершился с кодом {code}\n{output}"
     home = await sandboxes.home_dir(provider, live_env.sandbox_id)
     yield Prepared(
         env=live_env,
@@ -376,9 +375,11 @@ async def _memory_status(p: Prepared) -> object:
         envs={"EMBEDDING_API_KEY": p.embedding.get_secret_value()},
         timeout_s=600,
     )
-    assert result.exit_code == 0, _safe(result.stderr, p.secret_values)
+    code = result.exit_code
+    assert code == 0, _safe(result.stderr, p.secret_values)
+    text = result.stdout
     try:
-        return json.loads(result.stdout)
+        return json.loads(text)
     except ValueError:
         pytest.fail("вывод memory status --json не является JSON")
 
@@ -406,9 +407,8 @@ async def test_5_1_second_bootstrap_is_idempotent(prepared: Prepared) -> None:
     )
     output = _safe(result.stdout + result.stderr, prepared.secret_values)
 
-    assert result.exit_code == 0, (
-        f"повторный bootstrap завершился с кодом {result.exit_code}\n{output}"
-    )
+    code = result.exit_code
+    assert code == 0, f"повторный bootstrap завершился с кодом {code}\n{output}"
     # Ничего не ставится и не клонируется заново: в выводе нет строк установки (ставлю/клонирую).
     assert "ставлю" not in output, output
     assert "клонирую" not in output, output
@@ -418,14 +418,15 @@ async def test_5_1_second_bootstrap_is_idempotent(prepared: Prepared) -> None:
     marker = await _run(
         prepared, f"cat {shlex.quote(prepared.home + '/.harness/memory/installed-ref')}"
     )
-    assert marker.exit_code == 0
-    assert marker.stdout.strip() == spec, (
-        "маркер installed-ref не совпадает с закреплённым коммитом"
-    )
+    marker_code = marker.exit_code
+    assert marker_code == 0, "не читается маркер installed-ref"
+    marker_text = marker.stdout.strip()
+    assert marker_text == spec, "маркер installed-ref не совпадает с закреплённым коммитом"
 
     # Бинарь memory доступен пользователю песочницы, не только root (D-51: umask в установке).
     help_run = await _run(prepared, "memory --help")
-    assert help_run.exit_code == 0, _safe(help_run.stderr, prepared.secret_values)
+    help_code = help_run.exit_code
+    assert help_code == 0, _safe(help_run.stderr, prepared.secret_values)
 
 
 # --- 5.2 ---------------------------------------------------------------------------------------
@@ -441,7 +442,8 @@ async def test_5_2_memory_status_ok_and_key_not_on_disk(prepared: Prepared) -> N
             'grep -rlF -- "$CHECK_VALUE" "$HOME" 2>/dev/null; true',
             envs={"CHECK_VALUE": value},
         )
-        assert found.stdout.strip() == "", f"значение {label} найдено на диске песочницы"
+        found_paths = found.stdout.strip()
+        assert found_paths == "", f"значение {label} найдено на диске песочницы"
 
 
 # --- 5.3 ---------------------------------------------------------------------------------------
@@ -452,7 +454,8 @@ async def test_5_3_agent_runs_multi_turn_with_services_up_and_no_oom(prepared: P
     print(f"free -m до задачи:\n{before.stdout}")  # для отчёта владельца: ресурсы песочницы
     # dmesg может быть недоступен без прав: тогда счётчик 0 и проверка формальна (см. отчёт).
     oom = await _run(prepared, 'dmesg 2>/dev/null | grep -ci "out of memory\\|oom-kill" || true')
-    assert oom.stdout.strip() in {"", "0"}, "в dmesg есть записи OOM"
+    oom_count = oom.stdout.strip()
+    assert oom_count in {"", "0"}, "в dmesg есть записи OOM"
 
     workdir = await _workdir(prepared)
     try:
@@ -509,7 +512,8 @@ async def test_5_5_pause_resume_keeps_docker_and_memory(prepared: Prepared) -> N
             f"bash {shlex.quote(prepared.home + '/.harness/bin/ensure-docker.sh')}",
             timeout_s=600,
         )
-        assert ensure.exit_code == 0, _safe(ensure.stderr, prepared.secret_values)
+        ensure_code = ensure.exit_code
+        assert ensure_code == 0, _safe(ensure.stderr, prepared.secret_values)
         _assert_services_ok(await _memory_status(prepared))
     finally:
         # Возобновление в finally: следующие тесты не начнутся на паузе, даже если проверка упала.
@@ -653,16 +657,19 @@ async def test_5_7_activation_with_memory_commits_in_worktree(
                 agents_flow_url="https://harness.invalid/mcp",
                 memory_enabled=True,
             )
-        assert start.state is AgentStartState.STARTED
+        started = start.state is AgentStartState.STARTED
+        assert started, "агент не запущен"
         async with committed_session_factory() as session:
             info = await sandboxes.agent_run_info(session, sandbox_id)
-        assert info.pid is not None, "pid агента не записан"
+        agent_pid = info.pid
+        if agent_pid is None:
+            pytest.fail("pid агента не записан")
 
         # HARNESS_MEMORY_PROJECT читаем из env процесса сразу после запуска. Выводится только
         # имя переменной и путь клона: других значений из env не печатаем.
         environ = await _run(
             p,
-            f"tr '\\0' '\\n' < /proc/{int(info.pid)}/environ 2>/dev/null | "
+            f"tr '\\0' '\\n' < /proc/{int(agent_pid)}/environ 2>/dev/null | "
             "grep '^HARNESS_MEMORY_PROJECT=' || true",
             timeout_s=60,
         )
@@ -694,9 +701,8 @@ async def test_5_7_activation_with_memory_commits_in_worktree(
         run = await _wait_for_agent(p, task, started_at, info.pid)
         finished = run.state is AgentState.FINISHED
         assert finished, "агент не завершился штатно (статус из wait_agent, см. ленту задачи)"
-        assert run.succeeded, (
-            "агент завершился с ошибкой (код выхода или subtype, см. ленту задачи)"
-        )
+        succeeded = run.succeeded
+        assert succeeded, "агент завершился с ошибкой (код выхода или subtype, см. ленту задачи)"
 
         worktree = sandboxes.worktree_dir(p.home, task.id)
         subject = await _run(p, f"git -C {shlex.quote(worktree)} log -1 --format=%s")

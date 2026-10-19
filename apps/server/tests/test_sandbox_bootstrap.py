@@ -7,6 +7,7 @@
 import os
 import re
 import subprocess
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -510,3 +511,23 @@ async def test_bootstrap_without_token_has_no_gitlab_env() -> None:
     assert sandbox.received_env("GITLAB_TOKEN") is None
     assert "GITLAB_TOKEN" not in sandbox.journal[-1].env_keys
     assert sandbox.received_env("HARNESS_SANDBOX_BOOTSTRAP") == "1"
+
+
+def test_apt_update_precedes_apt_install_in_every_function() -> None:
+    """Образ песочницы может прийти с пустыми списками apt: update в функции раньше install."""
+    text = SCRIPT_PATH.read_text(encoding="utf-8")
+    # Сегмент — от определения функции (любой отступ) до следующего определения.
+    definition = re.compile(r"^\s*[A-Za-z_][A-Za-z0-9_]*\(\) \{$", re.MULTILINE)
+    starts = [m.start() for m in definition.finditer(text)] + [len(text)]
+    checked = 0
+    for begin, end in pairwise(starts):
+        segment = text[begin:end]
+        install = re.search(r"^\s*(?!apt_install\(\))(apt_install )", segment, re.MULTILINE)
+        if install is None:
+            continue
+        checked += 1
+        update = re.search(r"^\s*apt_update$", segment, re.MULTILINE)
+        first_line = segment.splitlines()[0]
+        ordered = update is not None and update.start() < install.start()
+        assert ordered, f"apt_install без apt_update раньше в функции: {first_line}"
+    assert checked >= 3  # ensure_node, ensure_acl, ensure_docker (и их ветки)

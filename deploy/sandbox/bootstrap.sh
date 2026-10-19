@@ -158,6 +158,8 @@ ensure_node() {
     exit 1
   fi
   echo "ставлю Node 22 из репозитория NodeSource"
+  # Образ песочницы может прийти с пустыми списками apt: без update установка не находит пакеты.
+  apt_update
   apt_install ca-certificates curl gnupg
   sudo -n install -m 0755 -d /etc/apt/keyrings
   curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key |
