@@ -8,17 +8,21 @@ send_task_card (её досылает recover_pending).
 """
 
 import logging
+from collections.abc import Sequence
 from uuid import UUID
 
 from sqlalchemy import select
 
 from harness_server.adapters.telegram.types import MessageNotEditable, TelegramError
+from harness_server.config import WorkspaceConfig
 from harness_server.db.models import Task, TelegramMessage
 from harness_server.security.redaction import redact
 from harness_server.services.context import BotContext
 from harness_server.services.tasks import get_task
 from harness_server.telegram.render import (
     STAGE_CHOOSING,
+    clarify_keyboard,
+    clarify_text,
     render_card,
     short_title,
     stage_line,
@@ -28,10 +32,13 @@ from harness_server.telegram.render import (
 logger = logging.getLogger(__name__)
 
 
-async def send_task_card(ctx: BotContext, task: Task) -> None:
+async def send_task_card(
+    ctx: BotContext, task: Task, *, workspaces: Sequence[WorkspaceConfig] | None = None
+) -> None:
     """Отправляет карточку задачи с кнопками выбора проекта. Идемпотентна: вторая карточка не
     уходит.
 
+    workspaces — кнопки маршрутизатора (не больше трёх); None — все workspace из конфига (D-13).
     TelegramError пробрасывается: вызывающий решает, что делать (процесс досылает карточку позже).
     """
     async with ctx.session_factory() as session:
@@ -41,7 +48,11 @@ async def send_task_card(ctx: BotContext, task: Task) -> None:
     line = stage_line(short_title(source), STAGE_CHOOSING)
     text = redact(render_card(source, [line]), ctx.secret_values)
     message_id = await ctx.telegram.send_message(
-        ctx.owner_chat_id, text, reply_markup=workspace_keyboard(task.id, ctx.workspaces)
+        ctx.owner_chat_id,
+        text,
+        reply_markup=workspace_keyboard(
+            task.id, ctx.workspaces if workspaces is None else workspaces
+        ),
     )
     async with ctx.session_factory() as session:
         session.add(
@@ -114,6 +125,33 @@ async def reply(ctx: BotContext, text: str) -> None:
     пробрасывается."""
     try:
         await ctx.telegram.send_message(ctx.owner_chat_id, redact(text, ctx.secret_values))
+    except TelegramError as exc:
+        logger.warning("telegram %s failed: %s", exc.method, type(exc).__name__)
+
+
+async def send_clarify(ctx: BotContext, routing_id: UUID, title: str) -> None:
+    """Вопрос «Сделать задачу / Показать статус» при низкой уверенности (D-33).
+
+    Ошибка Telegram логируется: владелец повторит команду, задача до нажатия не создана.
+    """
+    text = redact(clarify_text(title), ctx.secret_values)
+    try:
+        await ctx.telegram.send_message(
+            ctx.owner_chat_id, text, reply_markup=clarify_keyboard(routing_id)
+        )
+    except TelegramError as exc:
+        logger.warning(
+            "telegram %s failed routing=%s: %s", exc.method, routing_id, type(exc).__name__
+        )
+
+
+async def close_prompt(ctx: BotContext, chat_id: int, message_id: int, text: str) -> None:
+    """Заменяет текст сообщения с кнопками и убирает клавиатуру. Ошибки Telegram логируются.
+
+    Без reply_markup Bot API убирает инлайн-клавиатуру: повторно нажать уже нельзя.
+    """
+    try:
+        await ctx.telegram.edit_message_text(chat_id, message_id, redact(text, ctx.secret_values))
     except TelegramError as exc:
         logger.warning("telegram %s failed: %s", exc.method, type(exc).__name__)
 

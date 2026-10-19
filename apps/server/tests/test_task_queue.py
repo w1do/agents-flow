@@ -5,9 +5,15 @@ import asyncio
 from uuid import UUID
 
 import pytest
-from harness_server.db.models import Task
+from harness_server.db.models import Sandbox, Task
 from harness_server.domain.errors import InvalidTransition
-from harness_server.services.tasks import claim_next_task, create_task, list_task_events
+from harness_server.services.tasks import (
+    claim_next_task,
+    create_task,
+    list_task_events,
+    lock_next_task,
+)
+from harness_shared.sandboxes import SandboxStatus
 from harness_shared.tasks import TaskEventSource, TaskKind, TaskSource, TaskStatus
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -141,3 +147,38 @@ async def test_claim_ignores_other_kind_and_status(committed_session_factory: Fa
         )
     assert plan is not None
     assert plan.kind == TaskKind.PLAN
+
+
+async def test_lock_without_status_change_skips_task_pinned_to_sandbox(
+    committed_session_factory: Factory,
+) -> None:
+    # Задача уже закреплена за песочницей (current_task_id): без смены статуса её не берут.
+    pinned = await _implement(committed_session_factory)
+    free = await _implement(committed_session_factory)
+    async with committed_session_factory() as session:
+        session.add(
+            Sandbox(
+                provider_id="sbx-queue",
+                agent_type="claude-code",
+                status=SandboxStatus.ACTIVE,
+                current_task_id=pinned,
+            )
+        )
+        await session.commit()
+
+    async with committed_session_factory() as session:
+        task = await lock_next_task(
+            session,
+            kind=TaskKind.IMPLEMENT,
+            from_status=TaskStatus.BACKLOG,
+            to_status=None,
+        )
+        assert task is not None
+        assert task.id == free
+        assert task.status == TaskStatus.BACKLOG
+        await session.commit()
+
+    async with committed_session_factory() as session:
+        events = await list_task_events(session, free)
+    # Статус не менялся, событие записано с текущим статусом задачи.
+    assert [event.status for event in events] == [TaskStatus.BACKLOG]

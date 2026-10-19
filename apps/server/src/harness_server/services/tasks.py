@@ -14,7 +14,7 @@ from harness_shared.tasks import TaskEventSource, TaskKind, TaskSource, TaskStat
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from harness_server.db.models import SpecItem, Task, TaskEvent
+from harness_server.db.models import Sandbox, SpecItem, Task, TaskEvent
 from harness_server.domain.errors import NotFound, UnknownWorkspace
 from harness_server.domain.statuses import (
     ensure_transition,
@@ -193,6 +193,53 @@ async def add_event(
     return event
 
 
+async def lock_next_task(
+    session: AsyncSession,
+    *,
+    kind: TaskKind,
+    from_status: TaskStatus,
+    to_status: TaskStatus | None,
+    source: TaskEventSource = TaskEventSource.WORKER,
+    text: str | None = None,
+) -> Task | None:
+    """Блокирует следующую задачу очереди и пишет событие; БЕЗ commit (mvp-06, D-24 — исключение).
+
+    Только для композиции внутри сервиса, который сам владеет транзакцией: например, резервирование
+    песочницы и задачи одной транзакцией (services/sandboxes). Вызывающий обязан закоммитить или
+    откатить сессию; блокировки строки держатся до этого. Публичный вход без композиции —
+    claim_next_task, он коммитит сам.
+
+    to_status=None: задача берётся без смены статуса (например, plan остаётся в planning до
+    этапа mvp-08). Такая выборка исключает задачи, уже закреплённые за песочницей
+    (sandboxes.current_task_id), и пишет событие с текущим статусом задачи.
+
+    Выбор — наибольший priority, затем самая ранняя; FOR UPDATE SKIP LOCKED пропускает строки,
+    занятые другими транзакциями. Возвращает None, если подходящих задач нет.
+    """
+    if to_status is not None:
+        ensure_transition(kind, from_status, to_status)
+    stmt = select(Task).where(Task.kind == kind, Task.status == from_status)
+    if to_status is None:
+        # Задача, уже закреплённая за песочницей, второй раз не берётся.
+        pinned = select(Sandbox.id).where(Sandbox.current_task_id == Task.id).exists()
+        stmt = stmt.where(~pinned)
+    stmt = (
+        stmt.order_by(Task.priority.desc(), Task.created_at, Task.id)
+        .limit(1)
+        .with_for_update(skip_locked=True)
+        .execution_options(populate_existing=True)
+    )
+    task = (await session.execute(stmt)).scalar_one_or_none()
+    if task is None:
+        return None
+
+    if to_status is not None:
+        task.status = to_status
+    event = TaskEvent(task_id=task.id, status=task.status, text=text, source=source)
+    session.add(event)
+    return task
+
+
 async def claim_next_task(
     session: AsyncSession,
     *,
@@ -204,8 +251,7 @@ async def claim_next_task(
 ) -> Task | None:
     """Захватывает следующую задачу из очереди: переход, событие и commit одной транзакцией.
 
-    Выбор — наибольший priority, затем самая ранняя; FOR UPDATE SKIP LOCKED не даёт двум воркерам
-    получить одну задачу, а занятые строки пропускает. Блокировки снимаются commit внутри функции.
+    Выборка и её правила — в lock_next_task. Блокировки снимаются commit внутри функции.
     Долгую работу вызывающий выполняет после возврата, вне транзакции. Возвращает None, если
     подходящих задач нет.
 
@@ -214,23 +260,19 @@ async def claim_next_task(
     работы; это учитывается в mvp-06.
     """
     ensure_transition(kind, from_status, to_status)
-    stmt = (
-        select(Task)
-        .where(Task.kind == kind, Task.status == from_status)
-        .order_by(Task.priority.desc(), Task.created_at, Task.id)
-        .limit(1)
-        .with_for_update(skip_locked=True)
-        .execution_options(populate_existing=True)
+    task = await lock_next_task(
+        session,
+        kind=kind,
+        from_status=from_status,
+        to_status=to_status,
+        source=source,
+        text=text,
     )
-    task = (await session.execute(stmt)).scalar_one_or_none()
     if task is None:
         # Закрываем транзакцию, открытую выборкой, чтобы блокировок не осталось.
         await session.commit()
         return None
 
-    task.status = to_status
-    event = TaskEvent(task_id=task.id, status=to_status, text=text, source=source)
-    session.add(event)
-    await _commit(session, task, event)
+    await _commit(session, task)
     logger.info("task claimed id=%s to=%s", task.id, to_status)
     return task

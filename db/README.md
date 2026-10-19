@@ -10,7 +10,7 @@
 |---|---|
 | Окружение Alembic (async engine, URL из `DATABASE_URL`) | `db/migrations/env.py` |
 | Шаблон ревизии | `db/migrations/script.py.mako` |
-| Ревизии | `db/migrations/versions/`: `0001_initial` (9 таблиц MVP), `0002` (`telegram_updates.payload`) |
+| Ревизии | `db/migrations/versions/`: `0001_initial` (9 таблиц MVP), `0002` (`telegram_updates.payload`), `0003` (`routings`, mvp-05) |
 | Конфиг | `alembic.ini` в корне |
 
 Применить миграции до head:
@@ -44,6 +44,20 @@ testcontainers или берут `TEST_DATABASE_URL` и применяют ми�
 `telegram_updates.payload` (JSONB): нормализованный апдейт владельца до обработки. После обработки значение
 обнуляется, строка получает `processed_at` (D-27). Откат: `uv run alembic downgrade 0001` удаляет колонку и
 тела необработанных апдейтов, поэтому перед откатом дождитесь `processed_at` у всех строк.
+
+## Ревизия 0003 (mvp-05)
+
+Миграция `20261018_0003_routing_decision.py`, ручная, без импорта кода приложения (D-32). Меняет только
+`routings`, в которую до mvp-05 никто не писал:
+
+- `task_id` становится nullable: решения `status`, `unknown` и ожидающего уточнения задачи не имеют;
+- `command_class` сужается до `VARCHAR(16)` и получает CHECK `ck_routings_command_class` (`work`, `status`, `unknown`);
+- новые колонки: `decision` (NOT NULL, CHECK `ck_routings_decision`: `auto`, `clarify`, `fallback`), `error`
+  (причина запасного пути), `source_text` (текст уточнения до нажатия), `resolved_at` (время нажатия).
+
+Откат: `uv run alembic downgrade 0002` удаляет колонки `decision`, `error`, `source_text`, `resolved_at` и строки
+`routings` без задачи (решения status/unknown и ожидающие уточнения тексты). Перед откатом учтите, что эти строки
+удаляются без сохранения.
 
 ## Локальный Postgres
 

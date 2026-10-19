@@ -18,7 +18,7 @@
 - MCP: официальный MCP Python SDK, Streamable HTTP, смонтирован в FastAPI на `/mcp`.
 - Внешние API: httpx (async). Telegram — тонкий собственный клиент на httpx.
 - Тесты: pytest + pytest-asyncio, Postgres в testcontainers или сервисе CI. Линт: ruff, mypy `--strict`.
-- Консоль (после MVP): React + shadcn/ui, ESLint + Prettier, типы из `packages/shared-types`.
+- Консоль (MVP, `mvp-10-operator-console`, D-39): React + shadcn/ui, ESLint + Prettier, типы из `packages/shared-types`.
 - Git-хостинг: GitLab (MR, CI, Registry). Деплой: Dokploy.
 
 ## 3. Жёсткие правила

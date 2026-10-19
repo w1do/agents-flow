@@ -10,10 +10,15 @@ workspaces:
     default_branch: main
     test_command: "pytest"
     agent: claude-code
+    # Лимит ходов агента на задачу, 1…500 (D-38).
+    agent_max_turns: 50
 
 sandbox:
   # Id песочницы Novita, созданной вручную (заполняется на этапе mvp-06).
   provider_id: CHANGE_ME_SANDBOX_ID
+  # Версии, закреплённые для bootstrap песочницы (D-38); меняются только вместе с кодом.
+  claude_code_version: "2.1.292"
+  openspec_version: "1.14.3"
 
 gitlab:
   base_url: https://gitlab.com

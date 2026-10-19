@@ -2,7 +2,7 @@
 
 import json
 import os
-from collections.abc import AsyncIterator, Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +10,7 @@ import pytest
 import pytest_asyncio
 from alembic import command as alembic_command
 from alembic.config import Config as AlembicConfig
+from harness_server.adapters.polza import Router
 from harness_server.adapters.stt import SpeechToText
 from harness_server.adapters.telegram import FakeTelegramClient
 from harness_server.config import WorkspaceConfig
@@ -186,6 +187,8 @@ def make_bot_context() -> Callable[..., BotContext]:
         stt: SpeechToText | None = None,
         workspaces: tuple[WorkspaceConfig, ...] | None = None,
         voice_max_bytes: int = DEFAULT_VOICE_MAX_BYTES,
+        router: Router | None = None,
+        routing_min_confidence: float = 0.6,
     ) -> BotContext:
         if workspaces is None:
             workspaces = (
@@ -204,6 +207,31 @@ def make_bot_context() -> Callable[..., BotContext]:
             owner_chat_id=OWNER_CHAT_ID,
             secret_values=(VALID_WEBHOOK_SECRET,),
             voice_max_bytes=voice_max_bytes,
+            router=router,
+            routing_min_confidence=routing_min_confidence,
+        )
+
+    return build
+
+
+@pytest.fixture
+def routing_content() -> Callable[..., str]:
+    """JSON ответа модели маршрутизатора (design.md §1); ensure_ascii выключен из-за кириллицы."""
+
+    def build(
+        command_class: str,
+        confidence: float,
+        workspaces: Sequence[tuple[str, float]] = (),
+        title: str = "",
+    ) -> str:
+        return json.dumps(
+            {
+                "class": command_class,
+                "confidence": confidence,
+                "workspaces": [{"id": i, "score": s} for i, s in workspaces],
+                "title": title,
+            },
+            ensure_ascii=False,
         )
 
     return build

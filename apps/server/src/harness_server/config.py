@@ -36,6 +36,8 @@ _SECRET_SEGMENTS = frozenset(
 _SEGMENT_SPLIT = re.compile(r"[_-]")
 # Граница camelCase: accessToken → access_Token, чтобы сегмент token не терялся внутри слова.
 _CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
+# Версия пакета в bootstrap подставляется в команду npm: принимаем только X.Y.Z (D-38).
+_SEMVER_PATTERN = r"^\d+\.\d+\.\d+$"
 
 
 class WorkspaceConfig(BaseModel):
@@ -51,6 +53,8 @@ class WorkspaceConfig(BaseModel):
     default_branch: str = "main"
     test_command: str | None = None
     agent: str = "claude-code"
+    # Лимит ходов агента на задачу (D-38): ограничивает расход подписки и зацикливание.
+    agent_max_turns: int = Field(default=50, ge=1, le=500)
 
 
 class SandboxConfig(BaseModel):
@@ -59,6 +63,9 @@ class SandboxConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     provider_id: str = Field(min_length=1)
+    # Версии ставятся в песочницу bootstrap-скриптом и закреплены здесь, а не «latest» (D-38).
+    claude_code_version: str = Field(default="2.1.292", pattern=_SEMVER_PATTERN)
+    openspec_version: str = Field(default="1.14.3", pattern=_SEMVER_PATTERN)
 
 
 class GitLabConfig(BaseModel):

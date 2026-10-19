@@ -51,7 +51,7 @@ def test_empty_required_variable_counts_as_missing(
 def test_optional_defaults_applied(valid_env: dict[str, str]) -> None:
     settings = load_settings()
 
-    assert settings.routing_min_confidence == 0.7
+    assert settings.routing_min_confidence == 0.6
     assert settings.agent_run_timeout_min == 60
     assert settings.tests_timeout_min == 15
     assert settings.worker_poll_interval_sec == 5.0
@@ -269,3 +269,24 @@ def test_admin_token_surrounding_whitespace_rejected(
     message = str(info.value)
     assert "HARNESS_ADMIN_TOKEN" in message
     assert "c" * 32 not in message
+
+
+def test_polza_ai_url_requires_https(valid_env: dict[str, str], monkeypatch: MonkeyPatch) -> None:
+    # Текст владельца уходит в Polza: открытый http недопустим (D-31).
+    monkeypatch.setenv("POLZA_AI_URL", "http://polza.ai/api/v1")
+
+    with pytest.raises(SettingsError) as info:
+        load_settings()
+
+    assert "POLZA_AI_URL" in str(info.value)
+
+
+def test_routing_min_confidence_out_of_range_rejected(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ROUTING_MIN_CONFIDENCE", "1.5")
+
+    with pytest.raises(SettingsError) as info:
+        load_settings()
+
+    assert "ROUTING_MIN_CONFIDENCE" in str(info.value)

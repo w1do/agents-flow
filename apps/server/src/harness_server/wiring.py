@@ -10,6 +10,8 @@ import httpx
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from harness_server.adapters.novita import NovitaSandboxProvider, SandboxProvider
+from harness_server.adapters.polza import POLZA_API_URL, PolzaRouter, Router
 from harness_server.adapters.stt import OpenAiCompatibleStt, SpeechToText
 from harness_server.adapters.telegram import HttpxTelegramClient, TelegramClient
 from harness_server.config import HarnessConfig
@@ -27,6 +29,8 @@ class BotAdapters:
 
     telegram: TelegramClient
     stt: SpeechToText | None
+    # router = None, если Polza не настроена (POLZA_AI_KEY и POLZA_AI_MODEL).
+    router: Router | None = None
 
 
 def build_http_client() -> httpx.AsyncClient:
@@ -37,7 +41,7 @@ def build_http_client() -> httpx.AsyncClient:
 
 
 def build_adapters(settings: Settings, http: httpx.AsyncClient) -> BotAdapters:
-    """Реальные адаптеры из настроек. STT создаётся, только если заданы URL, ключ и модель."""
+    """Реальные адаптеры из настроек. STT и маршрутизатор — только при заданных ключе и модели."""
     telegram = HttpxTelegramClient(settings.telegram_bot_token.get_secret_value(), http)
     stt: SpeechToText | None = None
     if settings.stt_api_url and settings.stt_api_key is not None and settings.stt_model:
@@ -47,7 +51,26 @@ def build_adapters(settings: Settings, http: httpx.AsyncClient) -> BotAdapters:
             settings.stt_model,
             http,
         )
-    return BotAdapters(telegram=telegram, stt=stt)
+    router: Router | None = None
+    if settings.polza_ai_key is not None and settings.polza_ai_model:
+        router = PolzaRouter(
+            settings.polza_ai_url or POLZA_API_URL,
+            settings.polza_ai_key.get_secret_value(),
+            settings.polza_ai_model,
+            http,
+        )
+    return BotAdapters(telegram=telegram, stt=stt, router=router)
+
+
+def build_sandbox_provider(settings: Settings) -> SandboxProvider | None:
+    """Провайдер песочницы Novita из настроек; None, если NOVITA_API_KEY не задан (песочница не
+    настроена)."""
+    if settings.novita_api_key is None:
+        return None
+    return NovitaSandboxProvider(
+        api_key=settings.novita_api_key.get_secret_value(),
+        domain=settings.novita_domain,
+    )
 
 
 def secret_values(settings: Settings) -> tuple[str, ...]:
@@ -75,4 +98,6 @@ def build_bot_context(
         owner_chat_id=int(settings.telegram_chat_id),
         secret_values=secret_values(settings),
         voice_max_bytes=settings.voice_max_bytes,
+        router=adapters.router,
+        routing_min_confidence=settings.routing_min_confidence,
     )

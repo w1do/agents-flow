@@ -266,3 +266,62 @@ def test_gitlab_url_forms_rejected(tmp_path: Path, url: str) -> None:
     assert "pass" not in message
     assert "pw" not in message
     assert "evil" not in message
+
+
+def test_sandbox_versions_and_turn_limit_have_pinned_defaults(tmp_path: Path) -> None:
+    config = load_config(_write(tmp_path, _workspace_body(agent_max_turns=None) + TAIL))
+
+    assert config.sandbox.claude_code_version == "2.1.292"
+    assert config.sandbox.openspec_version == "1.14.3"
+    assert config.workspaces[0].agent_max_turns == 50
+
+
+@pytest.mark.parametrize("value", [0, 501])
+def test_agent_max_turns_out_of_range_rejected(tmp_path: Path, value: int) -> None:
+    body = _workspace_body(agent_max_turns=value) + TAIL
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "workspaces[0].agent_max_turns" in str(info.value)
+
+
+def test_sandbox_version_override_is_read(tmp_path: Path) -> None:
+    body = (
+        _workspace_body(agent_max_turns=None)
+        + "sandbox:\n  provider_id: sbx-1\n  claude_code_version: 2.2.0\n"
+        + "gitlab:\n  base_url: https://gitlab.example.com\n"
+    )
+
+    config = load_config(_write(tmp_path, body))
+
+    assert config.sandbox.claude_code_version == "2.2.0"
+
+
+def _workspace_body(agent_max_turns: int | None) -> str:
+    body = (
+        "workspaces:\n"
+        "  - id: demo\n"
+        "    name: Demo\n"
+        "    voice_aliases: []\n"
+        "    gitlab_project: group/demo\n"
+    )
+    if agent_max_turns is not None:
+        body += f"    agent_max_turns: {agent_max_turns}\n"
+    return body
+
+
+@pytest.mark.parametrize(
+    "version", ["latest", "2.1", "2.1.292-beta", "v2.1.292", "2.1.292; rm -rf /"]
+)
+def test_sandbox_version_must_be_semver(tmp_path: Path, version: str) -> None:
+    body = (
+        _workspace_body(agent_max_turns=None)
+        + f"sandbox:\n  provider_id: sbx-1\n  claude_code_version: '{version}'\n"
+        + "gitlab:\n  base_url: https://gitlab.example.com\n"
+    )
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "sandbox.claude_code_version" in str(info.value)
