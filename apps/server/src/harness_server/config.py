@@ -1,14 +1,15 @@
-"""Загрузка и проверка config/harness.yaml: несекретные настройки workspace, sandbox, gitlab.
+"""Загрузка и проверка config/harness.yaml: несекретные настройки workspace (в том числе
+репозиторий), sandbox.
 
 Секреты в YAML запрещены: ключи с сегментами token/tokens/key/password/passwd/pwd/secret/secrets/
 apikey/credential/credentials отклоняются до валидации Pydantic (D-20, D-26). Ошибки называют путь к
-полю (workspaces[0].gitlab_token), но не значение.
+полю (workspaces[0].repo.token), но не значение.
 """
 
 import re
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Self
-from urllib.parse import urlsplit
+from typing import Any, Final, Literal, Self
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
@@ -45,13 +46,93 @@ _GIT_SHA_PATTERN = r"^[0-9a-f]{40}$"
 # Сегмент начинается и заканчивается буквой или цифрой: ./. и ../.. не проходят (L1).
 _GITHUB_REPO_SEGMENT = r"[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?"
 _GITHUB_REPO_PATTERN = rf"^{_GITHUB_REPO_SEGMENT}/{_GITHUB_REPO_SEGMENT}$"
+# GitLab допускает подгруппы: group/subgroup/name, минимум два сегмента (D-60).
+_GITLAB_PROJECT_PATTERN = rf"^{_GITHUB_REPO_SEGMENT}(/{_GITHUB_REPO_SEGMENT})+$"
 # Автор коммитов: без управляющих символов (в том числе перевода строки); адрес без @ и пробелов.
 _GIT_NAME_PATTERN = r"^[^\x00-\x1f\x7f]+$"
 _GIT_EMAIL_PATTERN = r"^[^@\s\x00-\x1f\x7f]+@[^@\s\x00-\x1f\x7f]+$"
 
+# Провайдер git-хостинга репозитория workspace (D-60); GitHub Enterprise пока не поддержан.
+GitProviderName = Literal["github", "gitlab"]
+GITHUB_BASE_URL: Final = "https://github.com"
+DEFAULT_REPO_BASE_URLS: Final[Mapping[str, str]] = {
+    "github": GITHUB_BASE_URL,
+    "gitlab": "https://gitlab.com",
+}
+# Метка хоста и сегмент пути base_url начинаются и заканчиваются буквой или цифрой: «.», «..»,
+# «-host» и «a..b» не проходят (D-62, F3).
+_HOST_LABEL = r"[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?"
+_URL_PATH_SEGMENT = r"[A-Za-z0-9]([A-Za-z0-9._~-]*[A-Za-z0-9])?"
+# Только https: заголовок с ключом не уходит открытым текстом (D-60). Без query, fragment, пробелов.
+_REPO_BASE_URL_PATTERN = (
+    rf"^https://{_HOST_LABEL}(\.{_HOST_LABEL})*(:[0-9]{{1,5}})?(/{_URL_PATH_SEGMENT})*/?$"
+)
+
+
+class RepoConfig(BaseModel):
+    """Репозиторий workspace (D-60): провайдер, адрес, проект и ссылка vault на ключ записи.
+
+    Адрес по умолчанию зависит от провайдера. Ключ не хранится здесь: access_ref — только ссылка
+    vault (D-45), а без него задача не запускается, потому что все пайплайны пушат ветку.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: GitProviderName
+    # Пустое значение заменяет валидатор по умолчанию провайдера (_default_base_url), см. ниже.
+    base_url: str = ""
+    project: str = Field(min_length=1, max_length=255)
+    # Ключ записи из vault (D-45). Без него — только анонимный клон публичного репозитория.
+    access_ref: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _default_base_url(cls, data: Any) -> Any:
+        # Адрес по умолчанию подставляем до проверки поля, чтобы github без base_url не падал.
+        if isinstance(data, dict) and data.get("base_url") is None:
+            provider = data.get("provider")
+            if isinstance(provider, str) and provider in DEFAULT_REPO_BASE_URLS:
+                return {**data, "base_url": DEFAULT_REPO_BASE_URLS[provider]}
+        return data
+
+    @field_validator("base_url")
+    @classmethod
+    def _check_base_url(cls, value: str) -> str:
+        # Текст ошибки не содержит значения: pydantic выводит его без input (см. _format_errors).
+        if "@" in value:
+            raise ValueError(
+                "адрес не должен содержать учётные данные перед символом @; "
+                "ключ задаётся ссылкой repo.access_ref"
+            )
+        if re.fullmatch(_REPO_BASE_URL_PATTERN, value) is None:
+            raise ValueError(
+                "адрес репозитория — https://хост[:порт][/путь] без учётных данных, query, fragment"
+            )
+        return value.rstrip("/")
+
+    @field_validator("access_ref")
+    @classmethod
+    def _check_access_ref(cls, value: str | None) -> str | None:
+        return _check_vault_ref(value, "access_ref")
+
+    @model_validator(mode="after")
+    def _check_provider_rules(self) -> Self:
+        if self.project.lower().endswith(".git"):
+            raise ValueError("project указывается без .git")
+        if self.provider == "github":
+            if self.base_url != GITHUB_BASE_URL:
+                raise ValueError(
+                    "GitHub Enterprise пока не поддерживается: для github base_url — https://github.com"
+                )
+            if re.fullmatch(_GITHUB_REPO_PATTERN, self.project) is None:
+                raise ValueError("project для github — owner/name")
+        elif re.fullmatch(_GITLAB_PROJECT_PATTERN, self.project) is None:
+            raise ValueError("project для gitlab — group[/subgroup]/name")
+        return self
+
 
 class WorkspaceConfig(BaseModel):
-    """Проект, с которым работает харнесс: GitLab-репозиторий и команда тестов."""
+    """Проект, с которым работает харнесс: репозиторий GitHub или GitLab и команда тестов."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -59,12 +140,23 @@ class WorkspaceConfig(BaseModel):
     id: str = Field(min_length=1, max_length=28, pattern=r"^[A-Za-z0-9_-]+$")
     name: str = Field(min_length=1)
     voice_aliases: list[str]
-    gitlab_project: str = Field(min_length=1)
+    repo: RepoConfig
     default_branch: str = "main"
     test_command: str | None = None
     agent: str = "claude-code"
     # Лимит ходов агента на задачу (D-38): ограничивает расход подписки и зацикливание.
     agent_max_turns: int = Field(default=50, ge=1, le=500)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_legacy_fields(cls, data: Any) -> Any:
+        # Чистый разрыв (D-60): старое поле не переводится молча, иначе ключ одного хоста уйдёт на
+        # другой.
+        if isinstance(data, dict) and "gitlab_project" in data:
+            raise ValueError(
+                "gitlab_project удалён (D-60): задайте repo: provider, project, access_ref"
+            )
+        return data
 
 
 class SandboxMemoryConfig(BaseModel):
@@ -119,38 +211,6 @@ class SandboxConfig(BaseModel):
     git_author: GitAuthorConfig = Field(default_factory=GitAuthorConfig)
 
 
-class GitLabConfig(BaseModel):
-    """Адрес GitLab. Токен — ссылка на vault (access_ref) или ENV GITLAB_TOKEN, но не значение."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    base_url: str = Field(min_length=1)
-    # Главный ключ GitLab из vault (D-45). Без него сервер берёт GITLAB_TOKEN из ENV.
-    access_ref: str | None = None
-
-    @field_validator("access_ref")
-    @classmethod
-    def _check_access_ref(cls, value: str | None) -> str | None:
-        return _check_vault_ref(value, "access_ref")
-
-    @field_validator("base_url")
-    @classmethod
-    def _reject_userinfo(cls, value: str) -> str:
-        # Учётные данные в адресе попали бы в конфиг, логи и ответы; токен задаётся только в ENV.
-        # Текст ошибки не содержит значения: pydantic выводит его без input (см. _format_errors).
-        parts = urlsplit(value)
-        # Требуем схему http(s) и непустой netloc: без них urlsplit даёт netloc='' для строк
-        # вида user:pw@host или https:/user:pw@host, и userinfo проскакивает проверку.
-        if parts.scheme not in {"http", "https"} or not parts.netloc:
-            raise ValueError("адрес должен начинаться с http:// или https:// и содержать хост")
-        if "@" in parts.netloc or parts.username is not None or parts.password is not None:
-            raise ValueError(
-                "адрес не должен содержать учётные данные перед символом @; "
-                "токен задаётся в ENV GITLAB_TOKEN"
-            )
-        return value
-
-
 class HarnessConfig(BaseModel):
     """Корень harness.yaml."""
 
@@ -158,7 +218,16 @@ class HarnessConfig(BaseModel):
 
     workspaces: list[WorkspaceConfig] = Field(min_length=1)
     sandbox: SandboxConfig
-    gitlab: GitLabConfig
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_legacy_gitlab_section(cls, data: Any) -> Any:
+        # Секция gitlab удалена (D-60); без подсказки extra=forbid дал бы безликое «не разрешено».
+        if isinstance(data, dict) and "gitlab" in data:
+            raise ValueError(
+                "секция gitlab удалена (D-60): адрес, проект и ключ задаются в workspaces[].repo"
+            )
+        return data
 
     @model_validator(mode="after")
     def _check_unique_workspace_ids(self) -> Self:

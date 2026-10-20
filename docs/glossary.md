@@ -15,6 +15,8 @@
 | Активация | `activate` | Возобновление песочницы + выдача кредов + подготовка worktree |
 | Очистка | `cleanup` | Удаление worktree, локальной ветки, кредов; разрешает паузу |
 | Гейт | `Gate` | Механическая проверка сервером: секреты, коммит, тесты, push, MR |
+| MR | `MR` | Внутренний термин харнесса для запроса слияния: merge request в GitLab, pull request в GitHub (D-56, D-60). Слово для владельца выбирается по провайдеру (`change_request_label`: «MR» или «PR») |
+| Провайдер репозитория | `GitProviderName` | `github` или `gitlab`: задаётся у каждого workspace в `repo.provider` (D-60) |
 | Пункт спецификации | `SpecItem` | Зеркало пункта OpenSpec из `tasks.md` |
 | Событие задачи | `TaskEvent` | Запись в ленте этапов, источник сообщения в Telegram |
 | Источник события | `TaskEventSource` | Кто записал событие: `telegram`, `agent`, `worker`, `api` |

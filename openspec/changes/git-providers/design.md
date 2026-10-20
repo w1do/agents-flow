@@ -1,6 +1,10 @@
 # Design: git-providers
 
 > Решение D-60. Вопросы владельцу — в начале proposal.md; design написан на вариантах по умолчанию.
+>
+> **Эскалация 1 (security-ревью, D-62).** Раздел «Эскалация 1» в конце файла действует поверх разделов выше: где
+> они расходятся, исполняется он. Заменены решение 7, разделы 2, 3 (bootstrap и activate), 5 (обработка ошибки),
+> 7, 8 и часть 1 (адрес `base_url`).
 
 ## Problem statement
 
@@ -75,7 +79,8 @@ GitLab. Нужно, чтобы провайдер, адрес, проект и �
    через `http.https://github.com/.extraheader` — тот же способ, что у `actions/checkout`. Одно имя подходит для
    classic PAT, fine-grained PAT и (позже) токена App. Подтверждается live-тестом задачи 6.1 на
    `w1do/chistotyumen`.
-7. **Заголовок для bootstrap собирает сервер**, скрипт получает готовое значение в env `GIT_AUTH_HEADER_<i>`, где
+7. **[Заменено эскалацией 1, решение Э-2: клоны и fetch bootstrap делает сервер, `GIT_AUTH_HEADER_<i>` нет.]**
+   **Заголовок для bootstrap собирает сервер**, скрипт получает готовое значение в env `GIT_AUTH_HEADER_<i>`, где
    `i` — номер пары `<id>=<url>` в argv (с 0). Почему: знание о провайдере (имя пользователя Basic) остаётся в
    Python в одном месте (`services/git_access.py`), скрипт не различает провайдеров. Имя переменной по номеру, а не
    по id workspace: id допускает `-`, недопустимый в имени переменной окружения. Значение — секрет того же уровня,
@@ -353,6 +358,8 @@ for workspace in config.workspaces:
 ```
 
 ### 8. `deploy/sandbox/bootstrap.sh`
+
+> Заменено разделом Э.6 эскалации 1: `GIT_AUTH_HEADER_<i>`, `run_git_auth` и цикл клонов из скрипта удаляются.
 
 - Комментарий в шапке: пример без `--gitlab-url`; «Ключ репозитория уходит git только заголовком Authorization на
   префикс адреса своей пары (`GIT_CONFIG_*` в env одной команды); заголовок i-й пары приходит в env
@@ -640,3 +647,796 @@ openspec validate --all
 7. Остальные тесты из «Test strategy» (фабрики `WorkspaceConfig`, live-тесты). `./tools/harness check` целиком.
 8. Документация: задачи раздела 6 tasks.md.
 9. Память проекта: задачи раздела 7 tasks.md.
+
+## Эскалация 1: исправления security-ревью (D-62)
+
+Действует поверх разделов выше. Причина: security-ревью `CHANGES_REQUIRED` — F1 (high), F2 (medium), F3 и F4 (low);
+ревью кода — low 1–4. Ответы на вопросы владельца 1–6 не меняются; новый вопрос 7 — в proposal.md.
+
+### Э.0 Модель угроз и граница (что исправление закрывает и что нет)
+
+Проверено по коду:
+
+- Агент работает в песочнице под тем же пользователем, что и команды харнесса, и может писать в `~/work/<ws>/.git/`,
+  `~/.gitconfig`, `~/.profile`; у пользователя песочницы есть `sudo -n` (им пользуется bootstrap).
+- `novita_sandbox` (`core/sandbox_async/commands/command.py`, `_start`) запускает каждую команду как
+  `/bin/bash -l -c <cmd>`: login-shell читает `/etc/profile` и `~/.profile` до команды харнесса.
+- Канал stdin в SDK есть (`commands.run(stdin=True)` + `commands.send_stdin(pid, …)`), но в `SandboxProvider` его нет,
+  и от угроз ниже он не защищает: значение всё равно оказывается в памяти процесса той же учётной записи.
+
+Вывод. Агент с выполнением кода (prompt injection) может перехватить любой ключ, который попадает в песочницу
+после того, как он там поработал: через `~/.profile` (обёртка `git`, свои env), через `sudo` или чтением
+`/proc/<pid>/environ` git-процесса, если его процесс ещё жив. Перекрытия конфига git этого не закрывают. Это
+остаточный риск R-1, его принимает владелец (вопрос 7 proposal.md); полное решение — отдельное изменение (git с
+ключом вне песочницы или песочница на workspace плюс fine-grained ключи).
+
+Исправление закрывает то, что закрыть можно без смены границы:
+
+- **F1:** ключ не уходит по настройкам, которые агент записал в файлы конфига git (`.git/config` клона,
+  `~/.gitconfig`, `/etc/gitconfig`): прокси, отключение TLS, свой CA, хуки, помощники учётных данных, askpass,
+  `remote.origin.*`, подмодули, `ext::`/`file://` через `insteadOf`.
+- **F2:** ни один ключ не находится в env процессов, которые ставят пакеты (apt postinst, npm lifecycle), и ключи
+  разных workspace никогда не находятся в env одного процесса.
+
+### Э.1 Решения
+
+- **Э-1 (F1). Перекрытия конфига в env команды с ключом.** Ключи `GIT_CONFIG_*` — scope command, git читает его
+  последним. Для `http.<url>.*` git выбирает самый точный URL, при равной точности — последнее значение
+  (git-config, `http.<url>.*`; `urlmatch.c`: путь с завершающим `/` и без него равны по точности). Поэтому все
+  параметры `http.*` ставятся на тот же префикс `auth_url_prefix(repo)`, что и заголовок: агент не может записать
+  более точный ключ, чем адрес клона (git сравнивает ключи с адресом remote, а не с адресом каждого запроса), а при
+  равенстве побеждает scope command. Параметры без URL (`core.hooksPath`, `credential.helper` и др.) — тоже scope
+  command. Пустой `credential.helper` сбрасывает список помощников (git-config, `credential.helper`). Пустой
+  `http.proxy` выключает прокси, в том числе из env (`http.c`). `GIT_CONFIG_GLOBAL=/dev/null` и
+  `GIT_CONFIG_NOSYSTEM=1` убирают `~/.gitconfig` и `/etc/gitconfig` (там же `trace2.*`, `init.templateDir`).
+  `GIT_ALLOW_PROTOCOL=https` перебивает `protocol.*.allow` из файлов: `insteadOf` на `ext::`/`file://`/ssh не
+  выполнится. `insteadOf` на другой https-адрес остаётся возможным, но заголовок туда не уходит: он привязан к
+  префиксу адреса из конфига. `GIT_ASKPASS=/bin/false` перебивает `core.askPass` и `SSH_ASKPASS`.
+- **Э-1a (F1). Fetch по адресу из конфига, а не по имени `origin`.** `git -C <dir> fetch --quiet --prune
+  --no-recurse-submodules <clone_url> +refs/heads/*:refs/remotes/origin/*`: `remote.origin.*` клона (`proxy`, `vcs`,
+  `url`, `fetch`) в команде не участвуют, `refs/remotes/origin/*` обновляются как раньше. `set-url origin` перед
+  fetch остаётся (для git агента) и выполняется без ключа. Отвергнуто: отдельный временный bare-репозиторий на
+  каждый fetch — полная загрузка репозитория на каждую задачу, а R-1 он всё равно не закрывает.
+- **Э-2 (F2). Клоны и fetch bootstrap делает сервер, а не скрипт.** `sandboxes.bootstrap` выполняет три шага:
+  (1) `bootstrap.sh --phase setup` без ключей в env — все установки; (2) на каждый workspace отдельные git-команды
+  (`clone` или `set-url` + `fetch`) с env `git_access.git_auth_env` только этого workspace — тот же код, что в
+  `activate`; (3) при памяти `bootstrap.sh --phase memory` только с `EMBEDDING_API_KEY` — индексация клонов, без
+  установок. `GIT_AUTH_HEADER_<i>` удаляется. Идемпотентность: шаг 1 не переустанавливает совпадающие версии
+  (как раньше), шаг 2 клонирует только отсутствующий каталог, иначе `set-url` + `fetch`; шаг 3 не переиндексирует
+  неизменённые файлы. Анонимный клон без ключа сохраняется (`anonymous_git_env`). Отвергнуто: stdin (нет в
+  протоколе адаптера, не закрывает `/proc`), файл 0600 с удалением (агент той же учётной записи читает файл, ключи
+  на диске запрещены D-52), два вызова скрипта с ключами git во втором (ключи всех workspace снова в одном процессе
+  и дублирование перекрытий Э-1 в bash).
+- **Э-3 (F3, ревью 4).** Метки хоста и сегменты пути `base_url` начинаются и заканчиваются буквой или цифрой:
+  `.`, `..`, `-host`, `a..b` отклоняются.
+- **Э-4 (F4, ревью 1).** Redaction: префиксы токенов GitHub и GitLab ловятся и после `_` (граница
+  `(?<![A-Za-z0-9])` вместо `\b`); `Basic <значение>` заменяется в любом регистре, но только если в значении есть
+  цифра, `+` или `/` (слово «basic» перед длинным словом остаётся); пароль в адресе `https://user:pass@host`
+  заменяется; точные значения дополняются base64 заголовка в URL-кодировке. Отвергнуто: поиск base64 токена со
+  сдвигом внутри чужого base64 — текст такого вида харнесс не порождает, а шаблон дал бы ложные замены.
+- **Э-5 (ревью 2, 3).** Docstring и комментарии с переносом посреди фразы переписываются (тексты ниже); в
+  `apps/server/README.md` — абзац про `repo.access_ref`.
+
+### Э.2 `apps/server/src/harness_server/services/git_access.py` — файл целиком
+
+```python
+"""Адрес и авторизация git для репозитория workspace (D-60, D-62; уточняет D-52).
+
+Ключ уходит git только заголовком Authorization в env одной git-команды, на префикс адреса этого
+репозитория. Команда с ключом перекрывает настройки из .git/config клона, ~/.gitconfig и
+/etc/gitconfig, которые агент может править (D-62). Значения ключей и заголовков в логи и
+исключения не попадают.
+"""
+
+import base64
+import shlex
+from collections.abc import Mapping
+from typing import Final
+from urllib.parse import quote
+
+from harness_server.config import GitProviderName, RepoConfig
+
+# Пользователь Basic по провайдеру: GitLab принимает oauth2 (D-52, live 6c), GitHub — x-access-token
+# (тот же способ, что у actions/checkout; имя пользователя для PAT не используется, токен — пароль).
+GIT_BASIC_USERS: Final[Mapping[GitProviderName, str]] = {
+    "gitlab": "oauth2",
+    "github": "x-access-token",
+}
+# Слово для владельца: у GitLab merge request, у GitHub pull request; внутри харнесса — «MR» (D-56).
+CHANGE_REQUEST_LABELS: Final[Mapping[GitProviderName, str]] = {"gitlab": "MR", "github": "PR"}
+
+# fetch идёт по адресу из конфига, а не по имени origin: remote.origin.* клона в команде не
+# участвуют, а ветки попадают в refs/remotes/origin/* явной refspec (D-62).
+FETCH_REFSPEC: Final = "+refs/heads/*:refs/remotes/origin/*"
+# Хранилище CA Ubuntu в шаблоне песочницы: явный путь перекрывает sslCAInfo/sslCAPath клона (D-62).
+SYSTEM_CA_BUNDLE: Final = "/etc/ssl/certs/ca-certificates.crt"
+SYSTEM_CA_DIR: Final = "/etc/ssl/certs"
+# http.<префикс>.* на том же префиксе, что и заголовок. git берёт самый точный URL, при равной
+# точности — последнее значение, а scope command читается последним, поэтому http.<url>.* из
+# .git/config клона эти значения не перекрывают (D-62). Пустой proxy выключает и прокси из env.
+SCOPED_HTTP_OVERRIDES: Final[tuple[tuple[str, str], ...]] = (
+    ("followRedirects", "false"),
+    ("proxy", ""),
+    ("sslVerify", "true"),
+    ("sslCAInfo", SYSTEM_CA_BUNDLE),
+    ("sslCAPath", SYSTEM_CA_DIR),
+)
+# Параметры без URL: хуки, помощники учётных данных и дочерние процессы git получили бы env с
+# заголовком (D-62). Пустой credential.helper сбрасывает список помощников из всех файлов.
+COMMAND_OVERRIDES: Final[tuple[tuple[str, str], ...]] = (
+    ("credential.helper", ""),
+    ("core.hooksPath", "/dev/null"),
+    ("core.fsmonitor", "false"),
+    ("core.alternateRefsCommand", "true"),
+    ("gc.auto", "0"),
+    ("maintenance.auto", "false"),
+    ("fetch.recurseSubmodules", "false"),
+    ("submodule.recurse", "false"),
+)
+# env любой git-команды харнесса: без ~/.gitconfig и /etc/gitconfig, только https (insteadOf на
+# ext:: или file:// не сработает), askpass не запускает чужую программу (D-62).
+HARDENED_GIT_ENV: Final[Mapping[str, str]] = {
+    "GIT_TERMINAL_PROMPT": "0",
+    "GIT_ASKPASS": "/bin/false",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_ALLOW_PROTOCOL": "https",
+}
+
+
+def clone_url(repo: RepoConfig) -> str:
+    """Адрес клона: base_url + проект + .git. Учётных данных в адресе нет."""
+    return f"{repo.base_url}/{repo.project}.git"
+
+
+def auth_url_prefix(repo: RepoConfig) -> str:
+    """Префикс http.<url>.* для заголовка: только этот репозиторий (граница «/»).
+
+    git сопоставляет http.<url>.* по префиксу на границе «/», поэтому с завершающим «/» заголовок
+    не получает соседний репозиторий того же хоста (D-60).
+    """
+    return f"{clone_url(repo)}/"
+
+
+def git_auth_header(provider: GitProviderName, token: str) -> str:
+    """Authorization: Basic base64("<user>:<token>"), user по провайдеру. Значение — секрет."""
+    basic = base64.b64encode(f"{GIT_BASIC_USERS[provider]}:{token}".encode()).decode("ascii")
+    return f"Authorization: Basic {basic}"
+
+
+def git_auth_env(repo: RepoConfig, token: str) -> dict[str, str]:
+    """env git-команды с ключом: заголовок на префикс репозитория и перекрытия конфига (D-62).
+
+    GIT_CONFIG_* передаются через env одной команды, а не argv и не файлы (D-52); git >= 2.32.
+    Заголовок — всегда пара с номером 0.
+    """
+    prefix = auth_url_prefix(repo)
+    pairs: list[tuple[str, str]] = [
+        (f"http.{prefix}.extraHeader", git_auth_header(repo.provider, token)),
+        *((f"http.{prefix}.{name}", value) for name, value in SCOPED_HTTP_OVERRIDES),
+        *COMMAND_OVERRIDES,
+    ]
+    env = dict(HARDENED_GIT_ENV)
+    env["GIT_CONFIG_COUNT"] = str(len(pairs))
+    for index, (key, value) in enumerate(pairs):
+        env[f"GIT_CONFIG_KEY_{index}"] = key
+        env[f"GIT_CONFIG_VALUE_{index}"] = value
+    return env
+
+
+def anonymous_git_env() -> dict[str, str]:
+    """env git-команды без ключа: без запроса пароля и без ~/.gitconfig и /etc/gitconfig."""
+    return dict(HARDENED_GIT_ENV)
+
+
+def clone_command(repo: RepoConfig, repo_dir: str) -> str:
+    """Клон по адресу из конфига без подмодулей: подмодуль запустил бы git с чужим конфигом."""
+    return shlex.join(
+        ["git", "clone", "--quiet", "--no-recurse-submodules", "--", clone_url(repo), repo_dir]
+    )
+
+
+def set_origin_command(repo: RepoConfig, repo_dir: str) -> str:
+    """Возвращает origin клона на адрес из конфига: агент мог его поменять. Выполняется без ключа."""
+    return shlex.join(["git", "-C", repo_dir, "remote", "set-url", "origin", clone_url(repo)])
+
+
+def fetch_command(repo: RepoConfig, repo_dir: str) -> str:
+    """fetch по адресу из конфига с явной refspec и без подмодулей (D-62)."""
+    return shlex.join(
+        [
+            "git",
+            "-C",
+            repo_dir,
+            "fetch",
+            "--quiet",
+            "--prune",
+            "--no-recurse-submodules",
+            clone_url(repo),
+            FETCH_REFSPEC,
+        ]
+    )
+
+
+def git_auth_secret_values(provider: GitProviderName, token: str) -> tuple[str, str, str]:
+    """Секреты заголовка для redaction: строка заголовка, её base64 и base64 в URL-кодировке."""
+    header = git_auth_header(provider, token)
+    bare = header.removeprefix("Authorization: Basic ")
+    return header, bare, quote(bare, safe="")
+
+
+def change_request_label(provider: GitProviderName) -> str:
+    """«MR» или «PR» для текстов владельцу (mvp-09)."""
+    return CHANGE_REQUEST_LABELS[provider]
+```
+
+`GIT_CONFIG_COUNT` = 1 + 5 + 8 = `"14"`. Push в `mvp-09` строится так же: `git -C <worktree> push <clone_url>
+<refspec>` с `git_auth_env`, не по имени `origin` (дополняет раздел 9).
+
+### Э.3 `apps/server/src/harness_server/services/sandboxes.py`
+
+1. Константы рядом с `BOOTSTRAP_MEMORY_TIMEOUT_SEC`:
+
+```python
+# Фазы bootstrap.sh (D-62): setup — установки без ключей, memory — индексация клонов.
+BOOTSTRAP_PHASE_SETUP: Final = "setup"
+BOOTSTRAP_PHASE_MEMORY: Final = "memory"
+```
+
+2. Новые функции перед `bootstrap` (после `_remove_bootstrap_script`):
+
+```python
+def _merge_results(results: Sequence[ExecResult]) -> ExecResult:
+    """Итог шагов bootstrap: код первого неуспешного шага (или 0), вывод шагов по порядку."""
+    exit_code = next((item.exit_code for item in results if item.exit_code != 0), 0)
+    stdout = "\n".join(item.stdout.rstrip("\n") for item in results if item.stdout.strip())
+    stderr = "\n".join(item.stderr.rstrip("\n") for item in results if item.stderr.strip())
+    return ExecResult(exit_code=exit_code, stdout=stdout, stderr=stderr)
+
+
+async def _sync_clone(
+    provider: SandboxProvider,
+    sandbox_id: str,
+    *,
+    workspace_id: str,
+    repo_dir: str,
+    repo: RepoConfig,
+    token: SecretStr | None,
+) -> ExecResult:
+    """Клон или fetch одного workspace командами с ключом только этого workspace (D-62).
+
+    Каталога нет — clone; есть клон — set-url origin без ключа, затем fetch по адресу из конфига;
+    каталог без .git — код 1. Ключ передаётся только в env команды clone или fetch.
+    """
+    state = await provider.exec(
+        sandbox_id,
+        f"if [ -d {shlex.quote(repo_dir + '/.git')} ]; then echo repo; "
+        f"elif [ -e {shlex.quote(repo_dir)} ]; then echo other; else echo absent; fi",
+        timeout_s=SHORT_TIMEOUT_SEC,
+    )
+    if state.exit_code != 0:
+        return ExecResult(
+            exit_code=1, stdout="", stderr=f"workspace {workspace_id}: каталог клона не проверен"
+        )
+    kind = state.stdout.strip()
+    if kind == "other":
+        return ExecResult(
+            exit_code=1, stdout="", stderr=f"{repo_dir} существует и не является git-репозиторием"
+        )
+    if token is not None:
+        envs = git_access.git_auth_env(repo, token.get_secret_value())
+    else:
+        envs = git_access.anonymous_git_env()
+    if kind == "repo":
+        progress = ExecResult(exit_code=0, stdout=f"обновляю {workspace_id}", stderr="")
+        remote = await provider.exec(
+            sandbox_id,
+            git_access.set_origin_command(repo, repo_dir),
+            envs=git_access.anonymous_git_env(),
+            timeout_s=SHORT_TIMEOUT_SEC,
+        )
+        if remote.exit_code != 0:
+            return _merge_results([progress, remote])
+        fetched = await provider.exec(
+            sandbox_id,
+            git_access.fetch_command(repo, repo_dir),
+            envs=envs,
+            timeout_s=GIT_TIMEOUT_SEC,
+        )
+        return _merge_results([progress, remote, fetched])
+    # Каталога нет: clone. Если каталог всё же появился, git clone откажет и не перезапишет его.
+    progress = ExecResult(exit_code=0, stdout=f"клонирую {workspace_id}", stderr="")
+    cloned = await provider.exec(
+        sandbox_id,
+        git_access.clone_command(repo, repo_dir),
+        envs=envs,
+        timeout_s=GIT_TIMEOUT_SEC,
+    )
+    return _merge_results([progress, cloned])
+```
+
+3. `bootstrap`: сигнатура без изменений. Docstring целиком:
+
+```python
+    """Готовит песочницу в три шага (design 16, 3; D-62) и возвращает их общий результат.
+
+    1. bootstrap.sh --phase setup без ключей в env: установки, каталоги, mcp.json, memory-agent.
+    2. Для каждого workspace — clone или set-url и fetch отдельными git-командами; ключ из
+       repo_tokens (по id workspace) уходит только в env git-команды своего workspace, без ключа
+       клон анонимный (D-60).
+    3. При памяти — bootstrap.sh --phase memory с EMBEDDING_API_KEY: индексация клонов (D-47).
+
+    Шаг с ненулевым кодом останавливает следующие. Ключ неизвестного workspace и memory_ref без
+    memory_repo (и наоборот) — ValueError до любого вызова провайдера (D-51). Не удалось узнать
+    домашний каталог — SandboxStepError("home"). Вывод вызывающий пропускает через redaction.
+    """
+```
+
+   Тело: проверки `memory_ref`/`memory_repo` и `repo_tokens` — как сейчас; `args` — как сейчас (версии, флаги памяти,
+   пары `<id>=<clone_url>`); `script_path` — как сейчас. Блок `envs`/`GIT_AUTH_HEADER_*`/`timeout_s` и блок
+   `connect … finally` заменяются на:
+
+```python
+    def script_command(phase: str) -> str:
+        return shlex.join(["bash", script_path, "--phase", phase, *args])
+
+    # HARNESS_SANDBOX_BOOTSTRAP — защита скрипта от запуска вне песочницы (ревью, D-52).
+    script_envs = {"GIT_TERMINAL_PROMPT": "0", "HARNESS_SANDBOX_BOOTSTRAP": "1"}
+    # Установка Docker и memory-agent дольше обычной: таймаут памяти (D-47).
+    setup_timeout_s = BOOTSTRAP_TIMEOUT_SEC if memory_ref is None else BOOTSTRAP_MEMORY_TIMEOUT_SEC
+    results: list[ExecResult] = []
+
+    await provider.connect(sandbox_id)
+    try:
+        await provider.write_file(sandbox_id, script_path, script)
+        # Установки без ключей в env: postinst apt и lifecycle npm не видят ни одного ключа (D-62).
+        results.append(
+            await provider.exec(
+                sandbox_id,
+                script_command(BOOTSTRAP_PHASE_SETUP),
+                envs=dict(script_envs),
+                timeout_s=setup_timeout_s,
+            )
+        )
+        if results[-1].exit_code == 0:
+            home = await home_dir(provider, sandbox_id)
+            for ws in config.workspaces:
+                results.append(
+                    await _sync_clone(
+                        provider,
+                        sandbox_id,
+                        workspace_id=ws.id,
+                        repo_dir=f"{home}/work/{ws.id}",
+                        repo=ws.repo,
+                        token=repo_tokens.get(ws.id),
+                    )
+                )
+                if results[-1].exit_code != 0:
+                    break
+        if memory_ref is not None and all(item.exit_code == 0 for item in results):
+            memory_envs = dict(script_envs)
+            if embedding_key is not None:
+                memory_envs["EMBEDDING_API_KEY"] = embedding_key.get_secret_value()
+            results.append(
+                await provider.exec(
+                    sandbox_id,
+                    script_command(BOOTSTRAP_PHASE_MEMORY),
+                    envs=memory_envs,
+                    timeout_s=BOOTSTRAP_MEMORY_TIMEOUT_SEC,
+                )
+            )
+    finally:
+        # Скрипт не остаётся в песочнице и при сбое записи или запуска (ревью, D-52).
+        await _remove_bootstrap_script(provider, sandbox_id, script_path)
+    result = _merge_results(results)
+    logger.info("sandbox bootstrap finished sandbox=%s exit_code=%s", sandbox_id, result.exit_code)
+    return result
+```
+
+   `script_command` — вложенная функция (mypy: аннотации как выше). Если ruff или mypy требуют иначе, допустимо
+   вынести её в модульную `_script_command(script_path: str, phase: str, args: Sequence[str]) -> str` с тем же
+   результатом; другое поведение не меняется.
+
+4. `activate`: docstring — заменить текст от `"""Подключает песочницу` до строки `или SandboxStepError.`
+   включительно на:
+
+```python
+    """Подключает песочницу, продлевает её жизнь, обновляет репозиторий и создаёт worktree.
+
+    design 10, 4. repo и repo_token — репозиторий workspace задачи и его ключ (D-60); без ключа
+    fetch анонимный. Перед fetch origin клона возвращается на адрес из конфига, а fetch идёт по
+    этому адресу с перекрытиями конфига git (D-62): ключ не уходит на адрес или в программу, которые
+    агент записал в клон. Ключ передаётся только в env команды fetch. Идемпотентно: если worktree
+    уже на ветке task/<id>, worktree add не выполняется. Исключения — SandboxError (провайдер) или
+    SandboxStepError.
+```
+
+   Остальные абзацы docstring (`memory_envs …`) не меняются. Комментарии перед выбором `git_envs` и перед
+   `set-url` заменить одним:
+
+```python
+    # Заголовок — только на префикс адреса репозитория этого workspace (D-60), без ключа — анонимно.
+    # set-url идёт без ключа; fetch — по адресу из конфига, а не по имени origin (D-62).
+```
+
+   Два вызова `_exec_ok` для `remote` и `fetch`:
+
+```python
+    await _exec_ok(
+        provider,
+        provider_id,
+        git_access.set_origin_command(repo, repo_dir),
+        reason="remote",
+        envs=git_access.anonymous_git_env(),
+        timeout_s=SHORT_TIMEOUT_SEC,
+    )
+    await _exec_ok(
+        provider,
+        provider_id,
+        git_access.fetch_command(repo, repo_dir),
+        reason="fetch",
+        envs=git_envs,
+        timeout_s=GIT_TIMEOUT_SEC,
+    )
+```
+
+   Локальная переменная `origin` удаляется. Остальное в `activate` без изменений.
+
+### Э.4 `worker/dispatcher.py` и `cli.py`
+
+- `dispatcher.py`, `_run_reserved`: комментарий перед `workspace = …` заменить на
+
+```python
+        # Ключ записи — из vault по repo.access_ref workspace задачи, до активации: без него задача
+        # сразу уходит в error, fetch и worktree не выполняются (D-60). Значения сразу попадают в
+        # redaction очистки и ответа агента (design 6).
+```
+
+  а строки от `# Токен и заголовок Basic` до `runner.secrets = …` включительно — на
+
+```python
+        # Токен, заголовок Basic, его base64 и base64 в URL-кодировке — секреты redaction (D-52, D-62).
+        token_value = repo_token.get_secret_value()
+        runner.secrets = (
+            *runner.secrets,
+            token_value,
+            *git_access.git_auth_secret_values(workspace.repo.provider, token_value),
+        )
+```
+
+  В `build_dispatch_context` комментарий перед `without_key` — одной строкой:
+  `# Ключи репозиториев — в vault по repo.access_ref; ENV GITLAB_TOKEN не читается (D-60).`
+- `cli.py`, `sandbox_bootstrap`: docstring целиком
+
+```python
+    """Подготавливает песочницу: установки, клоны workspace и память (bootstrap.sh и git, D-62).
+
+    Ключи репозиториев (repo.access_ref) и embeddings берутся из vault по ссылкам harness.yaml и
+    передаются только в env своих команд; workspace без ключа клонируется анонимно с
+    предупреждением. Вывод проходит redaction, в том числе по значениям из vault.
+    """
+```
+
+  Перед `except SandboxError as exc:` вызова `sandboxes.bootstrap` добавить ветку (порядок важен):
+
+```python
+    except sandboxes.SandboxStepError as exc:
+        typer.echo(f"Ошибка песочницы: {exc.reason}", err=True)
+        raise typer.Exit(code=1) from None
+```
+
+  Цикл `vault_values += git_access.git_auth_secret_values(...)` не меняется (кортеж из трёх значений).
+- `git_access.py`, `sandboxes.py`, `dispatcher.py`, `cli.py`: других переносов посреди фразы в docstring и
+  комментариях этого изменения не остаётся (ревью 2). Проверка: в диффе этих файлов нет строки комментария или
+  docstring из одного-двух слов, продолжающей фразу предыдущей строки.
+
+### Э.5 `security/redaction.py` и `config.py`
+
+`_PATTERNS` целиком:
+
+```python
+_PATTERNS: Final[tuple[tuple[re.Pattern[str], str], ...]] = (
+    # Граница только по цифрам: токен в URL идёт как «/bot123456:…», перед цифрами стоит буква.
+    (re.compile(r"(?<!\d)\d{6,12}:[A-Za-z0-9_-]{30,}"), REDACTED),  # токен Telegram-бота
+    # Префиксы git-провайдеров ловятся и после «_» (FOO_ghp_…): граница — не буква и не цифра (D-62).
+    # GitLab: PAT, deploy, runner, OAuth и прочие токены с префиксом gl…- (D-60).
+    (
+        re.compile(r"(?<![A-Za-z0-9])gl(?:pat|dt|rt|cbt|oas|ptt|ft|imt|agent|soat)-[A-Za-z0-9_.-]{20,}"),
+        REDACTED,
+    ),
+    # GitHub: classic PAT, OAuth, user-to-server, server-to-server, refresh (D-60).
+    (re.compile(r"(?<![A-Za-z0-9])gh[pousr]_[A-Za-z0-9]{36,}"), REDACTED),
+    # GitHub fine-grained PAT (D-60).
+    (re.compile(r"(?<![A-Za-z0-9])github_pat_[A-Za-z0-9_]{22,}"), REDACTED),
+    (re.compile(r"\bsk-ant-[A-Za-z0-9_-]{20,}"), REDACTED),  # Anthropic
+    (re.compile(r"\baft_[A-Za-z0-9_-]{40,}"), REDACTED),  # токен задачи агента (D-42)
+    # Схема авторизации остаётся, чтобы текст было понятно читать; сам токен заменяется.
+    (re.compile(r"(?i)\b(bearer)\s+[A-Za-z0-9._~+/=-]{16,}"), rf"\1 {REDACTED}"),
+    # Заголовок Basic git в любом регистре: значение с цифрой, «+» или «/» — base64, а не слово (D-62).
+    (
+        re.compile(r"(?i)\b(basic)\s+(?=[A-Za-z0-9+/]*[0-9+/])[A-Za-z0-9+/]{16,}={0,2}"),
+        rf"\1 {REDACTED}",
+    ),
+    # Пароль в адресе https://user:pass@host: пользователь остаётся, пароль заменяется (D-62).
+    (re.compile(r"(?i)\b(https?://[^\s/@:]+):[^\s/@]+@"), rf"\1:{REDACTED}@"),
+)
+```
+
+Если строка с шаблоном `gl…` длиннее 100 символов, raw-строка делится на две соседние (неявная конкатенация
+`r"(?<![A-Za-z0-9])gl(?:pat|dt|rt|cbt|oas|ptt|ft|imt|agent|soat)"` + `r"-[A-Za-z0-9_.-]{20,}"`); шаблон тот же.
+
+`config.py`: вместо строки `_REPO_BASE_URL_PATTERN = …` и двух строк комментария над ней:
+
+```python
+# Метка хоста и сегмент пути base_url начинаются и заканчиваются буквой или цифрой: «.», «..»,
+# «-host» и «a..b» не проходят (D-62, F3).
+_HOST_LABEL = r"[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?"
+_URL_PATH_SEGMENT = r"[A-Za-z0-9]([A-Za-z0-9._~-]*[A-Za-z0-9])?"
+# Только https: заголовок с ключом не уходит открытым текстом (D-60). Без query, fragment, пробелов.
+_REPO_BASE_URL_PATTERN = (
+    rf"^https://{_HOST_LABEL}(\.{_HOST_LABEL})*(:[0-9]{{1,5}})?(/{_URL_PATH_SEGMENT})*/?$"
+)
+```
+
+Комментарий над `GitProviderName` — одной строкой: `# Провайдер git-хостинга репозитория workspace (D-60);
+GitHub Enterprise пока не поддержан.` (если длиннее 100 символов — две полные фразы на двух строках).
+
+### Э.6 `deploy/sandbox/bootstrap.sh`
+
+1. Шапка (строки 2–14): примеры запуска с `--phase setup`; вместо фраз про ключ репозитория и `GIT_AUTH_HEADER_<i>`:
+   «Скрипт не клонирует репозитории и не получает их ключей: клоны и fetch делает harness-server отдельными
+   git-командами (D-62). Фаза setup (установки) запускается без ключей в env; фаза memory получает только
+   EMBEDDING_API_KEY, который memory-agent читает из env этой команды; в .memory/.env и конфиг memory он не пишется.»
+2. Блок от комментария `# Ключи приходят в env процесса…` до `unset GITLAB_TOKEN EMBEDDING_API_KEY` включительно
+   заменить на:
+
+```bash
+# Ключ embeddings приходит в env только фазе memory. Скрипт забирает его в переменную оболочки и снимает
+# из env вместе с любыми переменными, похожими на ключи git; их имена (не значения) проверяются ниже:
+# фаза setup запускается без ключей, чтобы postinst apt и lifecycle npm их не видели (D-62).
+embedding_key="${EMBEDDING_API_KEY:-}"
+secret_env_names=""
+while IFS= read -r name; do
+  case "$name" in
+    GIT_AUTH_HEADER_* | GIT_CONFIG_* | GITLAB_TOKEN | EMBEDDING_API_KEY)
+      secret_env_names="$secret_env_names $name"
+      unset "$name"
+      ;;
+  esac
+done < <(compgen -e)
+```
+
+3. `usage` целиком:
+
+```bash
+usage() {
+  cat <<'USAGE'
+Использование: bootstrap.sh --phase setup|memory --claude-version V --openspec-version V [--memory-ref SHA --memory-repo OWNER/NAME] <workspace_id>=<clone_url>...
+  --phase setup — установки, каталоги и memory-agent; в env не должно быть ключей.
+  --phase memory — только индексация клонов (нужны --memory-ref и --memory-repo); ключ embeddings — в env EMBEDDING_API_KEY.
+  workspace_id — [A-Za-z0-9_-]{1,28}; clone_url — https-адрес без учётных данных. Клоны и fetch делает harness-server (D-62).
+  Память: memory-agent ставится из GitHub по полному sha коммита (--memory-ref, 40 символов 0-9a-f) из репозитория
+  --memory-repo; флаги задаются вместе.
+USAGE
+}
+```
+
+4. Удалить `HEADER_RE`. В разборе аргументов: `phase=""` рядом с `claude_version=""`; `--phase` добавить в список
+   `--claude-version | --openspec-version | --memory-ref | --memory-repo | --phase` и ветку `--phase) phase="$2" ;;`
+   во внутренний `case` (перед `*) memory_repo="$2" ;;`).
+5. Блоки `if [ -n "$bad_header_name" ] …` и цикл `for index in "${!git_auth_headers[@]}" …` (после проверки пар)
+   заменить на:
+
+```bash
+case "$phase" in
+  setup | memory) ;;
+  *)
+    echo "нужен --phase setup или --phase memory" >&2
+    exit 2
+    ;;
+esac
+if [ "$phase" = "memory" ] && [ -z "$memory_ref" ]; then
+  echo "фаза memory требует --memory-ref и --memory-repo" >&2
+  exit 2
+fi
+# Только имена: в фазе setup ключей нет совсем, в фазе memory допустим только EMBEDDING_API_KEY (D-62).
+for name in $secret_env_names; do
+  if [ "$phase" = "setup" ] || [ "$name" != "EMBEDDING_API_KEY" ]; then
+    echo "фаза $phase запускается без $name в env (D-62)" >&2
+    exit 2
+  fi
+done
+```
+
+6. Сразу после строки `HARNESS_DIR="${HOME:?HOME не задан}/.harness"` вставить:
+
+```bash
+# Индексация клонов памятью (D-47). Фаза memory идёт после клонов сервера и ничего не ставит (D-62).
+index_memory_clones() {
+  if ! command -v memory >/dev/null 2>&1; then
+    echo "memory-agent не установлен: сначала bootstrap.sh --phase setup" >&2
+    exit 1
+  fi
+  mkdir -p "$HARNESS_DIR/memory"
+  local pair workspace_id dir exclude
+  for pair in "${repos[@]}"; do
+    workspace_id="${pair%%=*}"
+    dir="$HOME/work/$workspace_id"
+    if [ ! -d "$dir/.git" ]; then
+      echo "нет клона $workspace_id: память не индексируется" >&2
+      exit 1
+    fi
+    # Индекс памяти — локальный каталог клона; в git он не попадает.
+    exclude="$dir/.git/info/exclude"
+    mkdir -p "$(dirname "$exclude")"
+    grep -qxF '.memory/' "$exclude" 2>/dev/null || echo '.memory/' >>"$exclude"
+    # Первый запуск индексирует проект; повторный не переиндексирует неизменённые файлы.
+    if [ -n "$embedding_key" ]; then
+      EMBEDDING_API_KEY="$embedding_key" memory init --path "$dir"
+    else
+      memory init --path "$dir"
+    fi
+    touch "$HARNESS_DIR/memory/$workspace_id.ready"
+    echo "память готова: $workspace_id"
+  done
+}
+if [ "$phase" = "memory" ]; then
+  index_memory_clones
+  exit 0
+fi
+```
+
+7. Удалить целиком: комментарий и функцию `run_git_auth`, цикл `for index in "${!repos[@]}" … done` (клоны и
+   fetch, включая `git -C "$dir" remote set-url`). В блоке `if [ -n "$memory_ref" ]` удалить строки от
+   `mkdir -p "$HARNESS_DIR/memory"` до закрывающего `done` цикла индексации (перенесены в п. 6); `memory service up`
+   остаётся последней командой блока. `echo "bootstrap завершён"` в конце остаётся.
+8. `shellcheck deploy/sandbox/bootstrap.sh` без замечаний.
+
+### Э.7 Документация
+
+- `ARCHITECTURE.md` §7, абзац про авторизацию git (строка с `GIT_AUTH_HEADER_<i>`): вместо «bootstrap получает
+  заголовок i-й пары в env `GIT_AUTH_HEADER_<i>`» — «клоны и fetch bootstrap и активации делает сервер отдельной
+  git-командой на workspace; команда с ключом перекрывает настройки `.git/config`, `~/.gitconfig` и `/etc/gitconfig`
+  (прокси, TLS, хуки, помощники учётных данных) и идёт по адресу из конфига, а не по `origin`; установки bootstrap
+  (`--phase setup`) идут без ключей (D-62). Остаточный риск: агент с выполнением кода в песочнице может перехватить
+  ключ через профиль оболочки или `sudo` (D-62, R-1)».
+- `apps/server/README.md`, после пункта про `harness.yaml` в разделе настроек — новый пункт:
+  «- Ключ репозитория workspace — ссылка `repo.access_ref` (`vault:<project>/<service>/<name>`). Без неё задача по
+  этому workspace уходит в `error` с причиной `repo_access_ref`, а `sandbox bootstrap` клонирует репозиторий
+  анонимно (только публичный) и предупреждает. Ключ уходит только в env git-команд своего workspace (D-60, D-62).»
+- `docs/operating-without-ui.md` и `docs/deployment.md`: если в тексте есть `GIT_AUTH_HEADER` или «скрипт
+  клонирует», заменить на «клоны делает сервер» (D-62); иначе не трогать.
+
+### Э.8 Тесты (`apps/server/tests/`)
+
+Новые тесты (имена точные):
+
+- `test_git_access.py`:
+  - `test_git_auth_env_overrides_clone_config` — `GIT_CONFIG_COUNT == "14"`; пара 0 — `extraHeader` на префикс;
+    для каждого `(name, value)` из `SCOPED_HTTP_OVERRIDES` есть пара `http.<prefix>.<name>` = `value`; все пары
+    `COMMAND_OVERRIDES` присутствуют; все ключи `HARDENED_GIT_ENV` с их значениями.
+  - `test_anonymous_git_env_is_hardened_without_header` (вместо `test_anonymous_git_env_has_no_header`) — равен
+    `dict(HARDENED_GIT_ENV)`, нет `GIT_CONFIG_COUNT`.
+  - `test_clone_command_disables_submodules`, `test_set_origin_command_uses_config_url`,
+    `test_fetch_command_uses_config_url_and_refspec` — точные строки, например для `RepoConfig(provider="gitlab",
+    project="group/demo")` и `/home/user/work/demo`:
+    `git -C /home/user/work/demo fetch --quiet --prune --no-recurse-submodules https://gitlab.com/group/demo.git '+refs/heads/*:refs/remotes/origin/*'`.
+  - `test_git_auth_secret_values_include_urlencoded_base64` (вместо `…_cover_header_and_base64`) — токен
+    `glpat-ABCDEFGHIJKLMNOPQR` (base64 с `=`), третье значение равно `quote(второе, safe="")` и содержит `%3D`;
+    `redact(text, extra_values=values)` убирает все три формы.
+  - Интеграционные с настоящим git (`pytest.mark.skipif`, если `shutil.which("git") is None` или версия < 2.32;
+    каждый в `tmp_path`, `env` подпроцесса = `{"PATH": os.environ["PATH"], "HOME": str(tmp_path)}` плюс проверяемый
+    env; сеть не нужна):
+    - `test_auth_env_disables_planted_hooks` — репозиторий с коммитом, хук `reference-transaction` в
+      `.git/hooks` и в каталоге из `core.hooksPath` клона пишет файл-маркер; `git update-ref refs/heads/x HEAD` с
+      `git_auth_env(repo, "glpat-…")` — маркера нет; контроль без env — маркер есть.
+    - `test_auth_env_overrides_planted_http_config` — в `.git/config` клона `http.<clone_url>.proxy`,
+      `http.<clone_url>/.sslVerify=false`, `http.sslCAInfo=/tmp/evil.pem`; `git config --get-urlmatch http.proxy
+      <clone_url>` с env даёт пустую строку, `http.sslVerify` — `true`, `http.sslCAInfo` — `SYSTEM_CA_BUNDLE`;
+      контроль без env — подложенные значения.
+    - `test_auth_env_resets_planted_credential_helper` — `credential.helper` и `credential.<base_url>.helper` в
+      `.git/config` клона и в `~/.gitconfig` (`HOME=tmp_path`) — `!f() { touch <marker>; }; f`; `git credential fill`
+      со stdin `protocol=https\nhost=<host>\npath=<project>.git\n\n` с env — маркера нет (код возврата не
+      проверяется); контроль без env с `GIT_TERMINAL_PROMPT=0` — маркер есть.
+- `test_sandbox_service.py`: обновить `test_activate_resets_origin_before_fetch` (команды — `set_origin_command`,
+  затем `fetch_command`; у `set-url` в env нет `GIT_CONFIG_VALUE_0`) и
+  `test_activate_fetch_env_carries_repo_scoped_auth_header`; новые `test_activate_fetches_config_url_not_origin`
+  (в журнале нет ` fetch origin`, есть `fetch_command(repo, repo_dir)`) и
+  `test_activate_fetch_env_overrides_clone_config` (`received_env("GIT_CONFIG_GLOBAL") == "/dev/null"`,
+  `received_env("GIT_CONFIG_COUNT") == "14"`).
+- `test_sandbox_bootstrap.py` (фейк: `respond('printf %s "$HOME"', stdout="/home/user")`; состояние каталога —
+  `respond("if [ -d ", stdout="repo"|"other")`, без ответа — clone):
+  - `test_bootstrap_runs_setup_phase_without_secrets` (вместо проверки env в
+    `test_bootstrap_writes_script_and_runs_it_with_config_arguments`, сам тест обновить на `--phase setup`):
+    первая команда `bash <path> --phase setup <EXPECTED_ARGS>`, `env_keys == ("GIT_TERMINAL_PROMPT",
+    "HARNESS_SANDBOX_BOOTSTRAP")` даже при `repo_tokens` и `embedding_key`.
+  - `test_bootstrap_clones_each_workspace_with_its_own_key` (вместо `test_bootstrap_passes_header_per_pair_in_env`):
+    github с ключом и gitlab без; у clone github в `env_keys` есть `GIT_CONFIG_VALUE_0`, у clone gitlab — нет ни
+    одного `GIT_CONFIG_*`; `received_env("GIT_CONFIG_VALUE_0")` — заголовок `x-access-token`; ни одна команда не
+    содержит токен.
+  - `test_bootstrap_fetches_existing_clone` — `stdout="repo"`: `set-url` без ключа, затем `fetch_command`, clone
+    нет; в выводе «обновляю <id>».
+  - `test_bootstrap_rejects_non_repo_workspace_dir` — `stdout="other"`: код 1, stderr «не является
+    git-репозиторием», git-команд и фазы memory нет.
+  - `test_bootstrap_stops_after_failed_setup_phase` — `respond("bash ", exit_code=1)`: нет `printf`, git-команд и
+    фазы memory; код 1.
+  - `test_bootstrap_memory_phase_runs_last_with_embedding_key_only` (вместо проверок env в
+    `test_memory_ref_goes_to_script_args_and_key_only_to_env`): порядок setup → clone → `--phase memory`; у memory
+    `env_keys == ("EMBEDDING_API_KEY", "GIT_TERMINAL_PROMPT", "HARNESS_SANDBOX_BOOTSTRAP")`.
+  - `test_bootstrap_home_error_still_removes_script` — `printf` с пустым stdout: `SandboxStepError("home")`, `rm -f`
+    скрипта выполнен.
+  - Скриптовые: `test_script_requires_phase`, `test_script_rejects_unknown_phase`,
+    `test_script_setup_phase_refuses_secret_env` (parametrize `GIT_AUTH_HEADER_0`, `GIT_CONFIG_COUNT`,
+    `GITLAB_TOKEN`, `EMBEDDING_API_KEY`; код 2 без `HARNESS_SANDBOX_BOOTSTRAP`, т.е. до guard; значения нет в
+    выводе), `test_script_memory_phase_accepts_only_embedding_key` (`GIT_AUTH_HEADER_0` при `--phase memory` →
+    код 2), `test_script_memory_phase_requires_memory_ref`, `test_script_memory_branch_precedes_installs`
+    (позиция `if [ "$phase" = "memory" ]` раньше `\nensure_node\n`), `test_script_has_no_repo_git_network_code`
+    (в тексте нет `run_git_auth`, `extraHeader`, `GIT_CONFIG_COUNT`, `"$url"`).
+  - Удалить: `test_bootstrap_passes_header_per_pair_in_env`, `test_script_binds_header_to_pair_prefix`,
+    `test_script_does_not_export_auth_headers`, `test_script_unsets_auth_headers_before_any_install_step`,
+    `test_script_rejects_header_without_pair`, `test_script_rejects_bad_header_name`,
+    `test_script_rejects_malformed_header`, `test_script_allows_anonymous_clones_without_token`.
+  - Обновить: `test_script_unsets_secrets_before_any_install_step` (позиция `unset "$name"` вместо `unset
+    GITLAB_TOKEN EMBEDDING_API_KEY`), `test_memory_agent_clone_is_anonymous_and_not_via_auth_wrapper` (в тексте нет
+    `run_git_auth`), `test_bootstrap_passes_token_only_in_command_env`, `test_bootstrap_without_tokens_has_no_auth_env`,
+    `test_memory_bootstrap_uses_longer_timeout`, `test_script_guard_is_after_argument_validation` и остальные
+    скриптовые запуски — с `--phase setup`.
+- `test_dispatcher.py`: `test_dispatcher_fetch_is_bound_to_repo_prefix` — команда `fetch_command`; секреты runner —
+  токен и три значения `git_auth_secret_values`.
+- `test_cli.py`: `test_sandbox_bootstrap_reports_step_error_reason` — `SandboxStepError("home")` из bootstrap даёт
+  код 1 и «Ошибка песочницы: home».
+- `test_redaction.py`: `test_redacts_basic_auth_header_any_case` (parametrize `Basic`, `BASIC`, `basic`),
+  `test_basic_before_long_word_is_kept` (`"basic internationalization"` без изменений),
+  `test_redacts_git_tokens_after_underscore` (`TOKEN_ghp_<36>`, `X_glpat-<20>`, `x_github_pat_<22>`),
+  `test_redacts_password_in_url` (`https://oauth2:s3cretvalue@gitlab.com/g/p.git` →
+  `https://oauth2:[REDACTED]@gitlab.com/g/p.git`), `test_url_without_password_unchanged`
+  (`https://gitlab.com/g/p.git`).
+- `test_config.py`: `test_repo_base_url_rejects_dot_and_dash_segments` (parametrize
+  `https://gitlab.example.com/..`, `https://gitlab.example.com/.`, `https://gitlab.example.com/a/../b`,
+  `https://-gitlab.example.com`, `https://gitlab..example.com`, `https://gitlab.example.com/-x`),
+  `test_repo_base_url_accepts_ip_port_and_path` (`https://10.0.0.5:8443/git-lab`).
+- Live (владелец, задача 5.2): `test_github_private_clone_live` и `test_sandbox_profile_live` проходят с новыми
+  фазами; дополнительно в live-профиле после bootstrap `git -C ~/work/<id> config --get remote.origin.url` равен
+  адресу из конфига.
+
+### Э.9 Критерии приёмки (дополняют список выше)
+
+7. Подложенные в `.git/config` клона и `~/.gitconfig` прокси, `sslVerify=false`, свой CA, хуки и
+   `credential.helper` не действуют в команде с ключом (интеграционные тесты Э.8).
+8. Команда `bootstrap.sh --phase setup` получает env без ключей; ключ workspace есть только в env git-команд этого
+   workspace; `EMBEDDING_API_KEY` — только в фазе memory (тесты Э.8).
+9. `base_url` с `.`/`..`/`-` в начале сегмента отклоняется; redaction покрывает `BASIC`/`basic`, `_ghp_…`, пароль в
+   URL и base64 в URL-кодировке.
+10. Владелец ответил на вопрос 7 proposal.md (принятие R-1) до финальной приёмки.
+
+### Э.10 Риски
+
+- [R-1, остаточный] Агент с выполнением кода перехватывает ключ, попавший в песочницу после его работы (login-shell
+  `~/.profile`, `sudo`, `/proc/<pid>/environ`), в том числе главный ключ GitHub с правами на все репозитории.
+  Снижение: перекрытия Э-1, ключ только в env git-команды своего workspace. Полное решение — отдельное изменение
+  (вопрос 7).
+- [Перекрытия ломают fetch на шаблоне без `/etc/ssl/certs/ca-certificates.crt`] → live-тест 5.2 ловит сразу; путь
+  — стандартный для Ubuntu 24.04 с `ca-certificates`.
+- [Пустое значение `GIT_CONFIG_VALUE_<i>` не дошло до процесса] → live-тест; интеграционные тесты проверяют
+  семантику git локально.
+- [Фаза memory падает, если между фазами остановились сервисы памяти] → повторный bootstrap идемпотентен.
+
+### Э.11 Разрешённые файлы (дополнение)
+
+Кроме списка выше: `apps/server/tests/test_git_access.py` (уже в списке), `ARCHITECTURE.md`, `apps/server/README.md`,
+`docs/operating-without-ui.md`, `docs/deployment.md` (только по Э.7). `docs/decisions.md`, proposal.md, tasks.md,
+specs и этот файл уже поправлены архитектором — Implementer их не меняет, кроме отметок `[x]` в tasks.md.
+
+### Э.12 Порядок для Implementer
+
+1. `config.py` по Э.5; тесты `test_config.py` из Э.8. `uv run pytest apps/server/tests/test_config.py -q`.
+2. `services/git_access.py` целиком по Э.2; `test_git_access.py` из Э.8.
+3. `security/redaction.py` по Э.5; `test_redaction.py` из Э.8.
+4. `services/sandboxes.py` по Э.3; `test_sandbox_service.py` и серверная часть `test_sandbox_bootstrap.py` из Э.8.
+5. `deploy/sandbox/bootstrap.sh` по Э.6; скриптовые тесты `test_sandbox_bootstrap.py`; `shellcheck`.
+6. `worker/dispatcher.py` и `cli.py` по Э.4; `test_dispatcher.py`, `test_cli.py`.
+7. Документация по Э.7.
+8. `./tools/harness fmt`, затем `./tools/harness check`; `openspec validate git-providers --strict`. Падение
+   `ruff format --check` только на `openspec/changes/{git-providers,task-rework}/design.md` — известное, есть на
+   `main`, вне изменения; сообщить, не чинить.
+9. Отметить `[x]` задачи 8.1–8.7 в tasks.md; вернуть список изменённых путей для синхронизации памяти.

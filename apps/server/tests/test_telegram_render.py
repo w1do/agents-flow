@@ -2,7 +2,7 @@
 
 import pytest
 from harness_server.adapters.telegram import InlineKeyboard
-from harness_server.config import WorkspaceConfig
+from harness_server.config import RepoConfig, WorkspaceConfig
 from harness_server.db.ids import uuid7
 from harness_server.telegram.render import (
     STAGE_CHOOSING,
@@ -25,7 +25,12 @@ from harness_server.telegram.render import (
 
 
 def _workspace(workspace_id: str, name: str) -> WorkspaceConfig:
-    return WorkspaceConfig(id=workspace_id, name=name, voice_aliases=[], gitlab_project="group/x")
+    return WorkspaceConfig(
+        id=workspace_id,
+        name=name,
+        voice_aliases=[],
+        repo=RepoConfig(provider="gitlab", project="group/x"),
+    )
 
 
 def test_short_title_keeps_short_text() -> None:

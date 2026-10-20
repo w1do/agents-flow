@@ -66,8 +66,14 @@
 
 ### Requirement: Адрес репозитория только https
 
-`repo.base_url` SHALL начинаться с `https://` и MUST NOT содержать учётные данные, query и fragment. Для GitHub
+`repo.base_url` SHALL начинаться с `https://` и MUST NOT содержать учётные данные, query и fragment; метки хоста и
+сегменты пути MUST начинаться и заканчиваться буквой или цифрой (`.`, `..`, `-x` отклоняются). Для GitHub
 адрес, отличный от `https://github.com`, MUST отклоняться: GitHub Enterprise не поддерживается.
+
+#### Scenario: Сегмент пути «..»
+
+- **WHEN** `repo.base_url: https://gitlab.example.com/a/../b`
+- **THEN** конфиг отклоняется с указанием `workspaces[0].repo.base_url`
 
 #### Scenario: Адрес по http
 

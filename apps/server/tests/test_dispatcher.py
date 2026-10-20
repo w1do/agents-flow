@@ -18,7 +18,7 @@ from harness_server.adapters.vault import FakeVault, McpSecretVault, VaultError
 from harness_server.config import HarnessConfig, SandboxMemoryConfig, load_config
 from harness_server.db.models import Task, TaskToken
 from harness_server.db.session import create_engine, create_session_factory
-from harness_server.services import sandboxes
+from harness_server.services import git_access, sandboxes
 from harness_server.services.tasks import create_task, get_task, list_task_events
 from harness_server.settings import Settings, load_settings
 from harness_server.vault_ref import VaultRef
@@ -144,12 +144,13 @@ def _ctx(
     fake: FakeSandbox,
     sleep: Any = _no_sleep,
 ) -> DispatchContext:
+    # Ключ записи workspace demo — из vault по repo.access_ref (D-60), как в боевой конфигурации.
     return DispatchContext(
         provider=fake,
-        config=CONFIG,
+        config=_vault_config(memory=False),
         session_factory=factory,
+        vault=FakeVault({VaultRef("demo", "gitlab", "main"): GITLAB}),
         oauth_token=SecretStr(OAUTH),
-        gitlab_token=SecretStr(GITLAB),
         secret_key=SecretStr(SECRET_KEY),
         agents_flow_url="https://harness.example/mcp",
         timeout_min=60,
@@ -519,39 +520,60 @@ MEMORY_REF = "0123456789abcdef0123456789abcdef01234567"
 
 
 def _vault_config(*, memory: bool) -> HarnessConfig:
-    """Конфиг с ссылками на vault; memory — блок памяти с ключом embeddings из vault."""
-    gitlab = CONFIG.gitlab.model_copy(update={"access_ref": GITLAB_REF})
+    """Конфиг с ключом записи workspace из vault; memory — блок памяти с ключом embeddings из
+    vault."""
+    repo = CONFIG.workspaces[0].repo.model_copy(update={"access_ref": GITLAB_REF})
+    workspace = CONFIG.workspaces[0].model_copy(update={"repo": repo})
     sandbox_update: dict[str, Any] = {}
     if memory:
         sandbox_update["memory"] = SandboxMemoryConfig(ref=MEMORY_REF, embedding_ref=EMBEDDING_REF)
     sandbox = CONFIG.sandbox.model_copy(update=sandbox_update)
-    return CONFIG.model_copy(update={"gitlab": gitlab, "sandbox": sandbox})
+    return CONFIG.model_copy(update={"workspaces": [workspace], "sandbox": sandbox})
 
 
-async def test_gitlab_key_comes_from_vault_and_env_is_not_needed(
+async def test_repo_key_comes_from_workspace_access_ref(
     committed_session_factory: Factory,
 ) -> None:
     task = await _prepare(committed_session_factory)
     fake = _fake()
     pipeline = _Pipeline(fake, agent_finishes=True)
     vault = FakeVault({VaultRef("demo", "gitlab", "main"): VAULT_GITLAB})
-    ctx = replace(
-        _ctx(committed_session_factory, fake),
-        config=_vault_config(memory=False),
-        gitlab_token=None,
-        vault=vault,
-    )
+    ctx = replace(_ctx(committed_session_factory, fake), vault=vault)
 
     await dispatch_once(ctx, {TaskKind.IMPLEMENT: pipeline})
 
     assert vault.requested == [VaultRef("demo", "gitlab", "main")]
-    # Ключ из vault уходит git только заголовком на префикс base_url (D-52), не как GITLAB_TOKEN.
+    # Ключ из vault уходит git только заголовком на префикс адреса репозитория (D-60), не как
+    # GITLAB_TOKEN.
     assert fake.received_env("GITLAB_TOKEN") is None
-    assert fake.received_env("GIT_CONFIG_KEY_0") == "http.https://gitlab.com/.extraHeader"
+    assert (
+        fake.received_env("GIT_CONFIG_KEY_0")
+        == "http.https://gitlab.com/group/demo.git/.extraHeader"
+    )
     header = fake.received_env("GIT_CONFIG_VALUE_0") or ""
     decoded = base64.b64decode(header.split()[-1]).decode()
     assert decoded == f"oauth2:{VAULT_GITLAB}"
     assert await _task_status(committed_session_factory, task.id) == TaskStatus.ACTIVE
+    assert await _sandbox_row(committed_session_factory) == (SandboxStatus.PAUSED, None)
+
+
+async def test_task_without_access_ref_goes_to_error_with_reason(
+    committed_session_factory: Factory,
+) -> None:
+    """Workspace без repo.access_ref: задача в error до активации, без fetch и worktree (D-60)."""
+    task = await _prepare(committed_session_factory)
+    fake = _fake()
+    pipeline = _Pipeline(fake, agent_finishes=True)
+    ctx = replace(_ctx(committed_session_factory, fake), config=CONFIG, vault=None)
+
+    await dispatch_once(ctx, {TaskKind.IMPLEMENT: pipeline})
+
+    assert await _task_status(committed_session_factory, task.id) == TaskStatus.ERROR
+    async with committed_session_factory() as session:
+        events = await list_task_events(session, task.id)
+    assert any(e.text and e.text.startswith("repo_access_ref:") for e in events)
+    assert not [e for e in fake.journal if e.cmd and "fetch origin" in e.cmd]
+    assert not [e for e in fake.journal if e.cmd and "worktree add" in e.cmd]
     assert await _sandbox_row(committed_session_factory) == (SandboxStatus.PAUSED, None)
 
 
@@ -562,9 +584,7 @@ async def test_vault_failure_marks_task_error_and_cleans_up(
     fake = _fake()
     pipeline = _Pipeline(fake, agent_finishes=True)
     vault = FakeVault(fail=VaultError("unavailable", ref="gitlab/main"))
-    ctx = replace(
-        _ctx(committed_session_factory, fake), config=_vault_config(memory=False), vault=vault
-    )
+    ctx = replace(_ctx(committed_session_factory, fake), vault=vault)
 
     await dispatch_once(ctx, {TaskKind.IMPLEMENT: pipeline})
 
@@ -611,25 +631,20 @@ async def test_memory_embedding_key_goes_to_sync_env_and_is_redacted(
 # --- sandbox-profile: сборка контекста диспетчера (tasks 2.3, пункт 5 ревью) ---
 
 
-def _dispatch_settings(
-    valid_env: dict[str, str], monkeypatch: pytest.MonkeyPatch, *, gitlab_env: bool
-) -> Settings:
-    """Settings для build_dispatch_context: ENV агента заданы, GITLAB_TOKEN — по флагу."""
+def _dispatch_settings(valid_env: dict[str, str], monkeypatch: pytest.MonkeyPatch) -> Settings:
+    """Settings для build_dispatch_context: ENV агента заданы; GITLAB_TOKEN из ENV не читается
+    (D-60)."""
     monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", OAUTH)
     monkeypatch.setenv("HARNESS_PUBLIC_URL", "https://harness.example.com")
-    if gitlab_env:
-        monkeypatch.setenv("GITLAB_TOKEN", GITLAB)
-    else:
-        monkeypatch.delenv("GITLAB_TOKEN", raising=False)
     return load_settings()
 
 
-async def test_build_context_takes_vault_and_no_gitlab_env_when_access_ref_set(
+async def test_build_context_takes_vault_for_repo_keys(
     valid_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("VAULT_MCP_URL", "https://vault.example/mcp")
     monkeypatch.setenv("VAULT_MCP_TOKEN", "vault-token-test-0123456789abcdef")
-    settings = _dispatch_settings(valid_env, monkeypatch, gitlab_env=False)
+    settings = _dispatch_settings(valid_env, monkeypatch)
     factory = create_session_factory(create_engine(UNREACHABLE_DATABASE_URL))
 
     ctx = build_dispatch_context(
@@ -638,48 +653,57 @@ async def test_build_context_takes_vault_and_no_gitlab_env_when_access_ref_set(
 
     assert ctx is not None
     assert isinstance(ctx.vault, McpSecretVault)
-    assert ctx.gitlab_token is None
 
 
-async def test_build_context_without_access_ref_or_token_returns_none(
+async def test_build_context_warns_about_workspace_without_key(
     valid_env: dict[str, str], monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    settings = _dispatch_settings(valid_env, monkeypatch, gitlab_env=False)
+    settings = _dispatch_settings(valid_env, monkeypatch)
     factory = create_session_factory(create_engine(UNREACHABLE_DATABASE_URL))
 
     ctx = build_dispatch_context(settings, CONFIG, factory, FakeSandbox(sandbox_id=PROVIDER_ID))
 
-    assert ctx is None
-    assert "GITLAB_TOKEN" in caplog.text
-    assert "vault" not in caplog.text.lower()
+    # Контекст создаётся: задачи без ключа уходят в error, остальные работают.
+    assert ctx is not None
+    assert "repo.access_ref" in caplog.text
+    assert "demo" in caplog.text
 
 
-async def test_build_context_without_access_ref_uses_env_token(
+async def test_build_context_ignores_gitlab_env(
     valid_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    settings = _dispatch_settings(valid_env, monkeypatch, gitlab_env=True)
+    monkeypatch.setenv("GITLAB_TOKEN", GITLAB)
+    settings = _dispatch_settings(valid_env, monkeypatch)
     factory = create_session_factory(create_engine(UNREACHABLE_DATABASE_URL))
 
     ctx = build_dispatch_context(settings, CONFIG, factory, FakeSandbox(sandbox_id=PROVIDER_ID))
 
     assert ctx is not None
     assert ctx.vault is None
-    assert ctx.gitlab_token is not None
-    assert ctx.gitlab_token.get_secret_value() == GITLAB
+    assert not hasattr(ctx, "gitlab_token")
 
 
-async def test_dispatcher_fetch_is_bound_to_gitlab_base_url(
+async def test_dispatcher_fetch_is_bound_to_repo_prefix(
     committed_session_factory: Factory,
 ) -> None:
-    """Диспетчер передаёт базовый адрес GitLab в fetch: заголовок только на его префикс (D-52)."""
+    """Диспетчер передаёт адрес репозитория workspace в fetch: заголовок только на его префикс
+    (D-60)."""
     await _prepare(committed_session_factory)
     fake = _fake()
     pipelines = {TaskKind.IMPLEMENT: _Pipeline(fake, agent_finishes=True)}
 
     await dispatch_once(_ctx(committed_session_factory, fake), pipelines)
 
-    assert fake.received_env("GIT_CONFIG_KEY_0") == "http.https://gitlab.com/.extraHeader"
-    assert fake.received_env("GIT_ASKPASS") is None
+    assert (
+        fake.received_env("GIT_CONFIG_KEY_0")
+        == "http.https://gitlab.com/group/demo.git/.extraHeader"
+    )
+    assert fake.received_env("GIT_ASKPASS") == "/bin/false"
+    # fetch идёт по адресу из конфига, а не по имени origin (D-62).
+    fetches = [e.cmd for e in fake.journal if e.cmd and " fetch --quiet --prune " in e.cmd]
+    assert len(fetches) == 1
+    assert fetches[0].endswith("'+refs/heads/*:refs/remotes/origin/*'")
+    assert all(" fetch origin" not in (e.cmd or "") for e in fake.journal)
 
 
 async def test_auth_header_value_is_redacted_from_agent_output(
@@ -691,7 +715,7 @@ async def test_auth_header_value_is_redacted_from_agent_output(
     pipeline = _Pipeline(fake, agent_finishes=False)
     await _reserve_for_pipeline(committed_session_factory, pipeline)
     await _set_agent_run(committed_session_factory, started_at=datetime.now(UTC), pid=AGENT_PID)
-    header = sandboxes.git_auth_header(VAULT_GITLAB)
+    header = git_access.git_auth_header("gitlab", VAULT_GITLAB)
     encoded = header.removeprefix("Authorization: Basic ")
     vault = FakeVault({VaultRef("demo", "gitlab", "main"): VAULT_GITLAB})
     await _seed_agent(fake, task, status_exit=1, stderr=f"эхо заголовка {header}")
@@ -716,7 +740,7 @@ async def test_bare_base64_auth_value_is_redacted_from_agent_output(
     pipeline = _Pipeline(fake, agent_finishes=False)
     await _reserve_for_pipeline(committed_session_factory, pipeline)
     await _set_agent_run(committed_session_factory, started_at=datetime.now(UTC), pid=AGENT_PID)
-    _, bare = sandboxes.git_auth_secret_values(VAULT_GITLAB)
+    _, bare, _ = git_access.git_auth_secret_values("gitlab", VAULT_GITLAB)
     vault = FakeVault({VaultRef("demo", "gitlab", "main"): VAULT_GITLAB})
     await _seed_agent(fake, task, status_exit=1, stderr=f"base64 без префикса: {bare}")
     ctx = replace(

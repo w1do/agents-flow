@@ -6,12 +6,30 @@ workspaces:
   - id: demo
     name: Демо-проект
     voice_aliases: ["демо", "демо-проект"]
-    gitlab_project: group/demo
+    # Репозиторий workspace (D-60): провайдер github | gitlab. base_url по умолчанию — https://gitlab.com
+    # (для github — https://github.com; GitHub Enterprise не поддержан). Самостоятельный GitLab — свой https-адрес.
+    repo:
+      provider: gitlab
+      project: group/demo
+      # base_url: https://gitlab.com
+      # Ключ записи из vault (D-45): ссылка vault:<project>/<service>/<name>. Без него задача уходит в error,
+      # а клон анонимный (только публичный репозиторий).
+      # access_ref: vault:CHANGE_ME/CHANGE_ME/CHANGE_ME
     default_branch: main
     test_command: "pytest"
     agent: claude-code
     # Лимит ходов агента на задачу, 1…500 (D-38).
     agent_max_turns: 50
+
+    # Пример workspace на GitHub: ключ записи — ссылка vault на главный ключ GitHub (fine-grained на
+    # репозиторий — позже, D-60). Ссылка — заглушка, значение токена в файл не пишется.
+    # - id: chistotyumen
+    #   name: Чистотюмень
+    #   voice_aliases: ["чистотюмень"]
+    #   repo:
+    #     provider: github
+    #     project: w1do/chistotyumen
+    #     access_ref: vault:CHANGE_ME/CHANGE_ME/CHANGE_ME
 
 sandbox:
   # Id песочницы Novita, созданной вручную (заполняется на этапе mvp-06).
@@ -31,8 +49,3 @@ sandbox:
   #   ref: CHANGE_ME_40_HEX_COMMIT_SHA
   #   # Ключ embeddings из vault; без поля поиск лексический.
   #   embedding_ref: vault:CHANGE_ME/CHANGE_ME/CHANGE_ME
-
-gitlab:
-  base_url: https://gitlab.com
-  # Главный ключ GitLab из vault (D-45): ссылка vault:<project>/<service>/<name>. Без поля — ENV GITLAB_TOKEN.
-  # access_ref: vault:CHANGE_ME/CHANGE_ME/CHANGE_ME

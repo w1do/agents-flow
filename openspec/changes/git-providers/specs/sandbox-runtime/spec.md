@@ -20,8 +20,9 @@ workspace, а песочница MUST NOT активироваться. Fetch п
 ### Requirement: Токены git-провайдеров в redaction
 
 Redaction SHALL заменять токены GitHub (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`, `github_pat_`), токены GitLab с
-префиксами `glpat-`, `gldt-`, `glrt-` и другими `gl…-`, а также значение заголовка `Basic` по шаблону, даже без
-точного значения. Точные значения ключа репозитория, его заголовка и base64 MUST добавляться в redaction для каждого
+префиксами `glpat-`, `gldt-`, `glrt-` и другими `gl…-`, в том числе сразу после `_`, значение заголовка `Basic` в
+любом регистре по шаблону, даже без точного значения, и пароль в адресе `https://user:pass@host`. Точные значения
+ключа репозитория, его заголовка, base64 и base64 в URL-кодировке MUST добавляться в redaction для каждого
 разрешённого ключа.
 
 #### Scenario: Токен GitHub в выводе агента
@@ -33,3 +34,13 @@ Redaction SHALL заменять токены GitHub (`ghp_`, `gho_`, `ghu_`, `g
 
 - **WHEN** текст ошибки содержит `Authorization: Basic <base64>`
 - **THEN** текст сохраняется как `Authorization: Basic [REDACTED]`
+
+#### Scenario: Пароль в адресе git
+
+- **WHEN** текст ошибки содержит `https://oauth2:<token>@gitlab.com/group/demo.git`
+- **THEN** текст сохраняется как `https://oauth2:[REDACTED]@gitlab.com/group/demo.git`
+
+#### Scenario: Слово basic в тексте
+
+- **WHEN** текст содержит `basic internationalization`
+- **THEN** текст не меняется

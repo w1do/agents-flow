@@ -15,10 +15,10 @@ from typing import Any
 
 import pytest
 from harness_server.adapters.novita import FakeSandbox
-from harness_server.config import GitAuthorConfig, HarnessConfig, load_config
+from harness_server.config import GitAuthorConfig, HarnessConfig, RepoConfig, load_config
 from harness_server.db.models import Task, TaskToken
 from harness_server.security import tokens
-from harness_server.services import sandboxes
+from harness_server.services import git_access, sandboxes
 from harness_server.services.agent_result import AgentRun, AgentState, parse_pid
 from harness_server.services.sandboxes import (
     AgentStartState,
@@ -44,6 +44,11 @@ SECRET_KEY = "test-secret-key-0123456789abcdef0123"
 # Значения тестовые, в формате настоящих секретов, но не настоящие.
 OAUTH = "oauth-test-value-0123456789abcdef"
 GITLAB = "glpat-test-token-0123456789abcdef"
+GITHUB = "github_pat_test-token-0123456789abcdef"
+# Репозиторий workspace demo для activate (D-60): провайдер gitlab, адрес как в тестовом конфиге.
+REPO_CONFIG = RepoConfig(
+    provider="gitlab", base_url="https://gitlab.example.com", project="group/demo"
+)
 
 
 class _Stage:
@@ -272,8 +277,8 @@ async def test_activate_extends_timeout_and_creates_worktree() -> None:
         task,
         base_ref="main",
         timeout_min=60,
-        gitlab_token=SecretStr(GITLAB),
-        gitlab_base_url="https://gitlab.example.com",
+        repo=REPO_CONFIG,
+        repo_token=SecretStr(GITLAB),
     )
 
     assert fake.timeout_s == 70 * 60
@@ -294,8 +299,8 @@ async def test_repeated_activation_skips_worktree_add() -> None:
         task,
         base_ref="main",
         timeout_min=60,
-        gitlab_token=SecretStr(GITLAB),
-        gitlab_base_url="https://gitlab.example.com",
+        repo=REPO_CONFIG,
+        repo_token=SecretStr(GITLAB),
     )
 
     assert not [e for e in fake.journal if e.cmd and "worktree add" in e.cmd]
@@ -312,8 +317,8 @@ async def test_activate_refuses_foreign_worktree_branch() -> None:
             task,
             base_ref="main",
             timeout_min=60,
-            gitlab_token=SecretStr(GITLAB),
-            gitlab_base_url="https://gitlab.example.com",
+            repo=REPO_CONFIG,
+            repo_token=SecretStr(GITLAB),
         )
 
     assert info.value.reason == "worktree_branch"
@@ -997,8 +1002,8 @@ async def test_activate_runs_memory_sync_with_envs_and_detached_default_branch()
         task,
         base_ref="main",
         timeout_min=60,
-        gitlab_token=SecretStr(GITLAB),
-        gitlab_base_url="https://gitlab.example.com",
+        repo=REPO_CONFIG,
+        repo_token=SecretStr(GITLAB),
         default_branch="develop",
         memory_envs={"EMBEDDING_API_KEY": EMBEDDING},
     )
@@ -1015,7 +1020,8 @@ async def test_activate_runs_memory_sync_with_envs_and_detached_default_branch()
     assert fake.files_containing(EMBEDDING) == []
     # Память идёт после fetch и до worktree add.
     order = [e.cmd or "" for e in fake.journal]
-    assert order.index(cmd) > next(i for i, c in enumerate(order) if "fetch origin" in c)
+    fetch_cmd = git_access.fetch_command(REPO_CONFIG, f"{HOME}/work/demo")
+    assert order.index(cmd) > order.index(fetch_cmd)
     assert next(i for i, c in enumerate(order) if "worktree add" in c) > order.index(cmd)
 
 
@@ -1028,8 +1034,8 @@ async def test_activate_without_memory_envs_skips_memory_step() -> None:
         _orphan_task(),
         base_ref="main",
         timeout_min=60,
-        gitlab_token=SecretStr(GITLAB),
-        gitlab_base_url="https://gitlab.example.com",
+        repo=REPO_CONFIG,
+        repo_token=SecretStr(GITLAB),
     )
 
     assert not [e for e in fake.journal if e.cmd and "memory" in e.cmd]
@@ -1046,8 +1052,8 @@ async def test_failed_memory_sync_does_not_fail_activation() -> None:
         task,
         base_ref="main",
         timeout_min=60,
-        gitlab_token=SecretStr(GITLAB),
-        gitlab_base_url="https://gitlab.example.com",
+        repo=REPO_CONFIG,
+        repo_token=SecretStr(GITLAB),
         memory_envs={},
     )
 
@@ -1088,13 +1094,14 @@ async def test_run_agent_without_memory_has_no_memory_project_env(
 
 async def test_bootstrap_with_memory_keeps_embedding_key_off_disk() -> None:
     fake = FakeSandbox(sandbox_id=PROVIDER_ID)
+    fake.respond('printf %s "$HOME"', stdout=HOME)
 
     await sandboxes.bootstrap(
         fake,
         PROVIDER_ID,
         CONFIG,
         script="echo\n",
-        gitlab_token=SecretStr(GITLAB),
+        repo_tokens={"demo": SecretStr(GITLAB)},
         memory_ref=MEMORY_REF,
         memory_repo="w1do/memory-agent",
         embedding_key=SecretStr(EMBEDDING),
@@ -1137,8 +1144,8 @@ def _decode_auth(value: str) -> str:
     return base64.b64decode(value[len(prefix) :]).decode()
 
 
-async def test_activate_fetch_env_carries_url_scoped_auth_header() -> None:
-    """Заголовок на префикс базового адреса GitLab через GIT_CONFIG_* (D-52), без askpass."""
+async def test_activate_resets_origin_before_fetch() -> None:
+    """origin возвращается на адрес из конфига до fetch; ключ не уходит на адрес из клона (D-60)."""
     fake = _fake()
 
     await sandboxes.activate(
@@ -1147,65 +1154,54 @@ async def test_activate_fetch_env_carries_url_scoped_auth_header() -> None:
         _orphan_task(),
         base_ref="main",
         timeout_min=60,
-        gitlab_token=SecretStr(GITLAB),
-        gitlab_base_url="https://gitlab.example.com",
+        repo=REPO_CONFIG,
+        repo_token=SecretStr(GITLAB),
     )
 
-    fetch = [e for e in fake.journal if e.cmd and "fetch origin" in e.cmd]
+    cmds = [e.cmd or "" for e in fake.journal]
+    remote = cmds.index(git_access.set_origin_command(REPO_CONFIG, REPO))
+    fetch = cmds.index(git_access.fetch_command(REPO_CONFIG, REPO))
+    assert remote < fetch
+    assert "https://gitlab.example.com/group/demo.git" in cmds[remote]
+    # Перенастройка origin идёт без заголовка: адрес не секрет, ключ нужен только fetch.
+    assert "GIT_CONFIG_VALUE_0" not in fake.journal[remote].env_keys
+    assert all(GITLAB not in cmd for cmd in cmds)
+
+
+async def test_activate_fetch_env_carries_repo_scoped_auth_header() -> None:
+    """Заголовок Basic на префикс адреса репозитория через GIT_CONFIG_* (D-52, D-60), без
+    askpass."""
+    fake = _fake()
+
+    await sandboxes.activate(
+        fake,
+        PROVIDER_ID,
+        _orphan_task(),
+        base_ref="main",
+        timeout_min=60,
+        repo=REPO_CONFIG,
+        repo_token=SecretStr(GITLAB),
+    )
+
+    fetch = [e for e in fake.journal if e.cmd == git_access.fetch_command(REPO_CONFIG, REPO)]
     assert len(fetch) == 1
-    assert fake.received_env("GIT_CONFIG_KEY_0") == "http.https://gitlab.example.com/.extraHeader"
+    prefix = "https://gitlab.example.com/group/demo.git/"
+    assert fake.received_env("GIT_CONFIG_KEY_0") == f"http.{prefix}.extraHeader"
     assert _decode_auth(fake.received_env("GIT_CONFIG_VALUE_0") or "") == f"oauth2:{GITLAB}"
-    assert fake.received_env("GIT_CONFIG_COUNT") == "2"
-    assert fake.received_env("GIT_CONFIG_KEY_1") == "http.followRedirects"
+    assert fake.received_env("GIT_CONFIG_COUNT") == "14"
+    assert fake.received_env("GIT_CONFIG_KEY_1") == f"http.{prefix}.followRedirects"
     assert fake.received_env("GIT_CONFIG_VALUE_1") == "false"
-    # Токен и askpass в env git не передаются (ни как GITLAB_TOKEN, ни как GIT_ASKPASS).
+    # Токен не передаётся ни как GITLAB_TOKEN, ни в env команды; GIT_ASKPASS — заглушка (D-62).
     assert "GITLAB_TOKEN" not in fetch[0].env_keys
-    assert "GIT_ASKPASS" not in fetch[0].env_keys
+    assert fake.received_env("GIT_ASKPASS") == "/bin/false"
     assert all(GITLAB not in (e.cmd or "") for e in fake.journal)
 
 
-async def test_activate_token_without_base_url_raises_before_provider_call() -> None:
-    """Токен без адреса GitLab: ValueError до любого вызова провайдера (D-52, ревью)."""
-    fake = _fake()
+async def test_activate_fetches_config_url_not_origin() -> None:
+    """fetch идёт по адресу из конфига, а не по имени origin: remote.origin клона не участвует.
 
-    with pytest.raises(ValueError, match="gitlab_base_url"):
-        await sandboxes.activate(
-            fake,
-            PROVIDER_ID,
-            _orphan_task(),
-            base_ref="main",
-            timeout_min=60,
-            gitlab_token=SecretStr(GITLAB),
-        )
-
-    assert fake.journal == []
-
-
-async def test_git_auth_env_is_scoped_to_base_url_prefix() -> None:
-    env = sandboxes.git_auth_env("https://gitlab.example.com", GITLAB)
-
-    assert env["GIT_CONFIG_KEY_0"] == "http.https://gitlab.example.com/.extraHeader"
-    assert env["GIT_CONFIG_COUNT"] == "2"
-    assert env["GIT_CONFIG_KEY_1"] == "http.followRedirects"
-    assert env["GIT_CONFIG_VALUE_1"] == "false"
-    assert env["GIT_TERMINAL_PROMPT"] == "0"
-    assert _decode_auth(env["GIT_CONFIG_VALUE_0"]) == f"oauth2:{GITLAB}"
-    assert "GIT_ASKPASS" not in env
-    assert "GITLAB_TOKEN" not in env
-
-
-async def test_git_auth_header_is_redaction_secret_material() -> None:
-    """base64 от токена — тоже секрет: по нему ищем в тексте (redaction, D-52)."""
-    header = sandboxes.git_auth_header(GITLAB)
-    encoded = header.removeprefix("Authorization: Basic ")
-
-    assert encoded != GITLAB
-    assert header == f"Authorization: Basic {encoded}"
-    assert _decode_auth(header) == f"oauth2:{GITLAB}"
-
-
-async def test_activate_without_token_fetches_anonymously() -> None:
-    """Без токена fetch идёт без заголовка и без GITLAB_TOKEN (публичный репозиторий, D-52)."""
+    D-62.
+    """
     fake = _fake()
 
     await sandboxes.activate(
@@ -1214,14 +1210,72 @@ async def test_activate_without_token_fetches_anonymously() -> None:
         _orphan_task(),
         base_ref="main",
         timeout_min=60,
-        gitlab_token=None,
-        gitlab_base_url="https://gitlab.example.com",
+        repo=REPO_CONFIG,
+        repo_token=SecretStr(GITLAB),
     )
 
-    fetch = [e for e in fake.journal if e.cmd and "fetch origin" in e.cmd]
+    cmds = [e.cmd or "" for e in fake.journal]
+    assert not [cmd for cmd in cmds if " fetch origin" in cmd]
+    assert git_access.fetch_command(REPO_CONFIG, REPO) in cmds
+
+
+async def test_activate_fetch_env_overrides_clone_config() -> None:
+    """Команда fetch с ключом перекрывает ~/.gitconfig и /etc/gitconfig (D-62)."""
+    fake = _fake()
+
+    await sandboxes.activate(
+        fake,
+        PROVIDER_ID,
+        _orphan_task(),
+        base_ref="main",
+        timeout_min=60,
+        repo=REPO_CONFIG,
+        repo_token=SecretStr(GITLAB),
+    )
+
+    assert fake.received_env("GIT_CONFIG_GLOBAL") == "/dev/null"
+    assert fake.received_env("GIT_CONFIG_NOSYSTEM") == "1"
+    assert fake.received_env("GIT_CONFIG_COUNT") == "14"
+
+
+async def test_activate_github_fetch_uses_x_access_token_header() -> None:
+    fake = _fake()
+    repo = RepoConfig(provider="github", project="w1do/chistotyumen")
+
+    await sandboxes.activate(
+        fake,
+        PROVIDER_ID,
+        _orphan_task(),
+        base_ref="main",
+        timeout_min=60,
+        repo=repo,
+        repo_token=SecretStr(GITHUB),
+    )
+
+    assert fake.received_env("GIT_CONFIG_KEY_0") == (
+        "http.https://github.com/w1do/chistotyumen.git/.extraHeader"
+    )
+    assert _decode_auth(fake.received_env("GIT_CONFIG_VALUE_0") or "") == f"x-access-token:{GITHUB}"
+    assert all(GITHUB not in (e.cmd or "") for e in fake.journal)
+
+
+async def test_activate_without_token_fetches_anonymously() -> None:
+    """Без ключа fetch идёт без заголовка и без GITLAB_TOKEN (публичный репозиторий, D-52, D-60)."""
+    fake = _fake()
+
+    await sandboxes.activate(
+        fake,
+        PROVIDER_ID,
+        _orphan_task(),
+        base_ref="main",
+        timeout_min=60,
+        repo=REPO_CONFIG,
+        repo_token=None,
+    )
+
+    fetch = [e for e in fake.journal if e.cmd == git_access.fetch_command(REPO_CONFIG, REPO)]
     assert len(fetch) == 1
     assert fake.received_env("GIT_CONFIG_VALUE_0") is None
-    assert fake.received_env("GITLAB_TOKEN") is None
     assert fake.received_env("GIT_TERMINAL_PROMPT") == "0"
 
 

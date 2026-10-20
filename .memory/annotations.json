@@ -17,11 +17,11 @@
   },
   {
     "relativePath": "ARCHITECTURE.md",
-    "summary": "Архитектура agents-flow: модули, статусы задач, эндпоинты, ENV, таблица sandboxes с agent_started_at и agent_pid, семантика sandbox resume.",
+    "summary": "Архитектура харнесса: §7 авторизация git (клоны и fetch делает сервер отдельной командой, фазы bootstrap, перекрытия конфига, остаточный риск R-1), §9 конфигурация workspaces[].repo (D-60, D-62).",
     "role": "doc",
-    "contentHash": "2a77f3bf1faa0d34a3fc86eb08f6cd08bda5868b25b99e98e0adb2fddc2ad984",
+    "contentHash": "00785d1a4522c864390cc980a681107030e0b21b5c1b52c88e7060c1ae46189b",
     "author": "agent",
-    "updatedAt": "2026-10-19T07:53:10.230Z"
+    "updatedAt": "2026-10-20T04:07:23.187Z"
   },
   {
     "relativePath": "CLAUDE.md",
@@ -41,27 +41,27 @@
   },
   {
     "relativePath": "PLAN.md",
-    "summary": "План MVP: порядок и статусы изменений OpenSpec; mvp-05 и mvp-06 в статусе review, mvp-06b ждёт приёмки mvp-06.",
+    "summary": "План проекта: 6e git-providers в review (ждёт live владельца), Следующее, ограничение ruff format на openspec design.md, строка keyed-git-outside-sandbox (R-1) в волне 5.",
     "role": "doc",
-    "contentHash": "2474b10580170cd7d3759610410b9777e4809d7a36d9b96d94b1dd6ad1f5a8cb",
+    "contentHash": "55f0c4f9cffc9765c6995fc0c4811340559a55f69d5e5a9983c1731c461b404f",
     "author": "agent",
-    "updatedAt": "2026-10-19T04:04:43.941Z"
+    "updatedAt": "2026-10-20T04:16:26.469Z"
   },
   {
     "relativePath": "apps/server/README.md",
-    "summary": "README сервера: запуск, тесты, команды sandbox (resume сбрасывает error, если задача не закреплена), структура worker/, live-тест песочницы, маршрутизация mvp-05.",
+    "summary": "README сервера: запуск, тесты и настройки harness.yaml, включая пункт про repo.access_ref (ключ записи workspace, поведение без ключа, env git-команд) (D-60, D-62).",
     "role": "doc",
-    "contentHash": "3a66166210e7fcb62bd0df1b6c9362ad5f8ca644cf25ac0ec32c6a1db8b3bccf",
+    "contentHash": "343bd412ab02232524433f2fba1e3ee891bf6121d094141bd864c5650862d05f",
     "author": "agent",
-    "updatedAt": "2026-10-19T04:05:59.641Z"
+    "updatedAt": "2026-10-20T04:07:23.245Z"
   },
   {
     "relativePath": "apps/server/pyproject.toml",
-    "summary": "Пакет harness_server: зависимости FastAPI, SQLAlchemy async, pydantic-settings, typer, харнесс shared; точка CLI harness_server.",
+    "summary": "Зависимости сервера харнесса: закреплённые mcp==2.3.0 (vault-клиент, D-45) и httpx2==2.14.0 напрямую; Python 3.12, FastAPI, SQLAlchemy, pytest/ruff/mypy.",
     "role": "config",
-    "contentHash": "6e3ab7cc2635f11ff1d5214d1d89a6e1c09a54f2e02b088d87f2a93ca78e6b87",
+    "contentHash": "9a3955673e185eba493ddfd0ef0d10f9cca6e04d87dd034cd76f8a7504e942c9",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:59:48.773Z"
+    "updatedAt": "2026-10-19T12:54:18.666Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/__init__.py",
@@ -185,11 +185,11 @@
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/telegram/client.py",
-    "summary": "HttpxTelegramClient на httpx: Bot API методы, download_file с дедлайном 60с, ошибки TelegramError/MessageNotEditable/FileTooLarge без URL и токена бота.",
+    "summary": "Клиент Bot API на httpx (D-14): базовый адрес telegram_api_url, ошибки InvalidURL и сетевые очищаются от URL с токеном бота.",
     "role": "module",
-    "contentHash": "976e5bd26c5c445c0d87497163cec49026980640d2e7b31e6bc6bab56f378f0b",
+    "contentHash": "ab1acc73f49cdc32fcdf24e0c3aeccbe5ea4c14288d24d64c21a314df3b41e68",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:02.561Z"
+    "updatedAt": "2026-10-19T19:53:10.216Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/telegram/fake.py",
@@ -214,6 +214,46 @@
     "contentHash": "7e7a39ed8eb6ea66d63c8abff478a6bbbe5702232ebd914fd893ed46314dd2a6",
     "author": "agent",
     "updatedAt": "2026-10-18T13:43:02.581Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/adapters/vault/__init__.py",
+    "summary": "Реэкспорт адаптера vault: SecretVault, VaultError, FakeVault, McpSecretVault для импорта из services и wiring.",
+    "role": "module",
+    "contentHash": "494dba4e8c1874c5e5d14a926551901d2220ac33b154ed1d2903e51c2e9b119d",
+    "author": "agent",
+    "updatedAt": "2026-10-19T12:54:19.111Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/adapters/vault/errors.py",
+    "summary": "Ошибки vault: VaultError с reason (not_configured, unavailable, timeout, tool_error, invalid_response); текст без значений и URL.",
+    "role": "module",
+    "contentHash": "617120b088e42e5314867abc253f4c49bf1be64a349afe35453c7c1ffd0cf181",
+    "author": "agent",
+    "updatedAt": "2026-10-19T12:54:19.153Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/adapters/vault/fake.py",
+    "summary": "FakeVault для тестов: значения по VaultRef, опциональная VaultError, журнал запрошенных ссылок.",
+    "role": "module",
+    "contentHash": "76beb7ecaad9beec8dce911c6bd3da315419408d60361ef33324c24d8ccc0cbe",
+    "author": "agent",
+    "updatedAt": "2026-10-19T12:54:19.177Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/adapters/vault/mcp_client.py",
+    "summary": "McpSecretVault: get_credential по MCP (mcp 2.3.0, httpx2, Bearer); parse_credential читает secret или credential.secret; ошибки timeout/unavailable/tool_error/invalid_response без значений.",
+    "role": "module",
+    "contentHash": "56a12c286219bc441b8ef3fb55593638c137dc11e696305129b33af1add2fc37",
+    "author": "agent",
+    "updatedAt": "2026-10-19T13:39:57.822Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/adapters/vault/protocol.py",
+    "summary": "Протокол SecretVault: async get(ref: VaultRef) -> SecretStr; сервисы зависят только от него, фейк для тестов.",
+    "role": "module",
+    "contentHash": "d4c36dd59381966f0b34f8afd3c420f21a16b6973cce09db721abcc8c2554e04",
+    "author": "agent",
+    "updatedAt": "2026-10-19T12:54:19.132Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/api/__init__.py",
@@ -265,19 +305,19 @@
   },
   {
     "relativePath": "apps/server/src/harness_server/cli.py",
-    "summary": "CLI harness-server: группа sandbox (status, pause, resume, bootstrap) с ensure_sandbox перед действием и отказом bootstrap на занятой песочнице; логика в services.",
-    "role": "entry",
-    "contentHash": "af336ebf09c6ebc39ee80024b9e437abb738f28849e87a84fb421c60cbc2e7fa",
+    "summary": "CLI harness-server: команда sandbox bootstrap берёт ключи из vault в env, вывод через redaction, SandboxStepError выводится как причина с кодом 1 (D-62).",
+    "role": "module",
+    "contentHash": "84925afbfbbb2faad92829cda1359e33676e7594f4384bded77667d9c3449f94",
     "author": "agent",
-    "updatedAt": "2026-10-19T04:04:43.882Z"
+    "updatedAt": "2026-10-20T04:07:22.930Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/config.py",
-    "summary": "Загрузка config/harness.yaml: несекретные настройки workspace; WorkspaceConfig.id ограничен 28 символами A-Za-z0-9_- (D-28); sandbox и gitlab-конфиг.",
-    "role": "config",
-    "contentHash": "63d4d2cde4a86b16a70a7c13ad64ab19a4a19020fc4f357edb299919479f5ca8",
+    "summary": "Конфиг harness.yaml: RepoConfig (provider, base_url, project, access_ref), валидация base_url с метками хоста и сегментами пути без «.»/«-» по краям (D-62 F3).",
+    "role": "module",
+    "contentHash": "323c9e0ae35d58d90e430a8d781424e8a49b4b5232be29c5c299e3adfccf6c8f",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:42:29.288Z"
+    "updatedAt": "2026-10-20T04:07:22.820Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/db/__init__.py",
@@ -385,11 +425,11 @@
   },
   {
     "relativePath": "apps/server/src/harness_server/security/redaction.py",
-    "summary": "Redaction текста из песочницы перед БД, Telegram и git: _PATTERNS (Bearer, ключи, токен задачи aft_…) и явные значения секретов; заменяет на [REDACTED].",
+    "summary": "Redacts secrets before output leaves the system: redact(text, extra_values) replaces exact values ≥8 chars and token patterns (Telegram, GitLab, GitHub, Anthropic, Bearer, Basic, URL passwords).",
     "role": "module",
-    "contentHash": "dfade777c20de4d5e229a703ff261222d04e37ddaf4a54f464323ec309399fdd",
+    "contentHash": "4353c3493f938b4b00045857c0cd81944c52b335464e2da1183cdc0e39f6f017",
     "author": "agent",
-    "updatedAt": "2026-10-19T07:53:10.089Z"
+    "updatedAt": "2026-10-20T04:14:58.640Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/security/tokens.py",
@@ -409,11 +449,11 @@
   },
   {
     "relativePath": "apps/server/src/harness_server/services/agent_result.py",
-    "summary": "Разбор итога агента: parse_pid (ASCII-цифры, 2…LINUX_PID_MAX=2**22), parse_exit_code, status.json как подсказка; завершение определяется живостью группы процессов.",
+    "summary": "Разбор итога агента: AgentResult, AgentRun.succeeded, limit_reached (лимит подписки Claude: ≤1 ход или is_error, текст ≤300, LIMIT_MARKERS), USAGE_LIMIT_REASON.",
     "role": "module",
-    "contentHash": "9cc3c89be68baee26935c22847501b6f5782b8ad713561f94c780a87976c59cd",
+    "contentHash": "19fce5ecd8a0bcd84f57a5f8edf05e61a369c87aabe0a36d2ef744aa7b10e38d",
     "author": "agent",
-    "updatedAt": "2026-10-19T07:59:33.326Z"
+    "updatedAt": "2026-10-19T18:49:12.377Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/context.py",
@@ -422,6 +462,14 @@
     "contentHash": "c13b29ce3e5968a39663027b32f23c87aa12c993e9119d70251f91ce23fb104c",
     "author": "agent",
     "updatedAt": "2026-10-19T03:47:45.525Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/services/git_access.py",
+    "summary": "Адрес и авторизация git: clone_url, git_auth_env с перекрытиями GIT_CONFIG_* (заголовок на префикс репо), clone/set_origin/fetch-команды, секреты для redaction (D-62).",
+    "role": "module",
+    "contentHash": "a472d0935708752ddc33dcbce864d66ec57723892af74aac50a7042c47bc9de5",
+    "author": "agent",
+    "updatedAt": "2026-10-20T04:07:22.842Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/intake.py",
@@ -465,11 +513,19 @@
   },
   {
     "relativePath": "apps/server/src/harness_server/services/sandboxes.py",
-    "summary": "Жизненный цикл песочницы: reserve, activate, run_agent (agent_started_at и pid в БД, DIED), wait_agent, cleanup (отзыв токенов, kill живой группы, rm каталога), resume по статусу.",
+    "summary": "Жизненный цикл песочницы: bootstrap в три шага (setup без ключей, _sync_clone на workspace, memory), activate с fetch по адресу из конфига, _merge_results, SandboxStepError (D-62).",
     "role": "module",
-    "contentHash": "49b5021409a702526dd81eabc8c6154167e21a891bf3d57f46753074e6c90d36",
+    "contentHash": "9cb6cebf190f2560d9bf8af281bdcc4a2265107cc6396a86a03830a55aaed70c",
     "author": "agent",
-    "updatedAt": "2026-10-19T07:59:33.344Z"
+    "updatedAt": "2026-10-20T04:07:22.888Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/services/secrets.py",
+    "summary": "Сервис секретов: resolve(vault, ref, fallback) — без ссылки fallback, ссылка без vault → not_configured, иначе значение из SecretVault.get.",
+    "role": "module",
+    "contentHash": "bb0507b6a94b50ba8e85ff6ac4f015229599e0fc98c10c6f09619a8311aeefc0",
+    "author": "agent",
+    "updatedAt": "2026-10-19T12:54:19.226Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/status_report.py",
@@ -497,11 +553,11 @@
   },
   {
     "relativePath": "apps/server/src/harness_server/settings.py",
-    "summary": "Настройки маршрутизации mvp-05: ROUTING_MIN_CONFIDENCE в [0, 1] (по умолчанию 0.6), POLZA_AI_URL только https через _check_polza_ai_url; нарушение — SettingsError.",
+    "summary": "Настройки ENV сервера: удалены gitlab_url и gitlab_token (D-60); ключи репозиториев живут в vault по repo.access_ref.",
     "role": "config",
-    "contentHash": "f2a98c986f87a5df183cc62a2263900f7b607df83ba850d43caab6c94c8ea78c",
+    "contentHash": "77fdbf20c7a79f35ca3d489f080e110784b15db29cda070640415c15f7ef7298",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:47:45.542Z"
+    "updatedAt": "2026-10-20T02:08:54.772Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/telegram/__init__.py",
@@ -528,12 +584,20 @@
     "updatedAt": "2026-10-19T02:30:15.640Z"
   },
   {
-    "relativePath": "apps/server/src/harness_server/wiring.py",
-    "summary": "Сборка зависимостей сервера: выбор PolzaRouter или FakeRouter, подключение сервисов routing и intake.",
-    "role": "entry",
-    "contentHash": "d9afc26305031b33c98d25201a7a6694b2c61129ca11056c88751c1d3a8441cd",
+    "relativePath": "apps/server/src/harness_server/vault_ref.py",
+    "summary": "Ссылки на секрет vault:<project>/<service>/<name>: VaultRef (frozen dataclass), parse_vault_ref и is_vault_ref по VAULT_REF_RE, str() обратим; кириллица и пробел в частях допускаются.",
+    "role": "module",
+    "contentHash": "7ed2363f393f7650ec142e60365fe97cc0fd64c90b722b831b1b8929fff1a1ef",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.649Z"
+    "updatedAt": "2026-10-19T12:54:19.079Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/wiring.py",
+    "summary": "Композиционный корень: сборка Telegram-клиента с telegram_api_url (прокси), build_vault, адаптеры и BotContext; без URL прокси используется официальный адрес Bot API (D-61).",
+    "role": "module",
+    "contentHash": "96d3091038fccd04543f7a23882f674e9089b54becbd2c7f3fd7ae22ef2405bf",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:53:10.131Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/worker.py",
@@ -553,43 +617,75 @@
   },
   {
     "relativePath": "apps/server/src/harness_server/worker/dispatcher.py",
-    "summary": "Диспетчер задач: _recover по серверной записи запуска, reserve → activate → pipeline.run; при отмене токен не отзывается (D-41), отзыв в cleanup; ошибки в error.",
+    "summary": "Диспетчер песочницы: резерв задачи, ключ записи из vault по repo.access_ref до активации, секреты токена и заголовка в redaction runner, без ключа — error (D-60, D-62).",
     "role": "module",
-    "contentHash": "4f0f5caa151a61bed1d8c0edb5b02b15cd83945468ba47f64416753e24dd5d01",
+    "contentHash": "6fe11e0f478bacdf32e5ce413716944d482c9ff3489f06c05a3b55a09fe26756",
     "author": "agent",
-    "updatedAt": "2026-10-19T07:53:10.137Z"
+    "updatedAt": "2026-10-20T04:07:22.908Z"
   },
   {
     "relativePath": "apps/server/tests/conftest.py",
-    "summary": "Общие фикстуры тестов сервера: реальный Postgres, фейковые адаптеры, включая FakeRouter для тестов маршрутизации.",
+    "summary": "Общие фикстуры тестов: фабрика BotContext и WorkspaceConfig с RepoConfig (gitlab group/demo, group/shop).",
     "role": "test",
-    "contentHash": "315ff23f73a694e3eb6d26e70de2e65b462d5de8da701394b3ee60d2b7daa542",
+    "contentHash": "af2a61eab1179f7947756942100ec6ee4b8ffcbb99732df212f7d5521b3bce1a",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.657Z"
+    "updatedAt": "2026-10-20T02:09:04.052Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_agent_result.py",
+    "summary": "Юнит-тесты разбора итога агента: распознавание лимита подписки Claude, варианты текста, ложные срабатывания (длинный ответ, много ходов, rate limit).",
+    "role": "test",
+    "contentHash": "c188292b86758328476f1b7521b722b7dfcdf795c835ef4823de3007f5054e5d",
+    "author": "agent",
+    "updatedAt": "2026-10-19T18:49:12.407Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_agent_runtime_live.py",
+    "summary": "Live-тест среды агента: activate с repo и repo_token для локального origin, заголовок не уходит на чужой адрес.",
+    "role": "test",
+    "contentHash": "10efd83b0331bbdf555a15a80d5a8029ed84aa1091474ae2b78f4069bc9cfe55",
+    "author": "agent",
+    "updatedAt": "2026-10-20T02:09:04.070Z"
   },
   {
     "relativePath": "apps/server/tests/test_cli.py",
-    "summary": "Тесты CLI: справка, отказ без конфига, пауза занятой песочницы, регистрация песочницы в pause/resume, отказ bootstrap на занятой песочнице; настоящий Postgres.",
+    "summary": "Тесты CLI: sandbox bootstrap берёт ключи из vault в env клона, анонимный клон с предупреждением, причина SandboxStepError в выводе с кодом 1, редакция base64 заголовка (D-62).",
     "role": "test",
-    "contentHash": "5a3f50c9e630bfb3b134f1a4226dfe0cda2d591b389cc00839526050c3be3543",
+    "contentHash": "e91fec1aeeb59bbb6e5849ab253d067deb3964f657c6a76d06cea0e54d654541",
     "author": "agent",
-    "updatedAt": "2026-10-19T04:04:43.897Z"
+    "updatedAt": "2026-10-20T04:07:23.161Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_compose.py",
+    "summary": "Тесты docker-compose.yml: сервисы migrate, server и worker, сборка, обязательные ENV, отсутствие публикации портов (D-59).",
+    "role": "test",
+    "contentHash": "f06aaf637b4886f4b49d93210ebd298128966fcf088d75e5282aa67a06a6445d",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:53:10.242Z"
   },
   {
     "relativePath": "apps/server/tests/test_config.py",
-    "summary": "Тесты config/harness.yaml: секреты в YAML отклоняются, уникальность id workspace, длина ≤28 и алфавит A-Za-z0-9_- для workspace id (D-28).",
+    "summary": "Тесты загрузки harness.yaml: RepoConfig, legacy-форма, отклонение base_url с метками «.»/«-» и принятие IP:порт с путём (D-62).",
     "role": "test",
-    "contentHash": "4ca511397fc52673869c62a4a3a05bd579fb4aae5b99803d2eb9b274af2f62c0",
+    "contentHash": "66dc54d85dfc296ae0052497f561c34edd0670398383bbae38ffa4dc0a136d45",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:29.403Z"
+    "updatedAt": "2026-10-20T04:07:23.002Z"
   },
   {
     "relativePath": "apps/server/tests/test_dispatcher.py",
-    "summary": "Тесты диспетчера: восстановление после рестарта (живой и мёртвый агент), токен при отмене и отзыв при очистке, resume из paused без вызова провайдера, секрет не в событиях.",
+    "summary": "Тесты диспетчера: fetch привязан к префиксу репозитория по fetch_command, секреты токена и base64 редактируются из вывода агента (D-60, D-62).",
     "role": "test",
-    "contentHash": "27f0d4f1de250c40f7e64fc2ffc032cb4eb0e17747ff82a929fb52ce33e206f1",
+    "contentHash": "23858134e96234869c293ce1852a95064cc2bd868987925eba8f6c5962510924",
     "author": "agent",
-    "updatedAt": "2026-10-19T07:59:33.385Z"
+    "updatedAt": "2026-10-20T04:07:23.133Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_git_access.py",
+    "summary": "Тесты git_access: env с перекрытиями, команды clone/set-url/fetch, redaction; интеграционные тесты с настоящим git (пропуск при git ниже 2.32) на приоритет конфига (D-62).",
+    "role": "test",
+    "contentHash": "ea80e43ca5add6ea28abfe6bb833964eafcd074522e60564679f00f8ba7cafbc",
+    "author": "agent",
+    "updatedAt": "2026-10-20T04:07:30.213Z"
   },
   {
     "relativePath": "apps/server/tests/test_health.py",
@@ -657,11 +753,11 @@
   },
   {
     "relativePath": "apps/server/tests/test_polza_live.py",
-    "summary": "Live-тесты Polza с маркером live: по умолчанию не запускаются, требуют реальный ключ из ENV, в репозитории ключей нет.",
+    "summary": "Live-тест Polza: WorkspaceConfig с RepoConfig (gitlab group/demo, group/shop) вместо gitlab_project.",
     "role": "test",
-    "contentHash": "cb4dedb4f3de010d84ca9d61b75e7fdd182248b996fe783883396b5563f875ed",
+    "contentHash": "98166f9b87ec36d12e9f6964b362488abe51c739fbb11614e5596205d2a03b3c",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.784Z"
+    "updatedAt": "2026-10-20T02:09:04.095Z"
   },
   {
     "relativePath": "apps/server/tests/test_recovery.py",
@@ -673,11 +769,11 @@
   },
   {
     "relativePath": "apps/server/tests/test_redaction.py",
-    "summary": "Тесты redaction: Bearer, ключи, токен задачи aft_ без явных значений, короткое слово aft_ не заменяется.",
+    "summary": "Тесты redaction: Basic любого регистра, токены после «_», пароль в URL, Bearer и точные значения extra_values (D-62).",
     "role": "test",
-    "contentHash": "e9ee834151fb44060e32a64a9288e79a3abd2783aa0180a583e94691be5e5968",
+    "contentHash": "47d229ec4d9af55f924c82bb2109456fcf730ea833e402ea6469f938b5229ddc",
     "author": "agent",
-    "updatedAt": "2026-10-19T07:53:10.184Z"
+    "updatedAt": "2026-10-20T04:07:23.043Z"
   },
   {
     "relativePath": "apps/server/tests/test_routing_models.py",
@@ -689,27 +785,43 @@
   },
   {
     "relativePath": "apps/server/tests/test_routing_service.py",
-    "summary": "Тесты сервиса routing: решения auto, clarify и fallback, запись routings, claim_clarification и AlreadyResolved при повторном разрешении.",
+    "summary": "Тесты маршрутизации: workspace demo и shop с RepoConfig вместо gitlab_project.",
     "role": "test",
-    "contentHash": "2a5d1e9adc09504808ece397b853718ed117dfae8c7209ba9cf2b36ba3e0abc9",
+    "contentHash": "4cf086f5e1e9951ab501f4c646f9c79f945f3208b336284a609c1158d6d13fc8",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.800Z"
+    "updatedAt": "2026-10-20T02:09:04.116Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_sandbox_bootstrap.py",
+    "summary": "Тесты bootstrap: фазы setup и memory, клон каждого workspace со своим ключом, fetch существующего клона, ошибка home, скриптовые проверки --phase и секретных env (D-62).",
+    "role": "test",
+    "contentHash": "132b5556da9835630f445d0db734a8e18df6f4e2393f22be4c02d29ebad43311",
+    "author": "agent",
+    "updatedAt": "2026-10-20T04:07:23.102Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_sandbox_profile_live.py",
+    "summary": "Live-тест профиля песочницы: LIVE_REPO_ACCESS_REF/PROVIDER/PROJECT, ключ по workspace в bootstrap и activate, проверка доступности без ключа.",
+    "role": "test",
+    "contentHash": "22c9e8dad161d519ea3c92773c2bf096e16dcc0ecab5996ea68b86a781ffaeff",
+    "author": "agent",
+    "updatedAt": "2026-10-20T02:09:04.155Z"
   },
   {
     "relativePath": "apps/server/tests/test_sandbox_service.py",
-    "summary": "Тесты сервиса песочниц: reserve/release, run_agent (started_at, pid, DIED), parse_pid в диапазоне Linux, wait_agent, cleanup с kill живой группы, resume из error/paused/active.",
+    "summary": "Тесты сервиса песочницы на FakeSandbox: bootstrap с фейком printf $HOME, activate с fetch по адресу из конфига и перекрытиями GIT_CONFIG_* (D-62).",
     "role": "test",
-    "contentHash": "b990b02aa1ab03831d037239d965cf9e3df16c35392923c49e6035471bb74677",
+    "contentHash": "0a6220d1ada572adff3d4217c2e31fa90b21ce7979c011c8582beca5766e26e6",
     "author": "agent",
-    "updatedAt": "2026-10-19T07:59:33.366Z"
+    "updatedAt": "2026-10-20T04:07:23.073Z"
   },
   {
     "relativePath": "apps/server/tests/test_settings.py",
-    "summary": "Тесты настроек сервера: ENV Polza (POLZA_AI_URL) и порог ROUTING_MIN_CONFIDENCE по умолчанию 0.6.",
+    "summary": "Тесты настроек ENV: telegram_api_url и telegram_webhook_url только https, VAULT_MCP_URL только https, секреты скрыты в repr, прежние значения по умолчанию.",
     "role": "test",
-    "contentHash": "cf8d3b1419998ae19b45b253009b45ccaaa0b39cdc07d6ff133beef903b82c0f",
+    "contentHash": "acdfdae06627bad0bd0a446c7be8671264ab9ee3adcda8a8d7ec88eca1f52a52",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.675Z"
+    "updatedAt": "2026-10-19T19:53:10.285Z"
   },
   {
     "relativePath": "apps/server/tests/test_status_report.py",
@@ -761,11 +873,11 @@
   },
   {
     "relativePath": "apps/server/tests/test_telegram_client.py",
-    "summary": "Контрактные тесты клиента Telegram на respx: методы Bot API, ошибки без URL и токена, дедлайн download_file 60с; токен в тестах ненастоящий.",
+    "summary": "Тесты клиента Telegram Bot API на respx: базовый адрес прокси, InvalidURL и сетевые ошибки без URL токена, повтор при ошибках сервера.",
     "role": "test",
-    "contentHash": "572f18a44143305cbc7719b7f0dba95a66f7ea50068474666b8da7e293200825",
+    "contentHash": "48e7d1f6ad634d1d244fd07bf95fb468a85afee940b77f181eec95d93d017481",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:29.497Z"
+    "updatedAt": "2026-10-19T19:53:10.326Z"
   },
   {
     "relativePath": "apps/server/tests/test_telegram_live.py",
@@ -785,11 +897,11 @@
   },
   {
     "relativePath": "apps/server/tests/test_telegram_render.py",
-    "summary": "Тесты рендера Telegram: кнопки выбора workspace и кнопки уточнения rt.",
+    "summary": "Тесты рендера Telegram: фабрика WorkspaceConfig с RepoConfig вместо gitlab_project.",
     "role": "test",
-    "contentHash": "dc60dab149d707fb080773f640c3f7b35fbb35322da5971a6cc98209a0e5f97b",
+    "contentHash": "d2377ddcccecf2a0e555414d4a96e75583b42c397097758728ff80ed0997d64f",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.687Z"
+    "updatedAt": "2026-10-20T02:09:04.187Z"
   },
   {
     "relativePath": "apps/server/tests/test_telegram_webhook.py",
@@ -808,6 +920,14 @@
     "updatedAt": "2026-10-19T07:53:10.168Z"
   },
   {
+    "relativePath": "apps/server/tests/test_vault.py",
+    "summary": "Тесты vault: ссылки vault:, parse_credential (secret и credential.secret, неверные формы), ошибки без значений, таймауты, группы исключений, build_vault, secrets.resolve.",
+    "role": "test",
+    "contentHash": "a7aa0fd35a6261fcfdb8e05035405fb39def870e6d734c47581a635b090a0caf",
+    "author": "agent",
+    "updatedAt": "2026-10-19T13:39:57.844Z"
+  },
+  {
     "relativePath": "apps/server/tests/test_webhook_service.py",
     "summary": "Тесты регистрации webhook: адрес https без query, fragment и учётных данных; список ALLOWED_UPDATES для setWebhook.",
     "role": "test",
@@ -824,6 +944,14 @@
     "updatedAt": "2026-10-19T02:30:15.817Z"
   },
   {
+    "relativePath": "apps/server/tests/test_wiring_telegram.py",
+    "summary": "Тесты wiring Telegram: telegram_api_url и webhook-адрес подставляются в клиент, без URL используется официальный адрес, значение токена не попадает в ошибки (D-61).",
+    "role": "test",
+    "contentHash": "b00aada4529034f83557c3f4031cbd89c70245d486ff9333530b000e3049b30f",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:53:10.267Z"
+  },
+  {
     "relativePath": "apps/server/tests/test_worker.py",
     "summary": "Тесты worker: цикл работает и завершается с кодом 0 по SIGTERM; сценарий serve_worker(settings, config) с восстановлением при старте.",
     "role": "test",
@@ -833,11 +961,11 @@
   },
   {
     "relativePath": "config/harness.example.yaml",
-    "summary": "Несекретный пример harness.yaml: workspaces, sandbox (provider_id), gitlab; токены и ключи сюда не пишутся, задаются в ENV.",
+    "summary": "Пример harness.yaml: workspace demo с блоком repo (gitlab, group/demo), закомментированный пример GitHub-workspace; секция gitlab удалена.",
     "role": "config",
-    "contentHash": "73b449c520ae10eb8cbe5f84c9d7ec2a2f6331396daf2aef8db35e1602532433",
+    "contentHash": "f0eb008503f24a8a68e7ecfcb3f9632fd4e10e7b16da2091b9008c08bbe97d3a",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:50:34.306Z"
+    "updatedAt": "2026-10-20T02:08:54.826Z"
   },
   {
     "relativePath": "db/README.md",
@@ -897,19 +1025,19 @@
   },
   {
     "relativePath": "deploy/sandbox/bootstrap.sh",
-    "summary": "Идемпотентный bootstrap песочницы: pinned claude и openspec, клон репозиториев workspace, ~/.harness, .mcp.json с плейсхолдерами ${AGENTS_FLOW_*}; секреты в файлы не пишутся.",
+    "summary": "Sandbox bootstrap script (mvp-06): installs Docker and acl, writes MCP config, sets up memory_ref, ensure_acl and setfacl on docker.sock.",
     "role": "config",
-    "contentHash": "a1334fe65c0481be8725d43d36ac14ea943ce6ecf464824da328eec27692ac46",
+    "contentHash": "5b926de6a560ef7d525f1858dabd1cf48405f3c2de48dc2a8114c1132a719ecb",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:50:34.275Z"
+    "updatedAt": "2026-10-20T04:14:55.879Z"
   },
   {
     "relativePath": "docker-compose.yml",
-    "summary": "Compose-стек харнесса для Dokploy: сервисы migrate, server и worker; ENV VOICE_MAX_BYTES пробрасывается в server и worker. Postgres вынесен в отдельный стек.",
+    "summary": "Compose стек: общий блок ENV сервера без GITLAB_URL/GITLAB_TOKEN (D-60); остальные ENV без изменений.",
     "role": "config",
-    "contentHash": "e2706cb5663db7a1e8037e8b5376ea8571c23d5c9ef3f5d87e0102377d5b8d7c",
+    "contentHash": "5af122e6796f6acae8f0d74224fd39b62e0c5b38bd171197e5879564f0f21403",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:42:29.186Z"
+    "updatedAt": "2026-10-20T03:31:24.439Z"
   },
   {
     "relativePath": "docs/README.md",
@@ -921,35 +1049,35 @@
   },
   {
     "relativePath": "docs/decisions.md",
-    "summary": "Журнал решений D-NN: Polza и Novita (D-16, D-17, D-31), песочница (D-35…D-38), VPS (D-40), серверный учёт запуска агента (D-41), префикс токена aft_ (D-42).",
+    "summary": "ADR-лог: D-60 провайдер репозитория, D-62 ключ git в песочнице; в D-62 ответ владельца 2026-10-19 — риск R-1 принят для 6e.",
     "role": "doc",
-    "contentHash": "220d45bc30db29f45d2a5cea123dd8dbe4e5412041f6e6a249197ca8a6d00fac",
+    "contentHash": "da4b555336065299a5e39508404f521f53aedd2189502726d5a74fc1b95e5cf5",
     "author": "agent",
-    "updatedAt": "2026-10-19T07:38:06.070Z"
+    "updatedAt": "2026-10-20T04:16:26.381Z"
   },
   {
     "relativePath": "docs/deployment.md",
-    "summary": "Деплой: bootstrap песочницы, токены задачи, ротация и allowlist, ручной разбор песочницы в error с закреплённой задачей; Postgres отдельным стеком Dokploy.",
+    "summary": "Деплой Dokploy и bootstrap песочницы: три шага (setup без ключей, клоны сервером с ключом workspace, memory), анонимный клон без ключа (D-62), переход на D-60.",
     "role": "doc",
-    "contentHash": "61ec54dba05168c0506bf5d2038b85a070c806fcd496829d6188a6b088d098a8",
+    "contentHash": "d78b13036f88230b02cc8aee72de86e74fb79e5e29959624149de000572ad6e2",
     "author": "agent",
-    "updatedAt": "2026-10-19T04:05:59.661Z"
+    "updatedAt": "2026-10-20T04:16:26.351Z"
   },
   {
     "relativePath": "docs/development.md",
-    "summary": "Локальная разработка: uv workspace, ./tools/harness check/fmt/dev/migrate, запуск server и worker, тесты и линт Python 3.12.",
+    "summary": "Локальная разработка: uv sync, Postgres в Docker, migrate, harness dev, harness check, webhook-туннель; ссылка на работу без UI (docs/operating-without-ui.md).",
     "role": "doc",
-    "contentHash": "68b7d2defe5703b7612b1c128d50e9e2c864ee9b1f04e1f112660d6ff9e5c457",
+    "contentHash": "08aebc2a33895de0a9aeda0701b3cc99241d4509816bf5aebda91ab7fef9e10e",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:59:48.715Z"
+    "updatedAt": "2026-10-19T09:00:18.966Z"
   },
   {
     "relativePath": "docs/glossary.md",
-    "summary": "Словарь терминов: статусы задачи, workspace, этапы, термины Telegram-приёма (апдейт, карточка, выбор workspace) для единообразного именования.",
+    "summary": "Глоссарий: термин MR (merge request GitLab или pull request GitHub, change_request_label) и провайдер репозитория GitProviderName (D-60).",
     "role": "doc",
-    "contentHash": "ae056f6739bd5cc0382958e01c22d3556f283947d6901b5677f4a6f6137ce126",
+    "contentHash": "4fe98952876064a4bcd417eb02e9979c3cb738439d6272f193af7062556d0b7f",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:42:43.853Z"
+    "updatedAt": "2026-10-20T02:08:55.100Z"
   },
   {
     "relativePath": "docs/mcp-agents-flow.md",
@@ -969,11 +1097,19 @@
   },
   {
     "relativePath": "docs/open-questions.md",
-    "summary": "Открытые вопросы ТЗ §17 (1–16) и раздел рисков; вопрос о Postgres в общей dokploy-network с expose 5432 не решён.",
+    "summary": "Открытые вопросы: вопрос 4 (клон при bootstrap, закрыт), вопрос 6 (шаблон Novita не делаем, D-44), риски без решения.",
     "role": "doc",
-    "contentHash": "4f4d4113efdd6576939a88863e65db99f799395339af9d5f1adf6fcb4b80b3f6",
+    "contentHash": "cc75d0d23ab5f6b89f533346839faf93370c31467c3c4b4af4f4fd3498de32fa",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:48:17.077Z"
+    "updatedAt": "2026-10-19T12:54:19.007Z"
+  },
+  {
+    "relativePath": "docs/operating-without-ui.md",
+    "summary": "Эксплуатация без UI: предупреждение worker о workspace без repo.access_ref, bootstrap клонирует по ключу репозитория из vault или анонимно.",
+    "role": "doc",
+    "contentHash": "f7cb0aaeaeef2b1205c8195b95b7fc7b3b18c8bd9242ed23b8ee30b292b0f485",
+    "author": "agent",
+    "updatedAt": "2026-10-20T02:08:55.135Z"
   },
   {
     "relativePath": "docs/tz/tz-v5.md",
@@ -1134,6 +1270,78 @@
     "contentHash": "6d65b511f6f51d52b633ceaebe924e7edc46bcde2ec5aa879f261e7b63c6d22f",
     "author": "agent",
     "updatedAt": "2026-10-18T14:16:06.347Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-19-mvp-05-command-routing/design.md",
+    "summary": "Архив mvp-05-command-routing, design: маршрутизация команд через Polza, классы work и status, кандидаты, запасной путь; решения заархивированы 2026-10-19.",
+    "role": "doc",
+    "contentHash": "515f47e988bf93a2eba8d2ac9a071098fc3329da9d101077e88dfd038928b515",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:07:41.638Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-19-mvp-05-command-routing/proposal.md",
+    "summary": "Архив mvp-05-command-routing, proposal: Polza для классов work и status, кандидаты задач, запасной путь маршрутизации; принято и заархивировано 2026-10-19.",
+    "role": "doc",
+    "contentHash": "96a17489a19ccde1d83cbcf55cfa132e8d7e84dfa8833e23ebe14ba4ef36678b",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:07:41.617Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-19-mvp-05-command-routing/tasks.md",
+    "summary": "Архив mvp-05-command-routing, tasks: задачи маршрутизации команд, проверки и живой прогон фраз; заархивировано 2026-10-19 после приёмки.",
+    "role": "doc",
+    "contentHash": "4c6ed88224169f960154a631f0a394ee1f6be8e8146fc080a735b5d949f63a4d",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:07:41.666Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-19-mvp-06-sandbox-runtime/design.md",
+    "summary": "Архив mvp-06-sandbox-runtime, design: адаптер Novita, bootstrap, запуск агента в песочнице, очистка, пауза, изоляция D-36; заархивировано 2026-10-19.",
+    "role": "doc",
+    "contentHash": "85519c5b1279b13bfa0855711997163f06b126cc79bb2347d5a761918c253223",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:07:41.709Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-19-mvp-06-sandbox-runtime/proposal.md",
+    "summary": "Архив mvp-06-sandbox-runtime, proposal: адаптер Novita, bootstrap, запуск агента, очистка и пауза песочницы; заархивировано 2026-10-19 после приёмки.",
+    "role": "doc",
+    "contentHash": "de88c03166943ab6aae810df670a6b0e1fd6a0322d7825b347bc7c1bc1c91d18",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:07:41.690Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-19-mvp-06-sandbox-runtime/tasks.md",
+    "summary": "Архив mvp-06-sandbox-runtime, tasks: задачи адаптера Novita, bootstrap, запуска агента, очистки и паузы с проверками; заархивировано 2026-10-19.",
+    "role": "doc",
+    "contentHash": "418db98f121b5e7bd848fc93b01384e3ee159330e9123a619433cebb75d82ba2",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:07:41.725Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-19-sandbox-profile/design.md",
+    "summary": "Архив sandbox-profile, design: vault, harness.yaml, bootstrap, память по sha (D-51), git-авторизация (D-52), рантайм и CLI; заархивировано 2026-10-19.",
+    "role": "doc",
+    "contentHash": "60b65f707ed92f50e7540a8c9a364b71e159ef2eec91d075d7249c9d4bbe869f",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:07:41.787Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-19-sandbox-profile/proposal.md",
+    "summary": "Архив sandbox-profile, proposal: bootstrap без участия владельца, ключи из vault, память проекта; ответы владельца на открытые вопросы; заархивировано 2026-10-19.",
+    "role": "doc",
+    "contentHash": "0c8cd31b6bdacf4ce53ad20176ad69da348df8b3dddeac8f106d3fe36a1abfeb",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:07:41.763Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-19-sandbox-profile/tasks.md",
+    "summary": "Архив sandbox-profile, tasks: разделы 1–4 отмечены, live-раздел 5 с результатом 7/7 (прогон 5); заархивировано 2026-10-19 (main edb7be6).",
+    "role": "doc",
+    "contentHash": "e5286d88b7cc13f3865c9fe6d831d9d92d2d4e529802e90804d5a5fbe06c6f2b",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:07:48.332Z"
   },
   {
     "relativePath": "openspec/changes/budget-usage/.openspec.yaml",
@@ -1528,28 +1736,92 @@
     "updatedAt": "2026-10-18T07:40:37.345Z"
   },
   {
-    "relativePath": "openspec/changes/gates-tests-deploy/proposal.md",
-    "summary": "OpenSpec proposal gates-tests-deploy (волна 4): Гейты тестов и деплоя по workspace. Зависит от processes. ТЗ §10 п.4, §12 (гейты workspace)",
+    "relativePath": "openspec/changes/gates-tests-deploy/design.md",
+    "summary": "Дизайн gates-tests-deploy (D-58): уровень 1 — CORE_GATES в коде, уровень 2 — workspaces[].gates в harness.yaml, уровень 3 — гейты задачи; изменение расширяет уровни 2 и 3.",
     "role": "doc",
-    "contentHash": "ad0db0b2cd52f14fe8a581c3aaf9d9cab0b3a2c54439fd1a5ae68aa7fce04169",
+    "contentHash": "38dd1455c39bc8d37b317c3528cffa36823fd08c5cc54726f19971dc78892efe",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.348Z"
+    "updatedAt": "2026-10-19T19:53:09.766Z"
+  },
+  {
+    "relativePath": "openspec/changes/gates-tests-deploy/proposal.md",
+    "summary": "Proposal gates-tests-deploy: гейты по workspace и задаче поверх mvp-09 (три уровня, D-58), гейт деплоя в staging с кодом возврата; волна 4 после MVP.",
+    "role": "doc",
+    "contentHash": "177c47d648c7cb18d3e62f8969c3cb1c08b2518d008a4bb47a89755557c1174b",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:53:09.750Z"
   },
   {
     "relativePath": "openspec/changes/gates-tests-deploy/specs/delivery-gates/spec.md",
-    "summary": "Delta-спека delivery-gates для gates-tests-deploy: Гейты задаются workspace, Гейт деплоя",
+    "summary": "Спека gates-tests-deploy: набор гейтов задаётся workspace, гейт secrets обязателен, сценарий workspace текстов без тестов и деплоя; гейт деплоя — отдельное требование.",
     "role": "doc",
-    "contentHash": "374dbe4d59482c0b5355477554cf685d51de9ca986b75af4600151d3e0b0897e",
+    "contentHash": "2ba9b2174aea8428e0f2d3c498ea83394d699e8497d3bfb40c481d5eaa90cd68",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.351Z"
+    "updatedAt": "2026-10-19T19:53:09.800Z"
   },
   {
     "relativePath": "openspec/changes/gates-tests-deploy/tasks.md",
-    "summary": "Чек-лист задач gates-tests-deploy: Гейты тестов и деплоя по workspace; реализация, документация, синхронизация памяти",
+    "summary": "Задачи gates-tests-deploy: схема гейтов в конфиге workspace, гейт deploy, обязательный secrets; документация ARCHITECTURE, mcp-agents-flow, decisions и PLAN.",
     "role": "doc",
-    "contentHash": "64b14f2f2702c838dd34f6556be25dce42c72e00ffe66791d8c516da298cfb66",
+    "contentHash": "c5320b67cb2b1a1e1a4f4ccdee16646c0e185513a12338c488b3968514e4c3bc",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.354Z"
+    "updatedAt": "2026-10-19T19:53:09.782Z"
+  },
+  {
+    "relativePath": "openspec/changes/git-providers/.openspec.yaml",
+    "summary": "Метаданные OpenSpec-изменения git-providers (6e): имя и схема изменения.",
+    "role": "config",
+    "contentHash": "b552ab6519df8f66b705724100f565c5cd842bc9389aeaa177da9cec3d02a685",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:58:07.804Z"
+  },
+  {
+    "relativePath": "openspec/changes/git-providers/design.md",
+    "summary": "Design git-providers (D-60) + Эскалация 1 (D-62): git_access перекрытия конфига, fetch по URL, bootstrap --phase setup/memory, клоны сервером, redaction, base_url, тесты, R-1",
+    "role": "doc",
+    "contentHash": "988084c7f96cbb12f7900cdf7cb4ee8afae4183444673888daee5de8f530ac31",
+    "author": "agent",
+    "updatedAt": "2026-10-20T03:53:00.274Z"
+  },
+  {
+    "relativePath": "openspec/changes/git-providers/proposal.md",
+    "summary": "OpenSpec git-providers: вопросы владельца 1–7; ответ по вопросу 7 (R-1 принят для 6e, закрытие — keyed-git-outside-sandbox) записан 2026-10-19.",
+    "role": "doc",
+    "contentHash": "6d262426ed2087a4488922906df640890be05128e7ccf3abaff8bd0098925f50",
+    "author": "agent",
+    "updatedAt": "2026-10-20T04:16:26.410Z"
+  },
+  {
+    "relativePath": "openspec/changes/git-providers/specs/platform-config/spec.md",
+    "summary": "Дельта platform-config: workspaces[].repo (provider, base_url https, project, access_ref), отказ от gitlab:, сегменты base_url без . .. -",
+    "role": "doc",
+    "contentHash": "354262916cb398bcd5a79dd310092ac08b600faf87da9b05ae8bf4f3a25d2baa",
+    "author": "agent",
+    "updatedAt": "2026-10-20T03:53:00.427Z"
+  },
+  {
+    "relativePath": "openspec/changes/git-providers/specs/sandbox-profile/spec.md",
+    "summary": "Дельта sandbox-profile: bootstrap, ключи из vault, авторизация git по workspace, перекрытия конфига git, фазы setup/memory без ключей, клоны делает сервер",
+    "role": "doc",
+    "contentHash": "48dfc29b0c73c4cc6efcb1de4112340d5f51a191f0317604cc6e6a59dcb92b36",
+    "author": "agent",
+    "updatedAt": "2026-10-20T03:53:00.368Z"
+  },
+  {
+    "relativePath": "openspec/changes/git-providers/specs/sandbox-runtime/spec.md",
+    "summary": "Дельта sandbox-runtime: ключ repo.access_ref перед задачей (error repo_access_ref), redaction токенов GitHub/GitLab, Basic любой регистр, пароль в URL",
+    "role": "doc",
+    "contentHash": "b6528fdc54195237517645fcdd916f357c51b5ef9893f6bb120f7b46d9359e7d",
+    "author": "agent",
+    "updatedAt": "2026-10-20T03:53:00.400Z"
+  },
+  {
+    "relativePath": "openspec/changes/git-providers/tasks.md",
+    "summary": "Чек-лист OpenSpec git-providers (6e): задачи 0–8; 8.8 закрыт ответом владельца в D-62; 5.1, 5.2, 6.5 открыты (live и .env.example).",
+    "role": "doc",
+    "contentHash": "a7aeb315ee0356c1afe11520db450fdf22c9527e69c5136c2a138d05129d70d3",
+    "author": "agent",
+    "updatedAt": "2026-10-20T04:16:26.439Z"
   },
   {
     "relativePath": "openspec/changes/harness-snap/.openspec.yaml",
@@ -1656,28 +1928,44 @@
     "updatedAt": "2026-10-18T07:40:37.399Z"
   },
   {
-    "relativePath": "openspec/changes/integrations-mcp-config/proposal.md",
-    "summary": "OpenSpec proposal integrations-mcp-config (волна 5): Интеграции и MCP-серверы. Зависит от skills-library. ТЗ §12 (интеграции), §11 (интеграции и MCP)",
+    "relativePath": "openspec/changes/integrations-mcp-config/design.md",
+    "summary": "Design: миграция 0005 mcp_servers, services/mcp_servers build_agent_config (${HARNESS_MCP_i_j}), mcp_formats ClaudeMcpFormat, run_agent(mcp_config), CLI mcp add/list/show/remove.",
     "role": "doc",
-    "contentHash": "d78578b7dbf093df350a3836cb2dee1e2839cc63559ad6cd5b6fd75c3567e42b",
+    "contentHash": "e1d157b53caa08922e5c46ccbb97d815f4b8fcf1dfa9a874433fccbd175cbd77",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.402Z"
+    "updatedAt": "2026-10-19T09:38:16.199Z"
+  },
+  {
+    "relativePath": "openspec/changes/integrations-mcp-config/proposal.md",
+    "summary": "Proposal integrations-mcp-config: таблица mcp_servers с vault:-ссылками, генерация ~/.harness/mcp.json на каждый run_agent, CLI harness-server mcp; до mvp-07.",
+    "role": "doc",
+    "contentHash": "409462149069eae37d064342686b7a790451374ec4fb4f2101b1e12626ede73d",
+    "author": "agent",
+    "updatedAt": "2026-10-19T09:38:16.184Z"
   },
   {
     "relativePath": "openspec/changes/integrations-mcp-config/specs/integrations/spec.md",
-    "summary": "Delta-спека integrations для integrations-mcp-config: Секреты только ссылками, Конфиг MCP для агента",
+    "summary": "Спека integrations: раздел MCP-серверов без секретов (vault:-ссылки), конфиг MCP агента генерируется на каждый запуск, значения только в env.",
     "role": "doc",
-    "contentHash": "49a66d6ebd34034afe044b7fa009c497dea680b5c675ffa1e3a3d8c8c717d446",
+    "contentHash": "5d24e8bf4e1e25fb0e146f680bfc03f20edef6f5a3e9393fb30d7a05680dea48",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.406Z"
+    "updatedAt": "2026-10-19T09:38:16.228Z"
+  },
+  {
+    "relativePath": "openspec/changes/integrations-mcp-config/specs/sandbox-runtime/spec.md",
+    "summary": "Delta sandbox-runtime (MODIFIED) от integrations-mcp-config: изоляция агента, mcp.json генерирует сервер из раздела MCP, --strict-mcp-config.",
+    "role": "doc",
+    "contentHash": "97efcdf9b424bf4c11d0c0e2fd61420d8253bf07f1bedcfc16ee982fe47edfea",
+    "author": "agent",
+    "updatedAt": "2026-10-19T09:38:16.242Z"
   },
   {
     "relativePath": "openspec/changes/integrations-mcp-config/tasks.md",
-    "summary": "Чек-лист задач integrations-mcp-config: Интеграции и MCP-серверы; реализация, документация, синхронизация памяти",
+    "summary": "Задачи integrations-mcp-config: хранение и валидация, конфиг агента и формат Claude, run_agent и диспетчер, CLI mcp, docs, live (vault connected, изоляция).",
     "role": "doc",
-    "contentHash": "8f7cac00e51b4f20c31ad42e28c3b5f7fd068774dccb82d83b33ec7c359eb7af",
+    "contentHash": "8a5ae04ddb6021ae6c56b7b246f939d360e59ef9373e0f80936aa0215da9ee30",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.409Z"
+    "updatedAt": "2026-10-19T09:38:16.213Z"
   },
   {
     "relativePath": "openspec/changes/mcp-operator-tools/.openspec.yaml",
@@ -1889,11 +2177,11 @@
   },
   {
     "relativePath": "openspec/changes/mvp-06-sandbox-runtime/tasks.md",
-    "summary": "Чек-лист mvp-06-sandbox-runtime: выполнены все пункты, включая раздел 6 (исправления после ревью); открыты только live-проверки 1.4 и 2.1.",
+    "summary": "Чек-лист mvp-06-sandbox-runtime: выполнены разделы 1–6, включая live-тест рантайма агента 6.12; у владельца остаются отметки live-проверок 1.4 и 2.1.",
     "role": "doc",
-    "contentHash": "a025b1b45c348e7c7a121a3814548ecd82065ebdab7a68ccb85632bdffbb27c2",
+    "contentHash": "c99896b870231438ab479a33287034c37301e97f03085ab9aab72e01c9a00bc6",
     "author": "agent",
-    "updatedAt": "2026-10-19T07:53:10.260Z"
+    "updatedAt": "2026-10-19T09:00:19.002Z"
   },
   {
     "relativePath": "openspec/changes/mvp-06b-vps-provider/design.md",
@@ -1945,11 +2233,11 @@
   },
   {
     "relativePath": "openspec/changes/mvp-07-agents-flow-mcp/proposal.md",
-    "summary": "MVP proposal mvp-07-agents-flow-mcp: MCP agents-flow на /mcp: токен задачи, роли planner/implementer, report_task, sync_spec, create_task",
+    "summary": "Proposal mvp-07: MCP agents-flow для агента — токен задачи, report_task, sync_spec, create_task; критерий D-56: агент коммитит и сдаёт работу.",
     "role": "doc",
-    "contentHash": "8245bf5a8b19c744f8aa2e3b43a4da9296acf7a383cac559e6954ef060081b74",
+    "contentHash": "d08e11ac55259d5735d2c768542fea9ec49818ddb05aefdc909604eb97fd5efc",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.526Z"
+    "updatedAt": "2026-10-19T18:49:12.675Z"
   },
   {
     "relativePath": "openspec/changes/mvp-07-agents-flow-mcp/specs/agents-flow-mcp/spec.md",
@@ -2017,35 +2305,35 @@
   },
   {
     "relativePath": "openspec/changes/mvp-09-delivery-mr/design.md",
-    "summary": "Design mvp-09-delivery-mr: технические решения, альтернативы и риски",
+    "summary": "Дизайн mvp-09: гейты exec-командами в worktree задачи (D-03, D-58 уровень 1), доставка через GitProvider — MR GitLab или PR GitHub (D-60), идемпотентные шаги, секреты не уходят в репозиторий.",
     "role": "doc",
-    "contentHash": "e65e1e433fa8881ef7f17df8cfd2ffea36b0216d7aa59630d764b428e2506eae",
+    "contentHash": "6387af416f130333cd0052ddc33e9ea3bbbbe67e089b7339c866c294b8c1af0e",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.555Z"
+    "updatedAt": "2026-10-19T19:58:07.994Z"
   },
   {
     "relativePath": "openspec/changes/mvp-09-delivery-mr/proposal.md",
-    "summary": "MVP proposal mvp-09-delivery-mr: Пайплайн implement: гейты commit/secrets/tests(no_tests)/push/MR GitLab, идемпотентность, итог в Telegram",
+    "summary": "Proposal mvp-09-delivery-mr: исполнитель, базовые гейты, доставка MR или PR по провайдеру workspace (D-60), итог в Telegram по критерию D-56.",
     "role": "doc",
-    "contentHash": "9031b988c41bdcfed2f937724165d2c30c4455c6df73112fbe067c8d618048ee",
+    "contentHash": "1a4a97b7997f80097a974e785c6df5855232bfffc8c805c2f63d5bc4e27545bb",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.559Z"
+    "updatedAt": "2026-10-19T19:58:08.023Z"
   },
   {
     "relativePath": "openspec/changes/mvp-09-delivery-mr/specs/delivery-gates/spec.md",
-    "summary": "Delta-спека delivery-gates (mvp-09-delivery-mr): требования и сценарии WHEN/THEN",
+    "summary": "Спека delivery-gates mvp-09: задача implement берётся из backlog в ветке task/<id>, после гейтов получает MR или PR по провайдеру репозитория; строки в Telegram о начале и готовности.",
     "role": "doc",
-    "contentHash": "1c4f272cf41a80f91f619d1f89e6b601dba210bbdbc322224dd38284392a6545",
+    "contentHash": "bada4309a4849fe10d638d8c577a990a458ab910be51c51a1cdbffd793a5352a",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.562Z"
+    "updatedAt": "2026-10-19T19:58:08.057Z"
   },
   {
     "relativePath": "openspec/changes/mvp-09-delivery-mr/tasks.md",
-    "summary": "Чек-лист задач mvp-09-delivery-mr с проверками, документацией и синхронизацией памяти",
+    "summary": "Задачи mvp-09: GitProvider с реализациями GitLab MR и GitHub PR, гейты commit_check, tests и merge_request, итог в Telegram; проверки по группам чек-листа.",
     "role": "doc",
-    "contentHash": "7ed8f7d84ea5d5776feaea789ede71f53bc3343e075ad2d03c3a3d14e2e42f89",
+    "contentHash": "52030a9cd7044bf52baa56018479ce8b3da8e396f2437284db7c17334a28f05e",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.565Z"
+    "updatedAt": "2026-10-19T19:58:08.084Z"
   },
   {
     "relativePath": "openspec/changes/mvp-10-operator-console/design.md",
@@ -2280,28 +2568,44 @@
     "updatedAt": "2026-10-18T07:40:37.650Z"
   },
   {
-    "relativePath": "openspec/changes/sandbox-profile/proposal.md",
-    "summary": "OpenSpec proposal sandbox-profile (волна 5): Версионируемый профиль песочницы. Зависит от sandbox-pool. ТЗ §9 (создание одной командой), §13, §7 (`GET /bootstrap`), §17 вопрос 4",
+    "relativePath": "openspec/changes/sandbox-profile/design.md",
+    "summary": "Дизайн sandbox-profile: vault, harness.yaml, bootstrap, память по sha (D-51), git-авторизация (D-52), рантайм, CLI, риски и принятые отклонения реализации.",
     "role": "doc",
-    "contentHash": "95ed9dccea9ae1125a448fbd44b0d9e46fc510e0aa00a5f7827125b64836a7ff",
+    "contentHash": "60b65f707ed92f50e7540a8c9a364b71e159ef2eec91d075d7249c9d4bbe869f",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.653Z"
+    "updatedAt": "2026-10-19T15:06:39.549Z"
+  },
+  {
+    "relativePath": "openspec/changes/sandbox-profile/proposal.md",
+    "summary": "Proposal sandbox-profile: ответы владельца на все три вопроса (vault URL, ссылки, 2 ГБ достаточно по live 5.3), объём и зависимости изменения.",
+    "role": "doc",
+    "contentHash": "0c8cd31b6bdacf4ce53ad20176ad69da348df8b3dddeac8f106d3fe36a1abfeb",
+    "author": "agent",
+    "updatedAt": "2026-10-19T15:06:39.339Z"
   },
   {
     "relativePath": "openspec/changes/sandbox-profile/specs/sandbox-profile/spec.md",
-    "summary": "Delta-спека sandbox-profile для sandbox-profile: Bootstrap по одноразовой ссылке, Версии профиля",
+    "summary": "Спека sandbox-profile: bootstrap без участия владельца, ключи из vault только в env, память проекта memory-agent в песочнице, git-авторизация без ключа в argv.",
     "role": "doc",
-    "contentHash": "041cbac4ce3c1c9c016f723b98ddd08a166746a7877b1dfa8194357a5bc9e809",
+    "contentHash": "ece2c03e46c75dab33022de380f19b5bc3f3026d17bab59c4c4926aba017a79c",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.656Z"
+    "updatedAt": "2026-10-19T15:06:39.565Z"
+  },
+  {
+    "relativePath": "openspec/changes/sandbox-profile/specs/sandbox-runtime/spec.md",
+    "summary": "Delta sandbox-runtime (MODIFIED) от sandbox-profile: креды не остаются в песочнице, ключи из vault в env и redaction по ним.",
+    "role": "doc",
+    "contentHash": "cc67cac56874e1265d54b5f9e55f2ce060c000e15f3b3e7432dcee8ce5ebfcb3",
+    "author": "agent",
+    "updatedAt": "2026-10-19T09:38:16.170Z"
   },
   {
     "relativePath": "openspec/changes/sandbox-profile/tasks.md",
-    "summary": "Чек-лист задач sandbox-profile: Версионируемый профиль песочницы; реализация, документация, синхронизация памяти",
+    "summary": "Задачи sandbox-profile: vault, настройки, bootstrap, D-51 memory-agent, D-52 git, git_author, документация, память; live 5.1–5.7 приняты владельцем 2026-10-19 (7/7).",
     "role": "doc",
-    "contentHash": "2294e583784c564342feff4fbe88c0bf5b410d1be0d3017cac0e020e15d5486a",
+    "contentHash": "e5286d88b7cc13f3865c9fe6d831d9d92d2d4e529802e90804d5a5fbe06c6f2b",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.660Z"
+    "updatedAt": "2026-10-19T15:36:58.302Z"
   },
   {
     "relativePath": "openspec/changes/sandbox-timeout-extend/.openspec.yaml",
@@ -2345,27 +2649,27 @@
   },
   {
     "relativePath": "openspec/changes/skills-library/proposal.md",
-    "summary": "OpenSpec proposal skills-library (волна 5): Библиотека skills через MCP. Зависит от sandbox-profile. ТЗ §12, §17 вопросы 13–14",
+    "summary": "Proposal skills-library: skills и агенты Claude в таблице skills с kind skill|agent, общие skills_manifest/get_skill/upsert_skill, файлы в ~/.claude (D-49).",
     "role": "doc",
-    "contentHash": "72eaafb989f8606282f500aa3e636540043fc10b463853cb30f9d0679d4b4ca7",
+    "contentHash": "46634a50d862d2bfc94d529c5bce8fc6ef75f4e9f45f08f0b4c814636b988f25",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.682Z"
+    "updatedAt": "2026-10-19T09:38:16.256Z"
   },
   {
     "relativePath": "openspec/changes/skills-library/specs/skills-library/spec.md",
-    "summary": "Delta-спека skills-library для skills-library: Манифест skills workspace, Применение со следующего этапа",
+    "summary": "Спека skills-library: манифест skills и агентов workspace, применение со следующего этапа, агенты Claude с платформы в ~/.claude/agents.",
     "role": "doc",
-    "contentHash": "a37ae4c93a2e64aebd3c0834ca65e5e98a681142553c9ebc1123805b4b755e18",
+    "contentHash": "67566dc6f336473a9bfda2e17b4150ae952643c8df94057070820e36e7bb67b6",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.686Z"
+    "updatedAt": "2026-10-19T09:38:16.286Z"
   },
   {
     "relativePath": "openspec/changes/skills-library/tasks.md",
-    "summary": "Чек-лист задач skills-library: Библиотека skills через MCP; реализация, документация, синхронизация памяти",
+    "summary": "Задачи skills-library: миграция skills с kind, инструменты с проверкой frontmatter, инструкция в промптах, live видимости субагента.",
     "role": "doc",
-    "contentHash": "b3572c33c60212a757831ffd6770dd050eabb6f4fa74c1c66434733ee24a5fc2",
+    "contentHash": "3ff77c00a02b2e56557522cd922dcf88a0d07eeb78d195f387f8511d29e2ca30",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.689Z"
+    "updatedAt": "2026-10-19T09:38:16.271Z"
   },
   {
     "relativePath": "openspec/changes/spec-approval/.openspec.yaml",
@@ -2592,6 +2896,78 @@
     "updatedAt": "2026-10-18T07:40:37.784Z"
   },
   {
+    "relativePath": "openspec/changes/task-rework/design.md",
+    "summary": "Дизайн task-rework: task_dialog, WIP-push с core-гейтами, доработка на той же ветке через git_for(workspace) (D-60), ask_owner, telegram_message_links, переходы статусов ready→backlog и active→paused.",
+    "role": "doc",
+    "contentHash": "7c87f03b9964a5a52aa57414a32ba1440106033183e698d19e2e446548410da3",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:58:08.118Z"
+  },
+  {
+    "relativePath": "openspec/changes/task-rework/proposal.md",
+    "summary": "Proposal task-rework: доработка задачи по замечанию в Telegram на той же ветке и MR (D-57), диалог с агентом; открытые вопросы владельцу, волна 1 после MVP.",
+    "role": "doc",
+    "contentHash": "c1f23a139d8bd9b364676bf8ce86a34600df243c426db11ca0976c19c49ef2dd",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:58:08.143Z"
+  },
+  {
+    "relativePath": "openspec/changes/task-rework/specs/agents-flow-mcp/spec.md",
+    "summary": "Дельта agents-flow-mcp: инструмент ask_owner с фильтром секретов, лимит длины и числа открытых вопросов, после вопроса без ответа задача переходит в paused.",
+    "role": "doc",
+    "contentHash": "d78c96c03d54fa4750927ab59438cc62a2a054f6299188e3502ffb0b91930852",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:53:09.686Z"
+  },
+  {
+    "relativePath": "openspec/changes/task-rework/specs/command-routing/spec.md",
+    "summary": "Дельта command-routing: класс feedback (замечание к задаче), до 3 кандидатов из недавних задач, автопривязка при уверенном классе и явном лидере, иначе кнопки выбора.",
+    "role": "doc",
+    "contentHash": "b24b481562bd21565a8ab47347c640f97ed7e9a796a62a81959c6e955a6141f7",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:53:09.660Z"
+  },
+  {
+    "relativePath": "openspec/changes/task-rework/specs/delivery-gates/spec.md",
+    "summary": "Дельта delivery-gates task-rework: доработка на той же ветке и в том же MR, гейты считаются по прогону после последнего перехода в active, push без перезаписи истории.",
+    "role": "doc",
+    "contentHash": "5dac18b98cab8e1f345c4f55fe6e38e0af8e3317e80b29cf102b63ede3e1b3fb",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:58:08.220Z"
+  },
+  {
+    "relativePath": "openspec/changes/task-rework/specs/task-dialog/spec.md",
+    "summary": "Спека task-dialog: реплики по задаче с фильтром секретов, непереданные реплики попадают в промпт следующего запуска, предел доработок TASK_REWORK_MAX.",
+    "role": "doc",
+    "contentHash": "f2d147ce3de4dd6f77f8ef448c559b01fd8ec9cce53633a568dcb0f7c7753c28",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:58:08.266Z"
+  },
+  {
+    "relativePath": "openspec/changes/task-rework/specs/task-lifecycle/spec.md",
+    "summary": "Дельта task-lifecycle: переходы ready→backlog, active→paused, paused→backlog по таблице domain/statuses.py; статусы только из набора ТЗ v5.",
+    "role": "doc",
+    "contentHash": "796374069bf62c6eddbb73ade816a51f45716c9448558703b12098c4dbe5435b",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:53:09.615Z"
+  },
+  {
+    "relativePath": "openspec/changes/task-rework/specs/telegram-bot/spec.md",
+    "summary": "Дельта telegram-bot: каждое сообщение бота о задаче связывается с ней, карточка содержит ссылку #ref, ответ на сообщение привязывается к задаче (telegram_message_links).",
+    "role": "doc",
+    "contentHash": "8ef6badf522e7fee234aa7f1f6d9573de6dee84d215a8259bbb0f4c6152d0f41",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:53:09.733Z"
+  },
+  {
+    "relativePath": "openspec/changes/task-rework/tasks.md",
+    "summary": "Задачи task-rework по группам: диалог и БД, routing feedback, Telegram и reply, ask_owner, worker и гейты через git_for(workspace), документация; порядок обязателен.",
+    "role": "doc",
+    "contentHash": "1a877b71aba166b8dc8ff5c5a5f3442793f69a8114200b3b655813ad27fec6b5",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:58:08.174Z"
+  },
+  {
     "relativePath": "openspec/changes/telegram-full-stages/.openspec.yaml",
     "summary": "Метаданные OpenSpec-изменения telegram-full-stages (schema spec-driven)",
     "role": "config",
@@ -2728,12 +3104,36 @@
     "updatedAt": "2026-10-18T07:40:37.841Z"
   },
   {
+    "relativePath": "openspec/specs/command-routing/spec.md",
+    "summary": "Основная спека command-routing (синхронизирована из mvp-05): классы work и status, кандидаты, запасной путь, маршрутизация через Polza; класс feedback — отдельной дельтой task-rework.",
+    "role": "doc",
+    "contentHash": "10526a6aad906a74c81eea1b3d68f617e1353d9e06adce66122f3989c3accba0",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:07:41.488Z"
+  },
+  {
     "relativePath": "openspec/specs/platform-config/spec.md",
     "summary": "Основная спека platform-config: конфиг и ENV-ссылки на секреты; дельта синхронизирована при архивации mvp-03-task-store (2026-10-18).",
     "role": "doc",
     "contentHash": "39268bd0f0869bef4b0bc41f4a623bb3cd262579449445f79c8c29c2af3c8119",
     "author": "agent",
     "updatedAt": "2026-10-18T14:16:06.236Z"
+  },
+  {
+    "relativePath": "openspec/specs/sandbox-profile/spec.md",
+    "summary": "Основная спека sandbox-profile (синхронизирована из archive): bootstrap без участия владельца, ключи из vault только в env, память проекта memory-agent в песочнице.",
+    "role": "doc",
+    "contentHash": "6ed49aa955c940b71b1665865d55547a69de456d37b4c5231583df8e5e311149",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:07:41.537Z"
+  },
+  {
+    "relativePath": "openspec/specs/sandbox-runtime/spec.md",
+    "summary": "Основная спека sandbox-runtime (синхронизирована из mvp-06): адаптер Novita, bootstrap, запуск агента, очистка, пауза; секреты из vault в env команд и redaction.",
+    "role": "doc",
+    "contentHash": "1eba2c5b74f6c7059a2e71da68f95014fd54bc9408a5eb9208a76e8dddcf6f38",
+    "author": "agent",
+    "updatedAt": "2026-10-19T19:07:41.511Z"
   },
   {
     "relativePath": "openspec/specs/speech-to-text/spec.md",
@@ -2753,11 +3153,11 @@
   },
   {
     "relativePath": "openspec/specs/telegram-bot/spec.md",
-    "summary": "Основная спека telegram-bot: приём задач из Telegram, выбор проекта кнопкой. Создана синхронизацией дельты mvp-04-telegram-intake (2026-10-18).",
+    "summary": "Основная спека telegram-bot: webhook, приём текста и голоса, кнопки проекта, одно сообщение на задачу; ответы и доработка через Telegram — дельтами task-rework.",
     "role": "doc",
-    "contentHash": "6101e7a611ceb4480dfad5fef63aa2c0c87abf175e7b213c493dd7ea8ce936e0",
+    "contentHash": "9dd259216f447e9f232d0de13056db4e349c6de5c160bc01a5e5ff863d247f0d",
     "author": "agent",
-    "updatedAt": "2026-10-18T14:16:06.259Z"
+    "updatedAt": "2026-10-19T19:07:41.580Z"
   },
   {
     "relativePath": "pyproject.toml",

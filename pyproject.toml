@@ -40,6 +40,11 @@ select = ["E", "F", "I", "B", "UP", "SIM", "ASYNC", "RUF"]
 # Документация и комментарии написаны по-русски: кириллическая «с», «а» и т.п. — не ошибка.
 ignore = ["RUF001", "RUF002", "RUF003"]
 
+[tool.ruff.format]
+# Примеры кода в OpenSpec — часть документа, а не исполняемый код; ruff 0.17 форматирует
+# Python-блоки в Markdown и иначе роняет check на каждом design.md.
+exclude = ["openspec/**"]
+
 [tool.mypy]
 strict = true
 # Пакеты src-layout: без этих путей mypy не видит harness_server / harness_shared.

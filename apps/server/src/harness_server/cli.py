@@ -10,17 +10,18 @@ import typer
 import uvicorn
 from alembic import command as alembic_command
 from alembic.config import Config as AlembicConfig
+from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from harness_server import wiring
 from harness_server.adapters.novita import SandboxError, SandboxProvider
 from harness_server.adapters.telegram import TelegramError
-from harness_server.adapters.vault import VaultError
+from harness_server.adapters.vault import SecretVault, VaultError
 from harness_server.app import create_app
 from harness_server.config import ConfigError, HarnessConfig, load_config
 from harness_server.db.session import create_engine, create_session_factory
 from harness_server.security.redaction import redact
-from harness_server.services import sandboxes
+from harness_server.services import git_access, sandboxes
 from harness_server.services import secrets as secret_refs
 from harness_server.services.webhook import register_webhook, webhook_url
 from harness_server.settings import Settings, SettingsError, load_settings
@@ -220,12 +221,25 @@ def sandbox_resume() -> None:
     )
 
 
+async def _resolve_repo_keys(
+    vault: SecretVault | None, config: HarnessConfig
+) -> dict[str, SecretStr]:
+    """Ключи записи по id workspace; без repo.access_ref workspace в словарь не попадает (D-60)."""
+    keys: dict[str, SecretStr] = {}
+    for workspace in config.workspaces:
+        token = await secret_refs.resolve(vault, workspace.repo.access_ref, fallback=None)
+        if token is not None:
+            keys[workspace.id] = token
+    return keys
+
+
 @sandbox_app.command("bootstrap")
 def sandbox_bootstrap(script: Path = Path("deploy/sandbox/bootstrap.sh")) -> None:
-    """Подготавливает песочницу скриптом bootstrap.sh: версии, каталоги, клоны и память.
+    """Подготавливает песочницу: установки, клоны workspace и память (bootstrap.sh и git, D-62).
 
-    Ключи GitLab и embeddings берутся из vault по ссылкам harness.yaml (или GITLAB_TOKEN из ENV) и
-    передаются только в env команды; вывод проходит redaction, в том числе по значениям из vault.
+    Ключи репозиториев (repo.access_ref) и embeddings берутся из vault по ссылкам harness.yaml и
+    передаются только в env своих команд; workspace без ключа клонируется анонимно с
+    предупреждением. Вывод проходит redaction, в том числе по значениям из vault.
     """
     settings, config = _load_or_exit()
     _configure_logging()
@@ -243,13 +257,7 @@ def sandbox_bootstrap(script: Path = Path("deploy/sandbox/bootstrap.sh")) -> Non
         raise typer.Exit(code=1) from None
     vault = wiring.build_vault(settings)
     try:
-        gitlab_key = asyncio.run(
-            secret_refs.resolve(
-                vault,
-                config.gitlab.access_ref,
-                fallback=settings.gitlab_token,
-            )
-        )
+        repo_tokens = asyncio.run(_resolve_repo_keys(vault, config))
         memory = config.sandbox.memory
         embedding_key = (
             asyncio.run(secret_refs.resolve(vault, memory.embedding_ref, fallback=None))
@@ -260,15 +268,26 @@ def sandbox_bootstrap(script: Path = Path("deploy/sandbox/bootstrap.sh")) -> Non
         # Строка песочницы не меняется: ошибка до любого вызова провайдера.
         typer.echo(f"Ошибка vault: {exc.reason}", err=True)
         raise typer.Exit(code=1) from None
-    if gitlab_key is None:
-        typer.echo("Ошибка конфигурации: нужен gitlab.access_ref или GITLAB_TOKEN", err=True)
-        raise typer.Exit(code=1)
+    for workspace in config.workspaces:
+        if workspace.id not in repo_tokens:
+            typer.echo(
+                f"workspace {workspace.id}: нет repo.access_ref, клон анонимный "
+                "(только публичный репозиторий)",
+                err=True,
+            )
     # Значения из vault известны только здесь: redaction вывода покрывает их вместе с ENV.
     vault_values = tuple(
-        value.get_secret_value() for value in (gitlab_key, embedding_key) if value is not None
+        value.get_secret_value()
+        for value in (*repo_tokens.values(), embedding_key)
+        if value is not None
     )
-    # Заголовок Basic и его base64-часть тоже секреты: попадают в git-команды (D-52).
-    vault_values += sandboxes.git_auth_secret_values(gitlab_key.get_secret_value())
+    # Заголовок Basic и его base64-часть тоже секреты: попадают в git-команды (D-52, D-60).
+    for workspace in config.workspaces:
+        token = repo_tokens.get(workspace.id)
+        if token is not None:
+            vault_values += git_access.git_auth_secret_values(
+                workspace.repo.provider, token.get_secret_value()
+            )
     try:
         result = asyncio.run(
             sandboxes.bootstrap(
@@ -276,12 +295,15 @@ def sandbox_bootstrap(script: Path = Path("deploy/sandbox/bootstrap.sh")) -> Non
                 config.sandbox.provider_id,
                 config,
                 script=text,
-                gitlab_token=gitlab_key,
+                repo_tokens=repo_tokens,
                 memory_ref=memory.ref if memory is not None else None,
                 memory_repo=memory.repo if memory is not None else None,
                 embedding_key=embedding_key,
             )
         )
+    except sandboxes.SandboxStepError as exc:
+        typer.echo(f"Ошибка песочницы: {exc.reason}", err=True)
+        raise typer.Exit(code=1) from None
     except SandboxError as exc:
         typer.echo(f"Ошибка песочницы: {type(exc).__name__}", err=True)
         raise typer.Exit(code=1) from None

@@ -124,7 +124,7 @@ curl --noproxy '*' localhost:8000/health/ready
 # {"status":"ready","database":true}
 ```
 
-Предупреждение worker «диспетчер песочницы не запущен: не заданы GITLAB_TOKEN» — норма, пока нет GitLab.
+Предупреждение worker «workspace без repo.access_ref, задачи по ним уходят в error» — норма, пока у workspace нет ключа записи (D-60): такие задачи получают `error` с причиной `repo_access_ref`.
 
 ## 4. Публичный адрес для webhook
 
@@ -230,9 +230,10 @@ uv run harness-server sandbox resume      # возобновление; смыс
 uv run harness-server sandbox bootstrap   # подготовка: версии claude/openspec, клоны репозиториев
 ```
 
-- `bootstrap` клонирует репозитории workspace из `harness.yaml`. Нужны реальный проект и `GITLAB_TOKEN`
-  с правами только на этот проект. Токен не должен быть административным: агент в песочнице его видит.
-  Повторный запуск безопасен, команда идемпотентна.
+- `bootstrap` клонирует репозитории workspace из `harness.yaml`. Ключ каждого репозитория берётся из vault по
+  `repo.access_ref` своего workspace и уходит git только на адрес этого репозитория. Целевой вариант — ключ только на
+  этот проект; пока workspace использует главный ключ владельца (решение 2026-10-19). Workspace без ключа клонируется
+  анонимно с предупреждением. Повторный запуск безопасен, команда идемпотентна.
 - Если песочница не возобновляется (`500: Failed to place sandbox`), пересоздайте её в кабинете Novita
   по шаблону с Node.js и git, затем обновите id в `harness.yaml`.
 - Песочница в статусе `error` с закреплённой задачей требует ручного разбора. См. [deployment.md](deployment.md),

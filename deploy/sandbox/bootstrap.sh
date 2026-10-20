@@ -1,50 +1,57 @@
 #!/usr/bin/env bash
 # Подготовка песочницы агентов (mvp-06, design 16; sandbox-profile, design 3). Запуск, например:
-#   bootstrap.sh --claude-version 2.1.292 --openspec-version 1.14.3 demo=https://gitlab.example/group/demo.git
-#   bootstrap.sh ... --memory-ref <sha> --memory-repo w1do/memory-agent demo=https://gitlab.example/group/demo.git
-#     (с памятью проекта: memory-agent из GitHub по полному sha коммита, D-51)
+#   bootstrap.sh --phase setup --claude-version 2.1.292 --openspec-version 1.14.3
+#   bootstrap.sh --phase memory --claude-version 2.1.292 --openspec-version 1.14.3 --memory-ref <sha> --memory-repo w1do/memory-agent demo=https://gitlab.example/group/demo.git
+#     (фаза memory: индексация клонов памятью проекта, memory-agent из GitHub по полному sha коммита, D-51)
 #
 # Идемпотентен: повторный запуск не переустанавливает совпадающие версии и не клонирует заново.
+# Скрипт не клонирует репозитории и не получает их ключей: клоны и fetch делает harness-server отдельными
+# git-командами (D-62). Фаза setup (установки) запускается без ключей в env; фаза memory получает только
+# EMBEDDING_API_KEY, который memory-agent читает из env этой команды; в .memory/.env и конфиг memory он не пишется.
 # Секреты в файлы не пишутся. mcp.json содержит литеральные плейсхолдеры ${AGENTS_FLOW_URL} и
-# ${AGENTS_FLOW_TOKEN}: Claude Code раскрывает их из env процесса. Токен GitLab уходит git только
-# заголовком Authorization на префикс --gitlab-url (GIT_CONFIG_* в env одной команды), в файлы не
-# пишется, git-askpass.sh не используется (D-52). EMBEDDING_API_KEY
-# читается memory-agent из env этой команды; в .memory/.env и конфиг memory он не пишется.
+# ${AGENTS_FLOW_TOKEN}: Claude Code раскрывает их из env процесса.
 # Все установки — через sudo -n: без sudo скрипт сообщает, что нужно поставить вручную.
 set -euo pipefail
 umask 077
 
-# Ключи приходят в env процесса. Скрипт забирает их в переменные оболочки и снимает из env, чтобы
-# postinst пакетов apt и lifecycle-скрипты npm их не видели. Значение получает только строка, где
-# оно нужно: заголовок git для клонов и fetch (GIT_CONFIG_* одной команды) и memory init (EMBEDDING_API_KEY).
-gitlab_token="${GITLAB_TOKEN:-}"
+# Ключ embeddings приходит в env только фазе memory. Скрипт забирает его в переменную оболочки и снимает
+# из env вместе с любыми переменными, похожими на ключи git; их имена (не значения) проверяются ниже:
+# фаза setup запускается без ключей, чтобы postinst apt и lifecycle npm их не видели (D-62).
 embedding_key="${EMBEDDING_API_KEY:-}"
-unset GITLAB_TOKEN EMBEDDING_API_KEY
+secret_env_names=""
+while IFS= read -r name; do
+  case "$name" in
+    GIT_AUTH_HEADER_* | GIT_CONFIG_* | GITLAB_TOKEN | EMBEDDING_API_KEY)
+      secret_env_names="$secret_env_names $name"
+      unset "$name"
+      ;;
+  esac
+done < <(compgen -e)
 
 usage() {
   cat <<'USAGE'
-Использование: bootstrap.sh --claude-version V --openspec-version V [--memory-ref SHA --memory-repo OWNER/NAME] <workspace_id>=<clone_url>...
-  workspace_id — [A-Za-z0-9_-]{1,28}; clone_url — http(s)-адрес без учётных данных.
-  Для git-операций нужен GITLAB_TOKEN в env; --gitlab-url — https-адрес GitLab, на его префикс уходит токен. Память: memory-agent ставится из GitHub по полному sha
-  коммита (--memory-ref, 40 символов 0-9a-f) из репозитория --memory-repo; флаги задаются вместе.
-  Ключ embeddings, если нужен, — в env EMBEDDING_API_KEY.
+Использование: bootstrap.sh --phase setup|memory --claude-version V --openspec-version V [--memory-ref SHA --memory-repo OWNER/NAME] <workspace_id>=<clone_url>...
+  --phase setup — установки, каталоги и memory-agent; в env не должно быть ключей.
+  --phase memory — только индексация клонов (нужны --memory-ref и --memory-repo); ключ embeddings — в env EMBEDDING_API_KEY.
+  workspace_id — [A-Za-z0-9_-]{1,28}; clone_url — https-адрес без учётных данных. Клоны и fetch делает harness-server (D-62).
+  Память: memory-agent ставится из GitHub по полному sha коммита (--memory-ref, 40 символов 0-9a-f) из репозитория
+  --memory-repo; флаги задаются вместе.
 USAGE
 }
 
 SEMVER_RE='^[0-9]+\.[0-9]+\.[0-9]+$'
-# Базовый адрес GitLab: только https, без учётных данных, пробелов и query (D-52).
-GITLAB_URL_RE='^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~-]+)*/?$'
-PAIR_RE='^[A-Za-z0-9_-]{1,28}=https?://[^[:space:]@]+$'
+# Пара: адрес клона только https, без учётных данных, пробелов, query и fragment (D-60).
+PAIR_RE='^[A-Za-z0-9_-]{1,28}=https://[^[:space:]@?#]+$'
 
+phase=""
 claude_version=""
 openspec_version=""
 memory_ref=""
 memory_repo=""
-gitlab_url=""
 repos=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --claude-version | --openspec-version | --memory-ref | --memory-repo | --gitlab-url)
+    --claude-version | --openspec-version | --memory-ref | --memory-repo | --phase)
       if [ "$#" -lt 2 ]; then
         echo "аргумент $1 без значения" >&2
         exit 2
@@ -53,7 +60,7 @@ while [ "$#" -gt 0 ]; do
         --claude-version) claude_version="$2" ;;
         --openspec-version) openspec_version="$2" ;;
         --memory-ref) memory_ref="$2" ;;
-        --gitlab-url) gitlab_url="$2" ;;
+        --phase) phase="$2" ;;
         *) memory_repo="$2" ;;
       esac
       shift 2
@@ -95,21 +102,27 @@ if [ -n "$memory_ref" ] || [ -n "$memory_repo" ]; then
     exit 2
   fi
 fi
-if [ -n "$gitlab_url" ] && ! [[ "$gitlab_url" =~ $GITLAB_URL_RE ]]; then
-  echo "--gitlab-url — https-адрес без учётных данных, пробелов и query" >&2
-  exit 2
-fi
-if [ "${#repos[@]}" -gt 0 ] && [ -z "$gitlab_url" ]; then
-  echo "нужен --gitlab-url: токен GitLab уходит только на префикс этого адреса" >&2
-  exit 2
-fi
-# Нормализация: префикс с завершающим слэшем, как его сопоставляет git (http.<url>.*).
-if [ -n "$gitlab_url" ]; then
-  gitlab_url="${gitlab_url%/}/"
-fi
 for pair in "${repos[@]}"; do
   if ! [[ "$pair" =~ $PAIR_RE ]]; then
     echo "некорректная пара <workspace_id>=<clone_url>" >&2
+    exit 2
+  fi
+done
+case "$phase" in
+  setup | memory) ;;
+  *)
+    echo "нужен --phase setup или --phase memory" >&2
+    exit 2
+    ;;
+esac
+if [ "$phase" = "memory" ] && [ -z "$memory_ref" ]; then
+  echo "фаза memory требует --memory-ref и --memory-repo" >&2
+  exit 2
+fi
+# Только имена: в фазе setup ключей нет совсем, в фазе memory допустим только EMBEDDING_API_KEY (D-62).
+for name in $secret_env_names; do
+  if [ "$phase" = "setup" ] || [ "$name" != "EMBEDDING_API_KEY" ]; then
+    echo "фаза $phase запускается без $name в env (D-62)" >&2
     exit 2
   fi
 done
@@ -123,6 +136,40 @@ if [ "${HARNESS_SANDBOX_BOOTSTRAP:-}" != "1" ]; then
 fi
 
 HARNESS_DIR="${HOME:?HOME не задан}/.harness"
+
+# Индексация клонов памятью (D-47). Фаза memory идёт после клонов сервера и ничего не ставит (D-62).
+index_memory_clones() {
+  if ! command -v memory >/dev/null 2>&1; then
+    echo "memory-agent не установлен: сначала bootstrap.sh --phase setup" >&2
+    exit 1
+  fi
+  mkdir -p "$HARNESS_DIR/memory"
+  local pair workspace_id dir exclude
+  for pair in "${repos[@]}"; do
+    workspace_id="${pair%%=*}"
+    dir="$HOME/work/$workspace_id"
+    if [ ! -d "$dir/.git" ]; then
+      echo "нет клона $workspace_id: память не индексируется" >&2
+      exit 1
+    fi
+    # Индекс памяти — локальный каталог клона; в git он не попадает.
+    exclude="$dir/.git/info/exclude"
+    mkdir -p "$(dirname "$exclude")"
+    grep -qxF '.memory/' "$exclude" 2>/dev/null || echo '.memory/' >>"$exclude"
+    # Первый запуск индексирует проект; повторный не переиндексирует неизменённые файлы.
+    if [ -n "$embedding_key" ]; then
+      EMBEDDING_API_KEY="$embedding_key" memory init --path "$dir"
+    else
+      memory init --path "$dir"
+    fi
+    touch "$HARNESS_DIR/memory/$workspace_id.ready"
+    echo "память готова: $workspace_id"
+  done
+}
+if [ "$phase" = "memory" ]; then
+  index_memory_clones
+  exit 0
+fi
 
 # Node 22.13 — минимум для memory-agent (D-47). Проверка без внешних утилит.
 node_ok() {
@@ -308,41 +355,6 @@ cat > "$HARNESS_DIR/mcp.json" <<'MCP'
 MCP
 chmod 600 "$HARNESS_DIR/mcp.json"
 
-# Заголовок git для клонов и fetch: не экспортируется, передаётся только env git-команд.
-# Без токена заголовка нет: git ходит анонимно, это публичные репозитории (D-52).
-git_auth_header=""
-if [ -n "$gitlab_token" ]; then
-  git_auth_header="Authorization: Basic $(printf '%s' "oauth2:$gitlab_token" | base64 -w0)"
-fi
-# Один вызов git для клона и fetch: заголовок — префиксная переменная той же команды, не argv.
-run_git_auth() {
-  if [ -n "$git_auth_header" ]; then
-    # Редиректы выключены, чтобы заголовок не ушёл на другой хост.
-    GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0="http.${gitlab_url}.extraHeader" \
-      GIT_CONFIG_VALUE_0="$git_auth_header" GIT_CONFIG_KEY_1=http.followRedirects \
-      GIT_CONFIG_VALUE_1=false GIT_TERMINAL_PROMPT=0 git "$@"
-  else
-    GIT_TERMINAL_PROMPT=0 git "$@"
-  fi
-}
-for pair in "${repos[@]}"; do
-  workspace_id="${pair%%=*}"
-  url="${pair#*=}"
-  dir="$HOME/work/$workspace_id"
-  if [ ! -e "$dir" ]; then
-    echo "клонирую $workspace_id"
-    run_git_auth clone --quiet -- "$url" "$dir"
-  else
-    if [ ! -d "$dir/.git" ]; then
-      echo "$dir существует и не является git-репозиторием" >&2
-      exit 1
-    fi
-    echo "обновляю $workspace_id"
-    git -C "$dir" remote set-url origin "$url"
-    run_git_auth -C "$dir" fetch --quiet --prune origin
-  fi
-done
-
 if [ -n "$memory_ref" ]; then
   # setfacl нужен ensure-docker.sh при каждом запуске демона, поэтому пакет acl ставится отдельно
   # от установки Docker: при уже стоящем Docker иначе не будет setfacl (ревью, пункт 6).
@@ -411,24 +423,6 @@ ENSURE
 
   ensure_memory_agent
   memory service up
-
-  mkdir -p "$HARNESS_DIR/memory"
-  for pair in "${repos[@]}"; do
-    workspace_id="${pair%%=*}"
-    dir="$HOME/work/$workspace_id"
-    # Индекс памяти — локальный каталог клона; в git он не попадает.
-    exclude="$dir/.git/info/exclude"
-    mkdir -p "$(dirname "$exclude")"
-    grep -qxF '.memory/' "$exclude" 2>/dev/null || echo '.memory/' >>"$exclude"
-    # Первый запуск индексирует проект; повторный не переиндексирует неизменённые файлы.
-    if [ -n "$embedding_key" ]; then
-      EMBEDDING_API_KEY="$embedding_key" memory init --path "$dir"
-    else
-      memory init --path "$dir"
-    fi
-    touch "$HARNESS_DIR/memory/$workspace_id.ready"
-    echo "память готова: $workspace_id"
-  done
 fi
 
 echo "bootstrap завершён"

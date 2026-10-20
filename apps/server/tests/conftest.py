@@ -13,7 +13,7 @@ from alembic.config import Config as AlembicConfig
 from harness_server.adapters.polza import Router
 from harness_server.adapters.stt import SpeechToText
 from harness_server.adapters.telegram import FakeTelegramClient
-from harness_server.config import WorkspaceConfig
+from harness_server.config import RepoConfig, WorkspaceConfig
 from harness_server.services.context import BotContext
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
@@ -195,10 +195,16 @@ def make_bot_context() -> Callable[..., BotContext]:
         if workspaces is None:
             workspaces = (
                 WorkspaceConfig(
-                    id="demo", name="Демо-проект", voice_aliases=[], gitlab_project="group/demo"
+                    id="demo",
+                    name="Демо-проект",
+                    voice_aliases=[],
+                    repo=RepoConfig(provider="gitlab", project="group/demo"),
                 ),
                 WorkspaceConfig(
-                    id="shop", name="Магазин", voice_aliases=[], gitlab_project="group/shop"
+                    id="shop",
+                    name="Магазин",
+                    voice_aliases=[],
+                    repo=RepoConfig(provider="gitlab", project="group/shop"),
                 ),
             )
         return BotContext(
