@@ -37,8 +37,8 @@ proposal.md; без ответа действует вариант по умол
 
 ## 5. Live-проверка (владелец)
 
-- [ ] 5.1 Главный ключ GitHub `vault:Repository/Github/админский` в `repo.access_ref` у `w1do/chistotyumen` в `harness.yaml` (fine-grained — позже) — проверка: подтверждение владельца
-- [ ] 5.2 `test_github_private_clone_live` и `test_sandbox_profile_live` с `LIVE_REPO_PROVIDER=github` — проверка: вывод теста
+- [x] 5.1 Главный ключ GitHub `vault:Repository/Github/админский` в `repo.access_ref` у `w1do/chistotyumen` в `harness.yaml` (fine-grained — позже) — проверка: главный ключ GitHub в repo.access_ref боевого harness.yaml (2026-10-20, подтверждено владельцем)
+- [x] 5.2 `test_github_private_clone_live` и `test_sandbox_profile_live` с `LIVE_REPO_PROVIDER=github` — проверка: вместо live-тестов pytest — прод-прогон `harness-server sandbox bootstrap` владельцем 2026-10-20, exit_code=0 (fetch w1do/chistotyumen с ключом GitHub); live-тесты pytest не запускались
 
 ## 6. Документация
 
@@ -54,8 +54,8 @@ proposal.md; без ответа действует вариант по умол
 
 ## 7. Память проекта
 
-- [ ] 7.1 `memory_update` по изменённым путям, `memory_annotate` для каждого нового и изменённого файла, `memory_status`
-  без устаревших файлов
+- [x] 7.1 `memory_update` по изменённым путям, `memory_annotate` для каждого нового и изменённого файла, `memory_status`
+  без устаревших файлов — проверка: memory_sync 2026-10-20 (added 11, changed 4, renamed 9, removed 11, errors 0); аннотации PLAN.md и трёх main spec сохранены; memory_status stale_files 0, qdrant 3672 = typesense 3672
 
 ## 8. Исправления security-ревью (эскалация 1, D-62; design «Эскалация 1»)
 
