@@ -25,7 +25,7 @@ from harness_server.adapters.novita import (
     NovitaSandboxProvider,
     SandboxProvider,
 )
-from harness_server.config import HarnessConfig, load_config
+from harness_server.config import HarnessConfig, RepoConfig, load_config
 from harness_server.db.models import Task, TaskToken
 from harness_server.services import sandboxes
 from harness_server.services.agent_result import AgentRun, AgentState
@@ -253,9 +253,9 @@ async def _activate(provider: SandboxProvider, sandbox_id: str, task: Task) -> N
         task,
         base_ref=DEFAULT_BRANCH,
         timeout_min=AGENT_TIMEOUT_MIN,
-        gitlab_token=SecretStr(UNUSED_GITLAB_TOKEN),
-        # Локальный origin не совпадает с префиксом GitLab: заголовок не уйдёт (D-52).
-        gitlab_base_url=BASE_CONFIG.gitlab.base_url,
+        # Локальный origin не совпадает с адресом репозитория: заголовок не уйдёт (D-52, D-60).
+        repo=RepoConfig(provider="gitlab", project="group/demo"),
+        repo_token=SecretStr(UNUSED_GITLAB_TOKEN),
     )
 
 

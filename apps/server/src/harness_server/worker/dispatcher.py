@@ -28,7 +28,7 @@ from harness_server.config import HarnessConfig
 from harness_server.db.models import Sandbox, Task
 from harness_server.domain.statuses import allowed_transitions
 from harness_server.security.redaction import redact
-from harness_server.services import sandboxes
+from harness_server.services import git_access, sandboxes
 from harness_server.services import secrets as secret_refs
 from harness_server.services.agent_result import AgentRun, AgentState, truncate_log_text
 from harness_server.services.sandboxes import (
@@ -46,6 +46,11 @@ logger = logging.getLogger(__name__)
 
 # Пауза между опросами агента, если не задана ENV: совпадает с AGENT_POLL_INTERVAL_SEC по умолчанию.
 DEFAULT_AGENT_POLL_INTERVAL_SEC: Final = 15.0
+# Задача без ключа записи в error до активации песочницы: все пайплайны пушат ветку (D-60).
+REPO_ACCESS_REF_REASON: Final = (
+    "repo_access_ref: у workspace {workspace_id} нет repo.access_ref — "
+    "задаче нужен ключ записи (push)"
+)
 
 
 def _utc_now() -> datetime:
@@ -61,8 +66,6 @@ class DispatchContext:
     config: HarnessConfig
     session_factory: async_sessionmaker[AsyncSession]
     oauth_token: SecretStr
-    # None, если главный ключ GitLab берётся из vault (gitlab.access_ref) и ENV не задан (D-45).
-    gitlab_token: SecretStr | None
     secret_key: SecretStr
     agents_flow_url: str
     timeout_min: int
@@ -201,16 +204,21 @@ async def _run_reserved(ctx: DispatchContext, pipeline: Pipeline, reservation: R
     # Отмена worker (BaseException) пробрасывается без очистки и без отзыва токенов: агент
     # продолжает работать, _recover продолжит задачу, а cleanup отзовёт токены (D-41).
     try:
-        # Ключи из vault — до активации: без них git fetch и memory sync не запустить. Значения
-        # сразу попадают в redaction очистки и ответа агента (design 6).
-        gitlab = await secret_refs.resolve(
-            ctx.vault, ctx.config.gitlab.access_ref, fallback=ctx.gitlab_token
+        # Ключ записи — из vault по repo.access_ref workspace задачи, до активации: без него задача
+        # сразу уходит в error, fetch и worktree не выполняются (D-60). Значения сразу попадают в
+        # redaction очистки и ответа агента (design 6).
+        workspace = sandboxes.workspace_for(ctx.config, task)
+        repo_token = await secret_refs.resolve(ctx.vault, workspace.repo.access_ref, fallback=None)
+        if repo_token is None:
+            raise SandboxStepError(REPO_ACCESS_REF_REASON.format(workspace_id=workspace.id))
+        # Токен, заголовок Basic, его base64 и base64 в URL-кодировке —
+        # секреты redaction (D-52, D-62).
+        token_value = repo_token.get_secret_value()
+        runner.secrets = (
+            *runner.secrets,
+            token_value,
+            *git_access.git_auth_secret_values(workspace.repo.provider, token_value),
         )
-        if gitlab is None:
-            raise SandboxStepError("gitlab_token")
-        # Токен и заголовок Basic (base64 от него) — оба секреты для redaction (D-52).
-        header, bare_b64 = sandboxes.git_auth_secret_values(gitlab.get_secret_value())
-        runner.secrets = (*runner.secrets, gitlab.get_secret_value(), header, bare_b64)
         memory_envs = await _memory_envs(ctx, runner)
         await sandboxes.activate(
             ctx.provider,
@@ -218,9 +226,9 @@ async def _run_reserved(ctx: DispatchContext, pipeline: Pipeline, reservation: R
             task,
             base_ref=pipeline.base_ref(task, ctx.config),
             timeout_min=ctx.timeout_min,
-            gitlab_token=gitlab,
-            gitlab_base_url=ctx.config.gitlab.base_url,
-            default_branch=sandboxes.workspace_for(ctx.config, task).default_branch,
+            repo=workspace.repo,
+            repo_token=repo_token,
+            default_branch=workspace.default_branch,
             memory_envs=memory_envs,
         )
         outcome: Outcome = await pipeline.run(runner, task)
@@ -315,20 +323,24 @@ def build_dispatch_context(
 
     AGENTS_FLOW_URL = HARNESS_PUBLIC_URL + /mcp (D-38). Пустые ENV считаются отсутствующими.
     """
-    # GITLAB_TOKEN нужен, только если ключ GitLab не берётся из vault (gitlab.access_ref, D-45).
-    gitlab_required = config.gitlab.access_ref is None
     missing = [
         name
-        for name, value, required in (
-            ("CLAUDE_CODE_OAUTH_TOKEN", settings.claude_code_oauth_token, True),
-            ("GITLAB_TOKEN", settings.gitlab_token, gitlab_required),
-            ("HARNESS_PUBLIC_URL", settings.harness_public_url, True),
+        for name, value in (
+            ("CLAUDE_CODE_OAUTH_TOKEN", settings.claude_code_oauth_token),
+            ("HARNESS_PUBLIC_URL", settings.harness_public_url),
         )
-        if required and value is None
+        if value is None
     ]
     if missing:
         logger.warning("диспетчер песочницы не запущен: не заданы %s", ", ".join(missing))
         return None
+    # Ключи репозиториев — в vault по repo.access_ref; ENV GITLAB_TOKEN не читается (D-60).
+    without_key = [ws.id for ws in config.workspaces if ws.repo.access_ref is None]
+    if without_key:
+        logger.warning(
+            "workspace без repo.access_ref, задачи по ним уходят в error: %s",
+            ", ".join(without_key),
+        )
     assert settings.claude_code_oauth_token is not None
     assert settings.harness_public_url is not None
     return DispatchContext(
@@ -336,7 +348,6 @@ def build_dispatch_context(
         config=config,
         session_factory=session_factory,
         oauth_token=settings.claude_code_oauth_token,
-        gitlab_token=settings.gitlab_token,
         secret_key=settings.harness_secret_key,
         agents_flow_url=f"{settings.harness_public_url.rstrip('/')}/mcp",
         timeout_min=settings.agent_run_timeout_min,

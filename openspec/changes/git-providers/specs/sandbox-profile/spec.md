@@ -71,16 +71,46 @@ MUST NOT попадать в argv и файлы. Перед fetch задачи `
 - **WHEN** агент изменил адрес `origin` клона на другой репозиторий того же хоста
 - **THEN** активация следующей задачи возвращает `origin` на адрес из конфига до fetch, ключ на другой адрес не уходит
 
-### Requirement: Заголовки репозиториев в bootstrap
+### Requirement: Перекрытия конфига git в команде с ключом
 
-Bootstrap SHALL получать заголовок i-й пары `<id>=<url>` только в env `GIT_AUTH_HEADER_<i>` и снимать эти
-переменные из env до любых установок. Неверное имя, номер без пары или значение не вида `Authorization: Basic`
-MUST завершать скрипт с кодом 2 без вывода значения.
+Git-команда харнесса с ключом SHALL идти по адресу из конфига, а не по имени `origin`, и MUST перекрывать в env
+настройки `.git/config` клона, `~/.gitconfig` и `/etc/gitconfig`: прокси, проверку TLS и CA, хуки, помощники
+учётных данных, askpass, подмодули и транспорты кроме https.
 
-#### Scenario: Заголовок без пары
+#### Scenario: Агент подложил настройки в конфиг клона
 
-- **WHEN** bootstrap получает `GIT_AUTH_HEADER_3`, а пар в аргументах две
-- **THEN** скрипт завершается с кодом 2 до любых установок, значение заголовка в выводе отсутствует
+- **WHEN** в `.git/config` клона или в `~/.gitconfig` записаны `http.<адрес клона>.proxy`, `sslVerify=false`, свой
+  CA, `core.hooksPath` с хуком и `credential.helper`
+- **THEN** git-команда харнесса с ключом не использует прокси и подложенный CA, проверяет TLS, не запускает хук и
+  помощник учётных данных
+
+### Requirement: Bootstrap без ключей в установках
+
+`bootstrap.sh --phase setup` SHALL выполнять установки без ключей в env, `bootstrap.sh --phase memory` — только
+индексацию клонов с `EMBEDDING_API_KEY`. Переменная с ключом в env фазы setup, кроме `EMBEDDING_API_KEY` в фазе
+memory, MUST завершать скрипт с кодом 2 до любых установок без вывода значения.
+
+#### Scenario: Ключ в env фазы setup
+
+- **WHEN** `bootstrap.sh --phase setup` запускается с `GIT_AUTH_HEADER_0`, `GIT_CONFIG_COUNT`, `GITLAB_TOKEN` или
+  `EMBEDDING_API_KEY` в env
+- **THEN** скрипт завершается с кодом 2 до любых установок, значение в выводе отсутствует
+
+### Requirement: Клоны bootstrap делает сервер
+
+Между фазами setup и memory сервер SHALL клонировать или обновлять репозиторий каждого workspace отдельной
+git-командой с ключом только этого workspace. Скрипт bootstrap MUST NOT клонировать репозитории workspace и получать
+их ключи.
+
+#### Scenario: Ключи разных workspace
+
+- **WHEN** bootstrap готовит песочницу с двумя workspace, у каждого свой ключ
+- **THEN** каждый ключ передаётся только в env git-команды своего workspace, ни одна команда не получает оба ключа
+
+#### Scenario: Повторный bootstrap на готовой песочнице
+
+- **WHEN** клон workspace уже есть
+- **THEN** сервер возвращает `origin` на адрес из конфига и выполняет fetch, репозиторий не клонируется заново
 
 #### Scenario: Удалённый аргумент адреса GitLab
 

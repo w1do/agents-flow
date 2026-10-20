@@ -43,7 +43,10 @@
   и в `.env.example`. Секреты читаются как `SecretStr`.
 - `harness.yaml`: пример в `config/harness.example.yaml`. Файл с настройками workspace; ключи
   вида `token`, `key`, `password`, `secret`, `apikey`, `credential` (и их варианты во множественном числе,
-  `passwd`, `pwd`) сервер отклоняет; `gitlab.base_url` с учётными данными тоже.
+  `passwd`, `pwd`) сервер отклоняет; `repo.base_url` с учётными данными тоже.
+- Ключ репозитория workspace — ссылка `repo.access_ref` (`vault:<project>/<service>/<name>`). Без неё задача по
+  этому workspace уходит в `error` с причиной `repo_access_ref`, а `sandbox bootstrap` клонирует репозиторий
+  анонимно (только публичный) и предупреждает. Ключ уходит только в env git-команд своего workspace (D-60, D-62).
 
 ## Запуск
 

@@ -16,7 +16,7 @@ from harness_server.adapters.telegram import FakeTelegramClient, TelegramError
 from harness_server.adapters.vault import FakeVault, VaultError
 from harness_server.cli import _configure_logging, app
 from harness_server.config import load_config
-from harness_server.services import sandboxes
+from harness_server.services import git_access, sandboxes
 from harness_server.services.tasks import create_task
 from harness_server.vault_ref import VaultRef
 from harness_server.wiring import BotAdapters
@@ -323,7 +323,7 @@ MEMORY_REF = "0123456789abcdef0123456789abcdef01234567"
 def _write_vault_config(tmp_path: Path, valid_env: dict[str, str], *, memory: bool) -> Path:
     """Копия примера harness.yaml со ссылками на vault; memory — блок памяти с embedding_ref."""
     data = load_config(Path(valid_env["HARNESS_CONFIG"])).model_dump(mode="json")
-    data["gitlab"]["access_ref"] = "vault:demo/gitlab/main"
+    data["workspaces"][0]["repo"]["access_ref"] = "vault:demo/gitlab/main"
     if memory:
         data["sandbox"]["memory"] = {
             "ref": MEMORY_REF,
@@ -352,6 +352,7 @@ def test_sandbox_bootstrap_takes_keys_from_vault_into_env(
     fake = FakeSandbox(
         sandbox_id=load_config(Path(valid_env["HARNESS_CONFIG"])).sandbox.provider_id
     )
+    fake.respond('printf %s "$HOME"', stdout="/home/sbx")
     vault = FakeVault(
         {
             VaultRef("demo", "gitlab", "main"): VAULT_GITLAB,
@@ -366,7 +367,9 @@ def test_sandbox_bootstrap_takes_keys_from_vault_into_env(
     )
 
     assert result.exit_code == 0, result.output
-    assert fake.received_env("GITLAB_TOKEN") == VAULT_GITLAB
+    assert fake.received_env("GIT_CONFIG_VALUE_0") == git_access.git_auth_header(
+        "gitlab", VAULT_GITLAB
+    )
     assert fake.received_env("EMBEDDING_API_KEY") == VAULT_EMBEDDING
     expected = f"--memory-ref {MEMORY_REF} --memory-repo w1do/memory-agent"
     assert expected in " ".join(e.cmd or "" for e in fake.journal)
@@ -400,26 +403,30 @@ def test_sandbox_bootstrap_vault_error_exits_before_provider(
     assert fake.journal == []
 
 
-def test_sandbox_bootstrap_without_any_gitlab_key_exits_one(
+def test_sandbox_bootstrap_without_any_key_clones_anonymously_with_warning(
     valid_env: dict[str, str],
     monkeypatch: MonkeyPatch,
     migrated_database_url: str,
     tmp_path: Path,
 ) -> None:
+    """Workspace без repo.access_ref: клон анонимный, с предупреждением; заголовка нет (D-60)."""
     monkeypatch.setenv("DATABASE_URL", migrated_database_url)
-    monkeypatch.delenv("GITLAB_TOKEN", raising=False)
+    monkeypatch.setenv("GITLAB_TOKEN", "glpat-env-value-0123456789abcdef")
     fake = FakeSandbox(
         sandbox_id=load_config(Path(valid_env["HARNESS_CONFIG"])).sandbox.provider_id
     )
+    fake.respond('printf %s "$HOME"', stdout="/home/sbx")
     monkeypatch.setattr(wiring, "build_sandbox_provider", lambda settings: fake)
 
     result = runner.invoke(
         app, ["sandbox", "bootstrap", "--script", str(_bootstrap_script(tmp_path))]
     )
 
-    assert result.exit_code == 1
-    assert "нужен gitlab.access_ref или GITLAB_TOKEN" in result.output
-    assert fake.journal == []
+    assert result.exit_code == 0, result.output
+    assert "workspace demo: нет repo.access_ref, клон анонимный" in result.output
+    assert fake.received_env("GIT_CONFIG_COUNT") is None
+    # ENV GITLAB_TOKEN больше не читается и не передаётся (D-60).
+    assert fake.received_env("GITLAB_TOKEN") is None
 
 
 def test_sandbox_bootstrap_redacts_vault_value_in_failure_output(
@@ -465,7 +472,7 @@ def test_sandbox_bootstrap_redacts_auth_header_in_failure_output(
     fake = FakeSandbox(
         sandbox_id=load_config(Path(valid_env["HARNESS_CONFIG"])).sandbox.provider_id
     )
-    header = sandboxes.git_auth_header(VAULT_GITLAB)
+    header = git_access.git_auth_header("gitlab", VAULT_GITLAB)
     fake.respond("bash /tmp/harness-bootstrap-", exit_code=1, stderr=f"эхо {header}")
     vault = FakeVault({VaultRef("demo", "gitlab", "main"): VAULT_GITLAB})
     monkeypatch.setattr(wiring, "build_sandbox_provider", lambda settings: fake)
@@ -495,7 +502,7 @@ def test_sandbox_bootstrap_redacts_bare_base64_in_failure_output(
     fake = FakeSandbox(
         sandbox_id=load_config(Path(valid_env["HARNESS_CONFIG"])).sandbox.provider_id
     )
-    _, bare = sandboxes.git_auth_secret_values(VAULT_GITLAB)
+    _, bare, _ = git_access.git_auth_secret_values("gitlab", VAULT_GITLAB)
     fake.respond("bash /tmp/harness-bootstrap-", exit_code=1, stderr=f"эхо {bare}")
     vault = FakeVault({VaultRef("demo", "gitlab", "main"): VAULT_GITLAB})
     monkeypatch.setattr(wiring, "build_sandbox_provider", lambda settings: fake)
@@ -508,6 +515,38 @@ def test_sandbox_bootstrap_redacts_bare_base64_in_failure_output(
     assert result.exit_code == 1
     assert bare not in result.output
     assert "[REDACTED]" in result.output
+
+
+def test_sandbox_bootstrap_reports_step_error_reason(
+    valid_env: dict[str, str],
+    monkeypatch: MonkeyPatch,
+    migrated_database_url: str,
+    tmp_path: Path,
+) -> None:
+    """SandboxStepError из bootstrap (нет домашнего каталога): код 1 и причина, без вывода.
+
+    D-62.
+    """
+    monkeypatch.setenv("DATABASE_URL", migrated_database_url)
+    monkeypatch.delenv("GITLAB_TOKEN", raising=False)
+    monkeypatch.setenv(
+        "HARNESS_CONFIG", str(_write_vault_config(tmp_path, valid_env, memory=False))
+    )
+    # Без ответа на printf "$HOME" домашний каталог не определяется: bootstrap бросает home.
+    fake = FakeSandbox(
+        sandbox_id=load_config(Path(valid_env["HARNESS_CONFIG"])).sandbox.provider_id
+    )
+    vault = FakeVault({VaultRef("demo", "gitlab", "main"): VAULT_GITLAB})
+    monkeypatch.setattr(wiring, "build_sandbox_provider", lambda settings: fake)
+    monkeypatch.setattr(wiring, "build_vault", lambda settings: vault)
+
+    result = runner.invoke(
+        app, ["sandbox", "bootstrap", "--script", str(_bootstrap_script(tmp_path))]
+    )
+
+    assert result.exit_code == 1
+    assert "Ошибка песочницы: home" in result.output
+    assert VAULT_GITLAB not in result.output
 
 
 def test_set_webhook_goes_through_configured_telegram_api_url(

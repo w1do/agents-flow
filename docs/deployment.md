@@ -72,7 +72,10 @@ Job `deploy:dokploy` не добавляет `curl -v` и `--trace`: при ош
    понятным сообщением. Вывод команды токен и секрет не содержат.
 3. Создать песочницу в Novita вручную, записать id в `harness.yaml` (`sandbox.provider_id`), затем выполнить
    `harness-server sandbox bootstrap`: команда загружает `deploy/sandbox/bootstrap.sh` и запускает его с версиями
-   из конфига и парами `<workspace_id>=<clone_url>`. Скрипт идемпотентен: повторный запуск безопасен.
+   из конфига и парами `<workspace_id>=<clone_url>`. Bootstrap идёт в три шага: `--phase setup` без ключей, затем
+   клоны и fetch делает сервер отдельной git-командой на каждый workspace с ключом только этого workspace, затем
+   `--phase memory` с индексацией памяти (только с `EMBEDDING_API_KEY`). Workspace без ключа клонируется анонимно (D-62).
+   Скрипт идемпотентен: повторный запуск безопасен.
 4. `harness-server sandbox pause` — песочница уходит в простой до первой задачи.
 
 ### Песочница в `error` с закреплённой задачей
@@ -85,11 +88,13 @@ Job `deploy:dokploy` не добавляет `curl -v` и `--trace`: при ош
 ## Песочница: профиль и память (sandbox-profile)
 
 - Ключи владельца лежат в vault. Серверу нужны ENV `VAULT_MCP_URL` (только `https://`) и `VAULT_MCP_TOKEN` (секрет).
-  В `harness.yaml` — ссылки `gitlab.access_ref` и `sandbox.memory.embedding_ref` вида `vault:<project>/<service>/<name>`.
-  Без `access_ref` сервер берёт `GITLAB_TOKEN` из ENV, как раньше.
+  В `harness.yaml` — ссылки `workspaces[].repo.access_ref` (ключ записи репозитория workspace) и
+  `sandbox.memory.embedding_ref` вида `vault:<project>/<service>/<name>`. ENV `GITLAB_TOKEN`/`GITLAB_URL`
+  больше не читаются (D-60). Workspace без `repo.access_ref` клонируется анонимно, а его задачи уходят в `error`.
 - Значения для боевого запуска (D-50): `VAULT_MCP_URL=https://safe.w1do.ru/mcp`; `VAULT_MCP_TOKEN` — значение задаёт
   владелец и вносит только в ENV Dokploy (в репозиторий и документацию не пишется). В боевом `harness.yaml`:
-  `gitlab.access_ref: "vault:Repository/Gitlab/админский"` и `sandbox.memory.embedding_ref: "vault:Сервисы/Polza/EmbeddingsMemory"`.
+  `repo.access_ref: "vault:Repository/Gitlab/админский"` (GitLab-workspace), `repo.access_ref: "vault:Repository/Github/админский"`
+  (`w1do/chistotyumen`) и `sandbox.memory.embedding_ref: "vault:Сервисы/Polza/EmbeddingsMemory"`.
   В `config/harness.example.yaml` эти ссылки не заносятся.
 - Первый bootstrap с памятью (после заполнения `sandbox.memory`): `harness-server sandbox bootstrap`. Команда
   ставит Node 22, Docker, memory-agent из GitHub на коммите `sandbox.memory.ref` и индексирует клоны. Повторный запуск не
@@ -113,7 +118,7 @@ Job `deploy:dokploy` не добавляет `curl -v` и `--trace`: при ош
 
 ## Песочница: токены, изоляция и allowlist (mvp-06)
 
-- Токен подписки `CLAUDE_CODE_OAUTH_TOKEN` и `GITLAB_TOKEN` живут только в ENV Dokploy. Агент получает их
+- Токен подписки `CLAUDE_CODE_OAUTH_TOKEN` живёт только в ENV Dokploy, ключи репозиториев — в vault. Агент получает их
   в env одной команды запуска, в файлы песочницы они не пишутся (проверяется тестами и live-тестом).
 - Ротация `CLAUDE_CODE_OAUTH_TOKEN` не реже 90 дней и сразу при подозрении на утечку (`claude setup-token`
   заново, затем обновить ENV и перезапустить worker).
@@ -122,6 +127,42 @@ Job `deploy:dokploy` не добавляет `curl -v` и `--trace`: при ош
   Anthropic и Novita. Код не применяет его в MVP: песочница создаётся вручную (D-38).
 - Claude Code в песочнице запускается с `--setting-sources user` и `--strict-mcp-config`: hooks и MCP-серверы
   репозитория задачи не выполняются (D-36). Bootstrap не кладёт hooks и plugins в профиль песочницы.
+
+## Переход на D-60 (провайдер репозитория, git-providers)
+
+Старая форма конфига не загружается: секция `gitlab:` и поле `workspaces[].gitlab_project` отклоняются с
+сообщением, куда перенести поля. ENV `GITLAB_URL` и `GITLAB_TOKEN` сервер больше не читает. Порядок выката:
+
+1. Правка боевого `harness.yaml` (один файл, до выката образа). Адрес GitLab переходит в `repo.base_url` workspace
+   (можно не указывать: по умолчанию `https://gitlab.com`), `gitlab_project` — в `repo.project`, `gitlab.access_ref` — в
+   `repo.access_ref`. Секцию `gitlab:` удалить:
+
+   ```yaml
+   workspaces:
+     - id: demo
+       name: Демо-проект
+       voice_aliases: ["демо"]
+       repo:
+         provider: gitlab
+         project: group/demo
+         access_ref: "vault:Repository/Gitlab/админский"
+     - id: chistotyumen
+       name: Чистотюмень
+       voice_aliases: ["чистотюмень"]
+       repo:
+         provider: github
+         project: w1do/chistotyumen
+         access_ref: "vault:Repository/Github/админский"
+   ```
+
+   Пока у workspace общий главный ключ владельца, fine-grained токен на репозиторий (Contents RW, Pull requests RW)
+   — позже, отдельным шагом в vault (D-60). Ключ GitHub не пишется в файлы и документацию, только ссылка.
+2. Удалить `GITLAB_TOKEN` и `GITLAB_URL` из ENV Dokploy: они не читаются, но остаются в настройках.
+3. Выкатить образ. Если правка п. 1 не сделана, сервер не стартует и называет поле, которое надо перенести.
+4. Подготовленная песочница: повторный `harness-server sandbox bootstrap` делает `set-url origin` и fetch с
+   новым заголовком. Клоны публичных репозиториев не меняются.
+
+Откат: вернуть прежний образ и `harness.yaml` с секцией `gitlab:` (сохранить копию до правки).
 
 ## Telegram за прокси (сервер в РФ)
 

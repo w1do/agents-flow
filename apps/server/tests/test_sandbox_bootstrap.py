@@ -4,6 +4,7 @@
 и отсутствие значения токена в записанном скрипте и в файлах песочницы.
 """
 
+import base64
 import os
 import re
 import subprocess
@@ -13,8 +14,13 @@ from typing import Any
 
 import pytest
 from harness_server.adapters.novita import ExecResult, FakeSandbox, SandboxUnavailable
-from harness_server.config import load_config
-from harness_server.services.sandboxes import BOOTSTRAP_SCRIPT_PREFIX, bootstrap
+from harness_server.config import HarnessConfig, load_config
+from harness_server.services import git_access
+from harness_server.services.sandboxes import (
+    BOOTSTRAP_SCRIPT_PREFIX,
+    SandboxStepError,
+    bootstrap,
+)
 from pydantic import SecretStr
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -23,15 +29,21 @@ SCRIPT_PATH = REPO_ROOT / "deploy" / "sandbox" / "bootstrap.sh"
 SANDBOX_ID = "sbx-test-1"
 # Тестовое значение в формате токена GitLab; настоящий токен здесь не используется.
 GITLAB_TOKEN = "glpat-test-token-0123456789abcdef"
+GITHUB_TOKEN = "github_pat_test-token-0123456789abcdef"
 # Фиктивный sha для тестов (D-51): настоящий закреплённый коммит — только в harness.yaml и D-51.
 MEMORY_REF = "0123456789abcdef0123456789abcdef01234567"
 MEMORY_REPO = "w1do/memory-agent"
 
 EXPECTED_ARGS = (
-    "--claude-version 2.1.292 --openspec-version 1.14.3 "
-    "--gitlab-url https://gitlab.com demo=https://gitlab.com/group/demo.git"
+    "--claude-version 2.1.292 --openspec-version 1.14.3 demo=https://gitlab.com/group/demo.git"
 )
 SCRIPT_PATH_RE = re.compile(r"/tmp/harness-bootstrap-[0-9a-f]{32}\.sh")
+
+
+def _basic_header(user: str, token: str) -> str:
+    """Ожидаемый заголовок Authorization: Basic для проверки env (значение не печатается в
+    тестах)."""
+    return "Authorization: Basic " + base64.b64encode(f"{user}:{token}".encode()).decode("ascii")
 
 
 def _written_script_paths(sandbox: FakeSandbox) -> list[str]:
@@ -44,6 +56,20 @@ def _script_path(sandbox: FakeSandbox) -> str:
     assert len(paths) == 1
     assert SCRIPT_PATH_RE.fullmatch(paths[0]) is not None
     return paths[0]
+
+
+SANDBOX_HOME = "/home/user"
+
+
+def _home_sandbox() -> FakeSandbox:
+    """Фейк с домашним каталогом: bootstrap читает $HOME после фазы setup (D-62)."""
+    sandbox = FakeSandbox(sandbox_id=SANDBOX_ID)
+    sandbox.respond('printf %s "$HOME"', stdout=SANDBOX_HOME)
+    return sandbox
+
+
+def _exec_cmds(sandbox: FakeSandbox) -> list[str]:
+    return [e.cmd or "" for e in sandbox.journal if e.method == "exec"]
 
 
 class _FailingBashSandbox(FakeSandbox):
@@ -82,38 +108,38 @@ class _FailingRmSandbox(FakeSandbox):
 
 async def test_bootstrap_writes_script_and_runs_it_with_config_arguments() -> None:
     config = load_config(EXAMPLE_CONFIG)
-    sandbox = FakeSandbox(sandbox_id=SANDBOX_ID)
+    sandbox = _home_sandbox()
 
     result = await bootstrap(
         sandbox,
         SANDBOX_ID,
         config,
         script="#!/usr/bin/env bash\necho ok\n",
-        gitlab_token=SecretStr(GITLAB_TOKEN),
+        repo_tokens={"demo": SecretStr(GITLAB_TOKEN)},
     )
 
-    assert result == ExecResult(exit_code=0, stdout="", stderr="")
+    assert result.exit_code == 0
     # Скрипт записан по уникальному абсолютному пути и запущен с ним же (D-52, ревью).
     path = _script_path(sandbox)
     assert sandbox.files_containing("echo ok") == [path]
     execs = [entry for entry in sandbox.journal if entry.method == "exec" and entry.cmd]
-    assert execs[0].cmd == f"bash {path} {EXPECTED_ARGS}"
-    assert execs[0].env_keys == ("GITLAB_TOKEN", "GIT_TERMINAL_PROMPT", "HARNESS_SANDBOX_BOOTSTRAP")
+    assert execs[0].cmd == f"bash {path} --phase setup {EXPECTED_ARGS}"
+    assert execs[0].env_keys == ("GIT_TERMINAL_PROMPT", "HARNESS_SANDBOX_BOOTSTRAP")
 
 
 async def test_bootstrap_passes_token_only_in_command_env() -> None:
     config = load_config(EXAMPLE_CONFIG)
-    sandbox = FakeSandbox(sandbox_id=SANDBOX_ID)
+    sandbox = _home_sandbox()
 
     await bootstrap(
         sandbox,
         SANDBOX_ID,
         config,
         script=SCRIPT_PATH.read_text(encoding="utf-8"),
-        gitlab_token=SecretStr(GITLAB_TOKEN),
+        repo_tokens={"demo": SecretStr(GITLAB_TOKEN)},
     )
 
-    assert sandbox.received_env("GITLAB_TOKEN") == GITLAB_TOKEN
+    assert sandbox.received_env("GIT_CONFIG_VALUE_0") == _basic_header("oauth2", GITLAB_TOKEN)
     assert all(GITLAB_TOKEN not in entry.cmd for entry in sandbox.journal if entry.cmd)
     assert sandbox.files_containing(GITLAB_TOKEN) == []
 
@@ -121,18 +147,27 @@ async def test_bootstrap_passes_token_only_in_command_env() -> None:
 async def test_bootstrap_connects_before_writing() -> None:
     config = load_config(EXAMPLE_CONFIG)
     sandbox = FakeSandbox(sandbox_id=SANDBOX_ID, paused=True)
+    sandbox.respond('printf %s "$HOME"', stdout=SANDBOX_HOME)
 
     await bootstrap(
         sandbox,
         SANDBOX_ID,
         config,
         script="echo\n",
-        gitlab_token=SecretStr(GITLAB_TOKEN),
+        repo_tokens={"demo": SecretStr(GITLAB_TOKEN)},
     )
 
     assert sandbox.paused is False
     # После запуска скрипт удаляется отдельной командой rm (D-52, ревью).
-    assert [entry.method for entry in sandbox.journal] == ["connect", "write_file", "exec", "exec"]
+    assert [entry.method for entry in sandbox.journal] == [
+        "connect",
+        "write_file",
+        "exec",
+        "exec",
+        "exec",
+        "exec",
+        "exec",
+    ]
 
 
 def test_repo_bootstrap_script_is_executable_and_has_no_secret_values() -> None:
@@ -147,7 +182,7 @@ def test_repo_bootstrap_script_is_executable_and_has_no_secret_values() -> None:
 
 async def test_memory_ref_goes_to_script_args_and_key_only_to_env() -> None:
     config = load_config(EXAMPLE_CONFIG)
-    sandbox = FakeSandbox(sandbox_id=SANDBOX_ID)
+    sandbox = _home_sandbox()
     embedding = "emb-test-value-0123456789abcdef"
 
     await bootstrap(
@@ -155,7 +190,7 @@ async def test_memory_ref_goes_to_script_args_and_key_only_to_env() -> None:
         SANDBOX_ID,
         config,
         script="echo\n",
-        gitlab_token=SecretStr(GITLAB_TOKEN),
+        repo_tokens={"demo": SecretStr(GITLAB_TOKEN)},
         memory_ref=MEMORY_REF,
         memory_repo=MEMORY_REPO,
         embedding_key=SecretStr(embedding),
@@ -164,13 +199,15 @@ async def test_memory_ref_goes_to_script_args_and_key_only_to_env() -> None:
     path = _script_path(sandbox)
     execs = [entry for entry in sandbox.journal if entry.method == "exec" and entry.cmd]
     assert execs[0].cmd == (
-        f"bash {path} --claude-version 2.1.292 --openspec-version 1.14.3 "
-        "--gitlab-url https://gitlab.com "
+        f"bash {path} --phase setup --claude-version 2.1.292 --openspec-version 1.14.3 "
         f"--memory-ref {MEMORY_REF} --memory-repo {MEMORY_REPO} demo=https://gitlab.com/group/demo.git"
     )
-    assert execs[0].env_keys == (
+    assert execs[0].env_keys == ("GIT_TERMINAL_PROMPT", "HARNESS_SANDBOX_BOOTSTRAP")
+    # Ключ embeddings — только в env фазы memory, и только там (D-62).
+    memory_execs = [e for e in execs if "--phase memory" in (e.cmd or "")]
+    assert len(memory_execs) == 1
+    assert memory_execs[0].env_keys == (
         "EMBEDDING_API_KEY",
-        "GITLAB_TOKEN",
         "GIT_TERMINAL_PROMPT",
         "HARNESS_SANDBOX_BOOTSTRAP",
     )
@@ -202,13 +239,14 @@ class _TimeoutRecordingSandbox(FakeSandbox):
 async def test_memory_bootstrap_uses_longer_timeout() -> None:
     config = load_config(EXAMPLE_CONFIG)
     sandbox = _TimeoutRecordingSandbox(sandbox_id=SANDBOX_ID)
+    sandbox.respond('printf %s "$HOME"', stdout=SANDBOX_HOME)
 
     await bootstrap(
         sandbox,
         SANDBOX_ID,
         config,
         script="echo\n",
-        gitlab_token=SecretStr(GITLAB_TOKEN),
+        repo_tokens={"demo": SecretStr(GITLAB_TOKEN)},
         memory_ref=MEMORY_REF,
         memory_repo=MEMORY_REPO,
     )
@@ -234,7 +272,8 @@ def _run_script(*args: str, env: dict[str, str] | None = None) -> subprocess.Com
     )
 
 
-ARGS_BASE = ("--claude-version", "2.1.292", "--openspec-version", "1.14.3")
+ARGS_VERSIONS = ("--claude-version", "2.1.292", "--openspec-version", "1.14.3")
+ARGS_BASE = ("--phase", "setup", *ARGS_VERSIONS)
 VALID_PAIR = "demo=https://gitlab.com/group/demo.git"
 
 
@@ -284,7 +323,7 @@ def test_script_help_exits_zero() -> None:
 def test_script_unsets_secrets_before_any_install_step() -> None:
     """Ключи не попадают в env postinst apt и lifecycle-скриптов npm (ревью, пункт 1)."""
     text = SCRIPT_PATH.read_text(encoding="utf-8")
-    unset_pos = text.index("unset GITLAB_TOKEN EMBEDDING_API_KEY")
+    unset_pos = text.index('unset "$name"')
     for marker in ("\nensure_node\n", 'ensure_npm_package "@anthropic', "\n  ensure_acl\n"):
         assert unset_pos < text.index(marker), marker
     assert not re.search(r"\bexport\b", text)
@@ -400,7 +439,7 @@ def test_npm_global_and_root_writes_run_with_umask_022() -> None:
 )
 async def test_bootstrap_rejects_memory_ref_without_repo(kwargs: dict[str, Any]) -> None:
     config = load_config(EXAMPLE_CONFIG)
-    sandbox = FakeSandbox(sandbox_id=SANDBOX_ID)
+    sandbox = _home_sandbox()
 
     with pytest.raises(ValueError, match="задаются вместе"):
         await bootstrap(
@@ -408,16 +447,11 @@ async def test_bootstrap_rejects_memory_ref_without_repo(kwargs: dict[str, Any])
             SANDBOX_ID,
             config,
             script="echo\n",
-            gitlab_token=SecretStr(GITLAB_TOKEN),
+            repo_tokens={"demo": SecretStr(GITLAB_TOKEN)},
             **kwargs,
         )
 
     assert sandbox.journal == []
-
-
-def _git_env_lines(text: str) -> list[str]:
-    """Строки скрипта, где задаётся заголовок git (присваивание GIT_CONFIG_VALUE_0)."""
-    return [line for line in text.splitlines() if "GIT_CONFIG_VALUE_0=" in line]
 
 
 def test_script_has_no_askpass_and_removes_leftover_file() -> None:
@@ -433,79 +467,18 @@ def test_script_has_no_askpass_and_removes_leftover_file() -> None:
     assert askpass_lines == ['rm -f "$HARNESS_DIR/bin/git-askpass.sh"']
 
 
-def test_script_sends_auth_header_only_on_clone_and_fetch() -> None:
-    text = SCRIPT_PATH.read_text(encoding="utf-8")
-    assert text.count("Authorization: Basic") == 1  # только в присваивании git_auth_header
-    # Заголовок задаётся один раз в обёртке run_git_auth и только при непустом токене.
-    assert text.count('GIT_CONFIG_KEY_0="http.${gitlab_url}.extraHeader"') == 1
-    assert text.count('GIT_CONFIG_VALUE_0="$git_auth_header"') == 1
-    assert text.count("GIT_CONFIG_COUNT=2") == 1
-    assert text.count("GIT_CONFIG_VALUE_1=false") == 1
-    assert "run_git_auth clone --quiet" in text
-    assert 'run_git_auth -C "$dir" fetch' in text
-    assert 'if [ -n "$git_auth_header" ]; then' in text
-    # Заголовок не экспортируется и не пишется в файлы.
-    assert not re.search(r"\bexport\b", text)
-    assert '> "$HARNESS_DIR/bin/git' not in text
-
-
-def test_script_builds_header_from_token_via_builtins_and_stdin() -> None:
-    """Токен не попадает в argv: printf (builtin) и base64 получают его через конвейер и stdin."""
-    text = SCRIPT_PATH.read_text(encoding="utf-8")
-    assert "printf '%s' \"oauth2:$gitlab_token\" | base64 -w0" in text
-
-
-def test_script_unsets_token_and_does_not_export_it() -> None:
-    text = SCRIPT_PATH.read_text(encoding="utf-8")
-    assert "unset GITLAB_TOKEN EMBEDDING_API_KEY" in text
-    assert "export GITLAB_TOKEN" not in text
-
-
-@pytest.mark.parametrize(
-    "url",
-    ["https://gitlab.example.com", "https://gitlab.example.com:8443/", "https://host/some/path/"],
-)
-def test_script_accepts_valid_gitlab_url(url: str) -> None:
-    result = _run_script(*ARGS_BASE, "--gitlab-url", url, "--help")
-
-    assert result.returncode == 0
-
-
-@pytest.mark.parametrize(
-    "url",
-    [
-        "http://gitlab.example.com",  # только https
-        "https://user@gitlab.example.com",  # учётные данные
-        "https://gitlab.example.com/a b",  # пробел
-        "https://gitlab.example.com/?q=1",  # query
-        "gitlab.example.com",  # без схемы
-    ],
-)
-def test_script_rejects_malformed_gitlab_url(url: str) -> None:
-    result = _run_script(*ARGS_BASE, "--gitlab-url", url, VALID_PAIR)
+def test_script_rejects_removed_gitlab_url_flag() -> None:
+    result = _run_script(*ARGS_BASE, "--gitlab-url", "https://gitlab.example.com", VALID_PAIR)
 
     assert result.returncode == 2
-    assert "--gitlab-url" in result.stderr
+    assert "неизвестный аргумент: --gitlab-url" in result.stderr
 
 
-def test_script_requires_gitlab_url_when_clones_are_given() -> None:
-    result = _run_script(*ARGS_BASE, VALID_PAIR)
+def test_script_rejects_http_pair() -> None:
+    result = _run_script(*ARGS_BASE, "demo=http://gitlab.example.com/group/demo.git")
 
     assert result.returncode == 2
-    assert "--gitlab-url" in result.stderr
-
-
-def test_script_allows_anonymous_clones_without_token(tmp_path: Path) -> None:
-    """Без токена клоны идут анонимно (публичные репозитории): ошибки токена нет, работает guard."""
-    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(tmp_path)}
-    result = _run_script(
-        *ARGS_BASE, "--gitlab-url", "https://gitlab.example.com", VALID_PAIR, env=env
-    )
-
-    # Код 3 от guard: до проверки токена и до установок. Токен не требуется для клонов.
-    assert result.returncode == 3
-    assert "GITLAB_TOKEN" not in result.stderr
-    assert 'GIT_TERMINAL_PROMPT=0 git "$@"' in SCRIPT_PATH.read_text(encoding="utf-8")
+    assert "некорректная пара" in result.stderr
 
 
 @pytest.mark.parametrize("repo", ["../..", "./.", "-x/y", "x./y", "w1do/-agent"])
@@ -556,12 +529,9 @@ def test_script_refuses_to_run_outside_sandbox_without_marker_variable(tmp_path:
     env = {
         "PATH": f"{stubs}:{os.environ.get('PATH', '/usr/bin:/bin')}",
         "HOME": str(home),
-        "GITLAB_TOKEN": "tok-test-guard-0123456789",
     }
 
-    result = _run_script(
-        *ARGS_BASE, "--gitlab-url", "https://gitlab.example.com", VALID_PAIR, env=env
-    )
+    result = _run_script(*ARGS_BASE, VALID_PAIR, env=env)
 
     assert result.returncode == 3
     assert "HARNESS_SANDBOX_BOOTSTRAP=1" in result.stderr
@@ -573,7 +543,7 @@ def test_script_guard_is_after_argument_validation(tmp_path: Path) -> None:
     """Ошибка аргументов по-прежнему даёт код 2, а не 3: проверка аргументов идёт раньше."""
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(tmp_path)}
 
-    result = _run_script(*ARGS_BASE, "--gitlab-url", "http://insecure.example", VALID_PAIR, env=env)
+    result = _run_script(*ARGS_BASE, "--memory-ref", "x", VALID_PAIR, env=env)
 
     assert result.returncode == 2
 
@@ -581,29 +551,72 @@ def test_script_guard_is_after_argument_validation(tmp_path: Path) -> None:
 async def test_bootstrap_command_env_marks_sandbox_run() -> None:
     """services/sandboxes.bootstrap ставит HARNESS_SANDBOX_BOOTSTRAP=1: иначе скрипт не работает."""
     config = load_config(EXAMPLE_CONFIG)
-    sandbox = FakeSandbox(sandbox_id=SANDBOX_ID)
+    sandbox = _home_sandbox()
 
     await bootstrap(
         sandbox,
         SANDBOX_ID,
         config,
         script="echo\n",
-        gitlab_token=SecretStr(GITLAB_TOKEN),
+        repo_tokens={"demo": SecretStr(GITLAB_TOKEN)},
     )
 
     assert sandbox.received_env("HARNESS_SANDBOX_BOOTSTRAP") == "1"
 
 
-async def test_bootstrap_without_token_has_no_gitlab_env() -> None:
-    """Публичные репозитории: токена нет, в env команды нет GITLAB_TOKEN (анонимные клоны, D-52)."""
+async def test_bootstrap_without_tokens_has_no_auth_env() -> None:
+    """Workspace без ключа: заголовка нет, клон анонимный (публичный репозиторий, D-60)."""
     config = load_config(EXAMPLE_CONFIG)
-    sandbox = FakeSandbox(sandbox_id=SANDBOX_ID)
+    sandbox = _home_sandbox()
 
-    await bootstrap(sandbox, SANDBOX_ID, config, script="echo\n", gitlab_token=None)
+    await bootstrap(sandbox, SANDBOX_ID, config, script="echo\n", repo_tokens={})
 
-    assert sandbox.received_env("GITLAB_TOKEN") is None
-    assert "GITLAB_TOKEN" not in sandbox.journal[-1].env_keys
+    # Анонимный клон: ни одного GIT_CONFIG_* в env (D-60, D-62).
+    assert sandbox.received_env("GIT_CONFIG_COUNT") is None
+    assert sandbox.received_env("GIT_CONFIG_VALUE_0") is None
     assert sandbox.received_env("HARNESS_SANDBOX_BOOTSTRAP") == "1"
+
+
+def _two_repo_config() -> HarnessConfig:
+    """Два workspace на разных провайдерах: github с ключом, gitlab без ключа (D-60)."""
+    return HarnessConfig.model_validate(
+        {
+            "workspaces": [
+                {
+                    "id": "site",
+                    "name": "Site",
+                    "voice_aliases": [],
+                    "repo": {
+                        "provider": "github",
+                        "project": "w1do/chistotyumen",
+                        "access_ref": "vault:demo/github/main",
+                    },
+                },
+                {
+                    "id": "demo",
+                    "name": "Demo",
+                    "voice_aliases": [],
+                    "repo": {"provider": "gitlab", "project": "group/demo"},
+                },
+            ],
+            "sandbox": {"provider_id": SANDBOX_ID},
+        }
+    )
+
+
+async def test_bootstrap_rejects_tokens_for_unknown_workspace() -> None:
+    sandbox = _home_sandbox()
+
+    with pytest.raises(ValueError, match="неизвестного workspace"):
+        await bootstrap(
+            sandbox,
+            SANDBOX_ID,
+            _two_repo_config(),
+            script="echo\n",
+            repo_tokens={"ghost": SecretStr(GITHUB_TOKEN)},
+        )
+
+    assert sandbox.journal == []
 
 
 def test_apt_update_precedes_apt_install_in_every_function() -> None:
@@ -629,11 +642,15 @@ def test_apt_update_precedes_apt_install_in_every_function() -> None:
 async def test_consecutive_bootstraps_use_different_script_paths() -> None:
     """Повторный bootstrap не пишет в тот же файл: fs.protected_regular=2 в sticky /tmp (D-52)."""
     config = load_config(EXAMPLE_CONFIG)
-    sandbox = FakeSandbox(sandbox_id=SANDBOX_ID)
+    sandbox = _home_sandbox()
 
     for _ in range(2):
         await bootstrap(
-            sandbox, SANDBOX_ID, config, script="echo ok\n", gitlab_token=SecretStr(GITLAB_TOKEN)
+            sandbox,
+            SANDBOX_ID,
+            config,
+            script="echo ok\n",
+            repo_tokens={"demo": SecretStr(GITLAB_TOKEN)},
         )
 
     paths = _written_script_paths(sandbox)
@@ -645,10 +662,14 @@ async def test_consecutive_bootstraps_use_different_script_paths() -> None:
 
 async def test_script_is_removed_after_successful_bootstrap() -> None:
     config = load_config(EXAMPLE_CONFIG)
-    sandbox = FakeSandbox(sandbox_id=SANDBOX_ID)
+    sandbox = _home_sandbox()
 
     await bootstrap(
-        sandbox, SANDBOX_ID, config, script="echo ok\n", gitlab_token=SecretStr(GITLAB_TOKEN)
+        sandbox,
+        SANDBOX_ID,
+        config,
+        script="echo ok\n",
+        repo_tokens={"demo": SecretStr(GITLAB_TOKEN)},
     )
 
     path = _script_path(sandbox)
@@ -662,7 +683,11 @@ async def test_script_is_removed_when_bootstrap_command_fails() -> None:
 
     with pytest.raises(SandboxUnavailable):
         await bootstrap(
-            sandbox, SANDBOX_ID, config, script="echo ok\n", gitlab_token=SecretStr(GITLAB_TOKEN)
+            sandbox,
+            SANDBOX_ID,
+            config,
+            script="echo ok\n",
+            repo_tokens={"demo": SecretStr(GITLAB_TOKEN)},
         )
 
     path = _script_path(sandbox)
@@ -673,9 +698,243 @@ async def test_script_is_removed_when_bootstrap_command_fails() -> None:
 async def test_failed_script_cleanup_does_not_change_bootstrap_result() -> None:
     config = load_config(EXAMPLE_CONFIG)
     sandbox = _FailingRmSandbox(sandbox_id=SANDBOX_ID)
+    sandbox.respond('printf %s "$HOME"', stdout=SANDBOX_HOME)
 
     result = await bootstrap(
-        sandbox, SANDBOX_ID, config, script="echo ok\n", gitlab_token=SecretStr(GITLAB_TOKEN)
+        sandbox,
+        SANDBOX_ID,
+        config,
+        script="echo ok\n",
+        repo_tokens={"demo": SecretStr(GITLAB_TOKEN)},
     )
 
     assert result.exit_code == 0
+
+
+def test_script_requires_phase() -> None:
+    result = _run_script(*ARGS_VERSIONS, VALID_PAIR)
+
+    assert result.returncode == 2
+    assert "нужен --phase setup или --phase memory" in result.stderr
+
+
+@pytest.mark.parametrize("phase", ["install", "all"])
+def test_script_rejects_unknown_phase(phase: str) -> None:
+    result = _run_script("--phase", phase, *ARGS_VERSIONS, VALID_PAIR)
+
+    assert result.returncode == 2
+    assert "нужен --phase setup или --phase memory" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "name", ["GIT_AUTH_HEADER_0", "GIT_CONFIG_COUNT", "GITLAB_TOKEN", "EMBEDDING_API_KEY"]
+)
+def test_script_setup_phase_refuses_secret_env(tmp_path: Path, name: str) -> None:
+    value = "sekret-test-value-0123456789"
+    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": str(tmp_path), name: value}
+
+    result = _run_script(*ARGS_BASE, VALID_PAIR, env=env)
+
+    # Код 2 до guard: проверка имён секретных переменных идёт раньше HARNESS_SANDBOX_BOOTSTRAP.
+    assert result.returncode == 2
+    assert f"без {name} в env" in result.stderr
+    assert value not in result.stderr
+
+
+def test_script_memory_phase_accepts_only_embedding_key(tmp_path: Path) -> None:
+    env = {
+        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+        "HOME": str(tmp_path),
+        "GIT_AUTH_HEADER_0": _basic_header("oauth2", GITLAB_TOKEN),
+    }
+
+    result = _run_script(
+        "--phase",
+        "memory",
+        *ARGS_VERSIONS,
+        "--memory-ref",
+        MEMORY_REF,
+        "--memory-repo",
+        MEMORY_REPO,
+        VALID_PAIR,
+        env=env,
+    )
+
+    assert result.returncode == 2
+    assert "фаза memory запускается без GIT_AUTH_HEADER_0 в env" in result.stderr
+    assert GITLAB_TOKEN not in result.stderr
+
+
+def test_script_memory_phase_requires_memory_ref() -> None:
+    result = _run_script("--phase", "memory", *ARGS_VERSIONS, VALID_PAIR)
+
+    assert result.returncode == 2
+    assert "фаза memory требует --memory-ref и --memory-repo" in result.stderr
+
+
+def test_script_memory_branch_precedes_installs() -> None:
+    text = SCRIPT_PATH.read_text(encoding="utf-8")
+
+    assert text.index('if [ "$phase" = "memory" ]; then') < text.index("\nensure_node\n")
+
+
+def test_script_has_no_repo_git_network_code() -> None:
+    text = SCRIPT_PATH.read_text(encoding="utf-8")
+
+    for needle in ("run_git_auth", "extraHeader", "GIT_CONFIG_COUNT", '"$url"'):
+        assert needle not in text
+
+
+async def test_bootstrap_runs_setup_phase_without_secrets() -> None:
+    """Фаза setup идёт первой и без ключей в env, даже когда ключи переданы (D-62)."""
+    sandbox = _home_sandbox()
+
+    await bootstrap(
+        sandbox,
+        SANDBOX_ID,
+        load_config(EXAMPLE_CONFIG),
+        script="echo\n",
+        repo_tokens={"demo": SecretStr(GITLAB_TOKEN)},
+        embedding_key=SecretStr("emb-test-value-0123456789abcdef"),
+    )
+
+    execs = [e for e in sandbox.journal if e.method == "exec" and e.cmd]
+    assert "--phase setup" in (execs[0].cmd or "")
+    assert execs[0].env_keys == ("GIT_TERMINAL_PROMPT", "HARNESS_SANDBOX_BOOTSTRAP")
+
+
+async def test_bootstrap_clones_each_workspace_with_its_own_key() -> None:
+    """github с ключом клонируется с его заголовком, gitlab без ключа — анонимно (D-60, D-62)."""
+    sandbox = _home_sandbox()
+
+    await bootstrap(
+        sandbox,
+        SANDBOX_ID,
+        _two_repo_config(),
+        script="echo\n",
+        repo_tokens={"site": SecretStr(GITHUB_TOKEN)},
+    )
+
+    clones = [
+        e for e in sandbox.journal if e.method == "exec" and (e.cmd or "").startswith("git clone")
+    ]
+    assert len(clones) == 2
+    github_clone, gitlab_clone = clones
+    assert f"{SANDBOX_HOME}/work/site" in (github_clone.cmd or "")
+    assert "GIT_CONFIG_VALUE_0" in github_clone.env_keys
+    # Анонимный клон без перекрытий с ключом: GIT_CONFIG_COUNT/KEY/VALUE нет.
+    # HARDENED_GIT_ENV содержит только флаги (D-62).
+    assert "GIT_CONFIG_COUNT" not in gitlab_clone.env_keys
+    assert not [
+        k for k in gitlab_clone.env_keys if k.startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_"))
+    ]
+    assert sandbox.received_env("GIT_CONFIG_VALUE_0") == _basic_header(
+        "x-access-token", GITHUB_TOKEN
+    )
+    assert all(GITHUB_TOKEN not in (e.cmd or "") for e in sandbox.journal)
+
+
+async def test_bootstrap_fetches_existing_clone() -> None:
+    config = load_config(EXAMPLE_CONFIG)
+    repo = config.workspaces[0].repo
+    repo_dir = f"{SANDBOX_HOME}/work/demo"
+    sandbox = _home_sandbox()
+    sandbox.respond("if [ -d ", stdout="repo")
+
+    result = await bootstrap(
+        sandbox,
+        SANDBOX_ID,
+        config,
+        script="echo\n",
+        repo_tokens={"demo": SecretStr(GITLAB_TOKEN)},
+    )
+
+    cmds = _exec_cmds(sandbox)
+    remote = git_access.set_origin_command(repo, repo_dir)
+    fetch = git_access.fetch_command(repo, repo_dir)
+    assert cmds.index(remote) < cmds.index(fetch)
+    assert not [c for c in cmds if c.startswith("git clone")]
+    remote_entry = next(e for e in sandbox.journal if e.cmd == remote)
+    assert "GIT_CONFIG_VALUE_0" not in remote_entry.env_keys
+    assert "обновляю demo" in result.stdout
+
+
+async def test_bootstrap_rejects_non_repo_workspace_dir() -> None:
+    sandbox = _home_sandbox()
+    sandbox.respond("if [ -d ", stdout="other")
+
+    result = await bootstrap(
+        sandbox,
+        SANDBOX_ID,
+        load_config(EXAMPLE_CONFIG),
+        script="echo\n",
+        repo_tokens={"demo": SecretStr(GITLAB_TOKEN)},
+        memory_ref=MEMORY_REF,
+        memory_repo=MEMORY_REPO,
+    )
+
+    assert result.exit_code == 1
+    assert "не является git-репозиторием" in result.stderr
+    cmds = _exec_cmds(sandbox)
+    assert not [c for c in cmds if c.startswith("git ")]
+    assert not [c for c in cmds if "--phase memory" in c]
+
+
+async def test_bootstrap_stops_after_failed_setup_phase() -> None:
+    sandbox = _home_sandbox()
+    sandbox.respond("bash ", exit_code=1)
+
+    result = await bootstrap(
+        sandbox,
+        SANDBOX_ID,
+        load_config(EXAMPLE_CONFIG),
+        script="echo\n",
+        repo_tokens={"demo": SecretStr(GITLAB_TOKEN)},
+        memory_ref=MEMORY_REF,
+        memory_repo=MEMORY_REPO,
+    )
+
+    assert result.exit_code == 1
+    cmds = _exec_cmds(sandbox)
+    assert not [
+        c for c in cmds if c.startswith(("printf", "if [ -d ", "git ")) or "--phase memory" in c
+    ]
+
+
+async def test_bootstrap_memory_phase_runs_last() -> None:
+    sandbox = _home_sandbox()
+
+    await bootstrap(
+        sandbox,
+        SANDBOX_ID,
+        load_config(EXAMPLE_CONFIG),
+        script="echo\n",
+        repo_tokens={"demo": SecretStr(GITLAB_TOKEN)},
+        memory_ref=MEMORY_REF,
+        memory_repo=MEMORY_REPO,
+        embedding_key=SecretStr("emb-test-value-0123456789abcdef"),
+    )
+
+    cmds = _exec_cmds(sandbox)
+    setup = next(i for i, c in enumerate(cmds) if "--phase setup" in c)
+    clone = next(i for i, c in enumerate(cmds) if c.startswith("git clone"))
+    memory = next(i for i, c in enumerate(cmds) if "--phase memory" in c)
+    assert setup < clone < memory
+
+
+async def test_bootstrap_home_error_still_removes_script() -> None:
+    sandbox = FakeSandbox(sandbox_id=SANDBOX_ID)
+
+    with pytest.raises(SandboxStepError) as info:
+        await bootstrap(
+            sandbox,
+            SANDBOX_ID,
+            load_config(EXAMPLE_CONFIG),
+            script="echo\n",
+            repo_tokens={},
+        )
+
+    assert info.value.reason == "home"
+    path = _script_path(sandbox)
+    rm_cmds = [e.cmd for e in sandbox.journal if e.method == "exec" and e.cmd and "rm -f" in e.cmd]
+    assert rm_cmds == [f"rm -f {path}"]

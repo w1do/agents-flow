@@ -1,7 +1,7 @@
 # ARCHITECTURE — agents-flow harness
 
 Голосовой AI-харнесс: задача диктуется в Telegram, выполняется агентом (Claude Code) в песочнице
-Novita, результат приходит как Merge Request в GitLab, статус обновляется в том же чате.
+Novita, результат приходит как Merge Request в GitLab или Pull Request в GitHub (провайдер задаёт `workspaces[].repo`, D-60), статус обновляется в том же чате.
 
 Источник требований: [`docs/tz/tz-v5.md`](docs/tz/tz-v5.md). Принятые решения: [`docs/decisions.md`](docs/decisions.md).
 План работ и статус: [`PLAN.md`](PLAN.md). Этот файл описывает **целевое** устройство системы и
@@ -25,7 +25,7 @@ Novita, результат приходит как Merge Request в GitLab, ст
  ┌──────── worker (диспетчер, polling Postgres) ────────┐
  │ выбирает задачу → активирует песочницу → exec агента │──► Novita Sandbox
  │ → гейты (секреты, коммит, тесты, push, MR)           │      └ claude, git, openspec
- └──────────────────────────────────────────────────────┘──► GitLab API (MR)
+ └──────────────────────────────────────────────────────┘──► Git-провайдер: GitLab (MR) или GitHub (PR), адаптер `adapters/git`
 ```
 
 | Компонент | Где | Назначение | Этап |
@@ -140,7 +140,7 @@ implement:  backlog → active → testing → ready (MR создан) → merge
    `test`): `code` запускает тесты (нет команды → `tests_state = no_tests`, не «зелёные»), `none` проверок качества
    не запускает. Без тестов задача получает `ready` с кнопкой «Принять» — решает владелец. Уровень 3 (гейты задачи,
    только добавляют) и остальные пресеты — `gates-tests-deploy`. Отчёт агента на результат не влияет. Итог —
-   `ready`, сообщение «готова, MR создан». Мердж — руками.
+   `ready`, сообщение «готова, MR создан» (для GitHub — «готова, PR создан», D-60). Мердж — руками.
 7. **Очистка.** Удаление worktree и локальной ветки, отзыв токена задачи; успех очистки разрешает паузу песочницы.
 
 ## 6. MCP `agents-flow`
@@ -170,18 +170,22 @@ implement:  backlog → active → testing → ready (MR создан) → merge
   Пакет `project-memory` из реестра npm не ставится (чужой пакет, D-51).
   Скрипт `~/.harness/bin/ensure-docker.sh` поднимает демон при активации (после паузы Novita). Ключ embeddings
   приходит только в env команды bootstrap; `EMBEDDING_API_KEY` в `.memory/.env` и конфиг memory не пишется.
-- Токен GitLab уходит git заголовком `Authorization` только на префикс `gitlab.base_url` (`GIT_CONFIG_*` в env клона и fetch, D-52); askpass не используется.
-  План `git-providers` (6e, D-60, todo): ключ у каждого workspace (`repo.access_ref`), заголовок `Basic` с пользователем
-  `oauth2` (GitLab) или `x-access-token` (GitHub) на префикс `<base_url>/<project>.git/`, bootstrap получает его в env
-  `GIT_AUTH_HEADER_<i>` вместо `--gitlab-url`; без ключа workspace задача — `error` `repo_access_ref`.
+- Ключ репозитория workspace уходит git заголовком `Authorization: Basic` только на префикс адреса его репозитория
+  `<base_url>/<project>.git/` (`GIT_CONFIG_*` в env клона и fetch, D-52, D-60). Пользователь Basic: `oauth2` для GitLab,
+  `x-access-token` для GitHub. Редиректы выключены. Клоны и fetch bootstrap и активации делает сервер отдельной
+  git-командой на workspace; команда с ключом перекрывает настройки `.git/config`, `~/.gitconfig` и `/etc/gitconfig`
+  (прокси, TLS, хуки, помощники учётных данных) и идёт по адресу из конфига, а не по `origin`; установки bootstrap
+  (`--phase setup`) идут без ключей (D-62). Workspace без ключа клонируется анонимно. Остаточный риск: агент с
+  выполнением кода в песочнице может перехватить ключ через профиль оболочки или `sudo` (D-62, R-1).
+  Задача без `repo.access_ref` уходит в `error` с причиной `repo_access_ref` до активации песочницы.
 - Ключи из vault (D-45, `adapters/vault`, MCP-клиент на официальном SDK): ссылка `vault:<project>/<service>/<name>`
-  в `harness.yaml` (`gitlab.access_ref`, `sandbox.memory.embedding_ref`); значение берётся на каждую команду и
-  передаётся только в env (bootstrap, активация, запуск агента). Без vault ссылка даёт `not_configured`; ключ
-  GitLab без ссылки — ENV `GITLAB_TOKEN`. Сбой vault при активации — задача `error` с причиной `vault`.
+  в `harness.yaml` (`workspaces[].repo.access_ref`, `sandbox.memory.embedding_ref`); значение берётся на каждую команду и
+  передаётся только в env (bootstrap, активация, запуск агента). Без vault ссылка даёт `not_configured`. ENV
+  `GITLAB_TOKEN`/`GITLAB_URL` больше не читаются (D-60). Сбой vault при активации — задача `error` с причиной `vault`.
 - Память проекта (`sandbox-profile`, D-47): при активации `git checkout --detach origin/<default_branch>` клона
   workspace и `memory sync --path <клон>`; сбой не роняет задачу (предупреждение в лог). Агент получает
   `HARNESS_MEMORY_PROJECT=~/work/<id>`; индекс по worktree не строится.
-- Креды (`CLAUDE_CODE_OAUTH_TOKEN`, `GITLAB_TOKEN`, токен задачи) передаются только в env конкретной exec-команды
+- Креды (`CLAUDE_CODE_OAUTH_TOKEN`, ключи репозиториев, токен задачи) передаются только в env конкретной exec-команды
   и не записываются на диск песочницы. Claude Code авторизуется подпиской через `CLAUDE_CODE_OAUTH_TOKEN`
   (D-18); `ANTHROPIC_API_KEY` в песочнице не задаётся: по документации Claude Code он перекрывает OAuth-токен (спайком не проверялось). `--bare` не используется. Риски токена подписки (экфильтрация, лимиты по окнам) — в `openspec/changes/archive/2026-10-19-mvp-06-sandbox-runtime/design.md`, Risks.
 - Агент запускается в фоне, вывод `stream-json` пишется в `~/.harness/tasks/<id>/stream.jsonl`, итог — в
@@ -207,14 +211,13 @@ implement:  backlog → active → testing → ready (MR создан) → merge
 ## 9. Конфигурация и ENV
 
 `config/harness.yaml` (путь в `HARNESS_CONFIG`, без секретов, пример — `config/harness.example.yaml`):
-workspaces (id, name, voice_aliases, gitlab_project, default_branch, test_command, agent), sandbox (provider_id,
-версии, опционально `git_author` (`name`, `email`: автор коммитов агента, передаётся агенту env `GIT_AUTHOR_*`/`GIT_COMMITTER_*`, по умолчанию `agents-flow`), опционально `memory`: `repo` (по умолчанию `w1do/memory-agent`), `ref` (полный sha коммита), `embedding_ref`), gitlab (base_url, опционально `access_ref` — ссылка
-`vault:…` на главный ключ GitLab). Ключи с сегментами `token`/`tokens`, `key`, `password`/`passwd`/`pwd`, `secret`/`secrets`, `apikey`,
-`credential`/`credentials` сервер отклоняет на любом уровне. `gitlab.base_url` с учётными данными (`user@host`) тоже
-отклоняется (D-26); токен GitLab задаётся только в ENV.
-План `git-providers` (6e, D-60, todo): секция `gitlab` и `gitlab_project` заменяются блоком `workspaces[].repo`
-(`provider: github | gitlab`, `base_url` только https с адресом по умолчанию провайдера, `project`, `access_ref`),
-ENV `GITLAB_URL`/`GITLAB_TOKEN` удаляются. До выката владелец переносит поля в боевом `harness.yaml`.
+workspaces (id, name, voice_aliases, repo, default_branch, test_command, agent), sandbox (provider_id,
+версии, опционально `git_author` (`name`, `email`: автор коммитов агента, передаётся агенту env `GIT_AUTHOR_*`/`GIT_COMMITTER_*`, по умолчанию `agents-flow`), опционально `memory`: `repo` (по умолчанию `w1do/memory-agent`), `ref` (полный sha коммита), `embedding_ref`). У каждого workspace блок `repo` (D-60): `provider` (`github` | `gitlab`), `base_url`
+(только https; по умолчанию `https://github.com` / `https://gitlab.com`), `project` (`owner/name` для GitHub,
+`group[/subgroup]/name` для GitLab), опционально `access_ref` — ссылка `vault:…` на ключ записи репозитория. Ключи с сегментами `token`/`tokens`, `key`, `password`/`passwd`/`pwd`, `secret`/`secrets`, `apikey`,
+`credential`/`credentials` сервер отклоняет на любом уровне. `repo.base_url` с учётными данными (`user@host`) тоже
+отклоняется (D-26); ключ репозитория задаётся только ссылкой vault. Секция `gitlab:` и поле `gitlab_project` удалены
+(D-60): конфиг с ними не загружается, сообщение называет поля для переноса (`docs/deployment.md`, «Переход на D-60»).
 
 Обязательные ENV (решение D-20): `DATABASE_URL`, `HARNESS_CONFIG`, `HARNESS_SECRET_KEY`, `TELEGRAM_BOT_TOKEN`,
 `TELEGRAM_CHAT_ID`, `TELEGRAM_WEBHOOK_SECRET`. Сервер и worker не стартуют, если их нет или они пустые.
@@ -237,7 +240,6 @@ ENV `GITLAB_URL`/`GITLAB_TOKEN` удаляются. До выката владе
 | `STT_PROVIDER`, `STT_API_URL`, `STT_API_KEY`, `STT_MODEL` | Распознавание речи. `STT_PROVIDER` — только `openai` (OpenAI-совместимый протокол) или не задан; без `STT_API_URL`, `STT_API_KEY` и `STT_MODEL` голос не распознаётся, бот отвечает «пришлите текстом». Whisper через Polza по умолчанию; `STT_API_KEY` — секрет |
 | `VOICE_MAX_BYTES` | Лимит размера голосового файла в байтах: по умолчанию и максимум 20 МиБ (20971520), это лимит `getFile` Telegram. Больший файл не скачивается |
 | `NOVITA_API_KEY`, `NOVITA_DOMAIN` | Песочницы (`NOVITA_API_KEY` — секрет) |
-| `GITLAB_URL`, `GITLAB_TOKEN` | Push и MR (`GITLAB_TOKEN` — секрет; не нужен, если задан `gitlab.access_ref`) |
 | `VAULT_MCP_URL`, `VAULT_MCP_TOKEN` | Vault с ключами владельца (D-45, `sandbox-profile`): адрес MCP-сервера, только `https://`, и Bearer-токен (секрет). Без них ссылки `vault:…` не разрешаются |
 | `CLAUDE_CODE_OAUTH_TOKEN` | Токен подписки Claude для Claude Code в песочнице (`claude setup-token`, срок ~1 год; передаётся только в exec, D-18). Секрет |
 | `AGENT_RUN_TIMEOUT_MIN`, `TESTS_TIMEOUT_MIN` | Лимит времени агента и гейта тестов (по умолчанию 60 и 15) |

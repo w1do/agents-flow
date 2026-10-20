@@ -92,8 +92,6 @@ class Settings(BaseSettings):
     voice_max_bytes: int = Field(default=_VOICE_MAX_BYTES_LIMIT, gt=0, le=_VOICE_MAX_BYTES_LIMIT)
     novita_api_key: SecretStr | None = None
     novita_domain: str | None = None
-    gitlab_url: str | None = None
-    gitlab_token: SecretStr | None = None
     claude_code_oauth_token: SecretStr | None = None
     agent_run_timeout_min: int = Field(default=60, gt=0)
     tests_timeout_min: int = Field(default=15, gt=0)

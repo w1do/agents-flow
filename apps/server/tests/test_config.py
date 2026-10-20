@@ -14,14 +14,14 @@ WORKSPACE_BLOCK = """\
   - id: {id}
     name: Проект {id}
     voice_aliases: ["{id}"]
-    gitlab_project: group/{id}
+    repo:
+      provider: gitlab
+      project: group/{id}
 """
 
 TAIL = """\
 sandbox:
   provider_id: sbx-1
-gitlab:
-  base_url: https://gitlab.example.com
 """
 
 
@@ -45,7 +45,7 @@ def test_secret_field_is_rejected_with_path(tmp_path: Path) -> None:
         "  - id: demo\n"
         "    name: Demo\n"
         "    voice_aliases: []\n"
-        "    gitlab_project: group/demo\n"
+        "    repo:\n      provider: gitlab\n      project: group/demo\n"
         "    gitlab_token: glpat-leaked-value\n" + TAIL
     )
 
@@ -76,7 +76,7 @@ def test_secret_like_keys_rejected_on_any_level(tmp_path: Path, key: str) -> Non
         "  - id: demo\n"
         "    name: Demo\n"
         "    voice_aliases: []\n"
-        "    gitlab_project: group/demo\n"
+        "    repo:\n      provider: gitlab\n      project: group/demo\n"
         + TAIL
         + f"extra:\n  nested:\n    {key}: value-should-not-appear\n"
     )
@@ -182,7 +182,7 @@ def test_extended_secret_segments_rejected(tmp_path: Path, key: str) -> None:
         "  - id: demo\n"
         "    name: Demo\n"
         "    voice_aliases: []\n"
-        "    gitlab_project: group/demo\n"
+        "    repo:\n      provider: gitlab\n      project: group/demo\n"
         + TAIL
         + f"extra:\n  gitlab_{key}: value-should-not-appear\n"
     )
@@ -194,81 +194,249 @@ def test_extended_secret_segments_rejected(tmp_path: Path, key: str) -> None:
     assert f"extra.gitlab_{key}" in str(info.value)
 
 
-def test_gitlab_base_url_with_userinfo_rejected(tmp_path: Path) -> None:
-    body = (
+def _workspace_with_repo(repo_lines: str, tail: str = TAIL) -> str:
+    """Конфиг с одним workspace; repo_lines — строки блока repo с отступом 6 (D-60)."""
+    return (
         "workspaces:\n"
         "  - id: demo\n"
         "    name: Demo\n"
         "    voice_aliases: []\n"
-        "    gitlab_project: group/demo\n"
-        "sandbox:\n"
-        "  provider_id: sbx-1\n"
-        "gitlab:\n"
-        "  base_url: https://user:pass@gitlab.example.com\n"
+        "    repo:\n" + repo_lines + tail
+    )
+
+
+def test_repo_github_defaults_base_url(tmp_path: Path) -> None:
+    body = _workspace_with_repo("      provider: github\n      project: w1do/chistotyumen\n")
+
+    repo = load_config(_write(tmp_path, body)).workspaces[0].repo
+
+    assert repo.provider == "github"
+    assert repo.base_url == "https://github.com"
+    assert repo.project == "w1do/chistotyumen"
+    assert repo.access_ref is None
+
+
+def test_repo_gitlab_defaults_base_url(tmp_path: Path) -> None:
+    body = _workspace_with_repo("      provider: gitlab\n      project: group/demo\n")
+
+    repo = load_config(_write(tmp_path, body)).workspaces[0].repo
+
+    assert repo.base_url == "https://gitlab.com"
+
+
+def test_repo_gitlab_self_hosted_with_path(tmp_path: Path) -> None:
+    body = _workspace_with_repo(
+        "      provider: gitlab\n"
+        "      base_url: https://host.example.com/gitlab\n"
+        "      project: group/sub/demo\n"
+    )
+
+    repo = load_config(_write(tmp_path, body)).workspaces[0].repo
+
+    assert repo.base_url == "https://host.example.com/gitlab"
+    assert repo.project == "group/sub/demo"
+
+
+def test_repo_base_url_trailing_slash_stripped(tmp_path: Path) -> None:
+    body = _workspace_with_repo(
+        "      provider: gitlab\n"
+        '      base_url: "https://gitlab.example.com/"\n'
+        "      project: group/demo\n"
+    )
+
+    repo = load_config(_write(tmp_path, body)).workspaces[0].repo
+
+    assert repo.base_url == "https://gitlab.example.com"
+
+
+def test_repo_base_url_http_rejected(tmp_path: Path) -> None:
+    body = _workspace_with_repo(
+        "      provider: gitlab\n"
+        "      base_url: http://gitlab.example.com\n"
+        "      project: group/demo\n"
+    )
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "repo.base_url" in str(info.value)
+
+
+def test_repo_base_url_with_userinfo_rejected(tmp_path: Path) -> None:
+    body = _workspace_with_repo(
+        "      provider: gitlab\n"
+        "      base_url: https://user:pass@gitlab.example.com\n"
+        "      project: group/demo\n"
     )
 
     with pytest.raises(ConfigError) as info:
         load_config(_write(tmp_path, body))
 
     message = str(info.value)
-    assert "gitlab.base_url" in message
+    assert "repo.base_url" in message
     assert "pass" not in message
-
-
-def test_gitlab_base_url_with_user_only_rejected(tmp_path: Path) -> None:
-    body = (
-        "workspaces:\n"
-        "  - id: demo\n"
-        "    name: Demo\n"
-        "    voice_aliases: []\n"
-        "    gitlab_project: group/demo\n"
-        "sandbox:\n"
-        "  provider_id: sbx-1\n"
-        "gitlab:\n"
-        "  base_url: https://user@gitlab.example.com\n"
-    )
-
-    with pytest.raises(ConfigError) as info:
-        load_config(_write(tmp_path, body))
-
-    assert "gitlab.base_url" in str(info.value)
-
-
-_BASE_URL_TEMPLATE = (
-    "workspaces:\n"
-    "  - id: demo\n"
-    "    name: Demo\n"
-    "    voice_aliases: []\n"
-    "    gitlab_project: group/demo\n"
-    "sandbox:\n"
-    "  provider_id: sbx-1\n"
-    "gitlab:\n"
-    '  base_url: "{url}"\n'
-)
 
 
 @pytest.mark.parametrize(
     "url",
     [
-        "user:pass@gitlab.example.com",
-        "https:/user:pw@gitlab.example.com",
-        "//user:pw@gitlab.example.com",
-        "ftp://gitlab.example.com",
+        "https://gitlab.example.com?x=1",
+        "https://gitlab.example.com#frag",
+        "https://gitlab example.com",
         "gitlab.example.com",
-        "https://user:pw@gitlab.example.com",
-        "https://gitlab.example.com@evil.example.com",
+        "ftp://gitlab.example.com",
     ],
 )
-def test_gitlab_url_forms_rejected(tmp_path: Path, url: str) -> None:
-    # Строки без схемы http(s) и с userinfo без «//» раньше проходили проверку (security mvp-03).
+def test_repo_base_url_forms_rejected(tmp_path: Path, url: str) -> None:
+    body = _workspace_with_repo(
+        f'      provider: gitlab\n      base_url: "{url}"\n      project: group/demo\n'
+    )
+
     with pytest.raises(ConfigError) as info:
-        load_config(_write(tmp_path, _BASE_URL_TEMPLATE.format(url=url)))
+        load_config(_write(tmp_path, body))
 
     message = str(info.value)
-    assert "gitlab.base_url" in message
-    assert "pass" not in message
-    assert "pw" not in message
+    assert "repo.base_url" in message
     assert "evil" not in message
+
+
+def test_repo_github_enterprise_rejected(tmp_path: Path) -> None:
+    body = _workspace_with_repo(
+        "      provider: github\n"
+        "      base_url: https://ghe.example.com\n"
+        "      project: w1do/chistotyumen\n"
+    )
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "GitHub Enterprise" in str(info.value)
+
+
+def test_repo_github_project_must_be_owner_name(tmp_path: Path) -> None:
+    body = _workspace_with_repo("      provider: github\n      project: group/sub/name\n")
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "owner/name" in str(info.value)
+
+
+def test_repo_gitlab_project_needs_group(tmp_path: Path) -> None:
+    body = _workspace_with_repo("      provider: gitlab\n      project: demo\n")
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "group" in str(info.value)
+
+
+def test_repo_project_with_dot_git_rejected(tmp_path: Path) -> None:
+    body = _workspace_with_repo("      provider: github\n      project: w1do/chistotyumen.git\n")
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert ".git" in str(info.value)
+
+
+def test_repo_unknown_provider_rejected(tmp_path: Path) -> None:
+    body = _workspace_with_repo("      provider: bitbucket\n      project: team/demo\n")
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "repo.provider" in str(info.value)
+
+
+def test_repo_access_ref_accepts_vault_reference(tmp_path: Path) -> None:
+    body = _workspace_with_repo(
+        "      provider: github\n      project: w1do/chistotyumen\n"
+        "      access_ref: vault:demo/github/main\n"
+    )
+
+    repo = load_config(_write(tmp_path, body)).workspaces[0].repo
+
+    assert repo.access_ref == "vault:demo/github/main"
+
+
+def test_repo_access_ref_must_be_vault_reference(tmp_path: Path) -> None:
+    body = _workspace_with_repo(
+        "      provider: github\n"
+        "      project: w1do/chistotyumen\n"
+        "      access_ref: github_pat_plain\n"
+    )
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "access_ref" in str(info.value)
+    assert "github_pat_plain" not in str(info.value)
+
+
+def test_repo_access_ref_optional(tmp_path: Path) -> None:
+    body = _workspace_with_repo("      provider: gitlab\n      project: group/demo\n")
+
+    assert load_config(_write(tmp_path, body)).workspaces[0].repo.access_ref is None
+
+
+def test_legacy_gitlab_section_rejected_with_hint(tmp_path: Path) -> None:
+    body = (
+        _workspace_with_repo("      provider: gitlab\n      project: group/demo\n")
+        + "sandbox:\n  provider_id: sbx-1\n"
+        + "gitlab:\n  base_url: https://gitlab.example.com\n"
+    )
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "секция gitlab удалена" in str(info.value)
+
+
+def test_legacy_gitlab_project_rejected_with_hint(tmp_path: Path) -> None:
+    body = (
+        "workspaces:\n"
+        "  - id: demo\n"
+        "    name: Demo\n"
+        "    voice_aliases: []\n"
+        "    gitlab_project: group/demo\n" + TAIL
+    )
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "gitlab_project удалён" in str(info.value)
+
+
+def test_workspace_without_repo_rejected(tmp_path: Path) -> None:
+    body = "workspaces:\n  - id: demo\n    name: Demo\n    voice_aliases: []\n" + TAIL
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "workspaces[0].repo" in str(info.value)
+
+
+def test_workspaces_with_different_providers_accepted(tmp_path: Path) -> None:
+    body = (
+        "workspaces:\n"
+        "  - id: site\n"
+        "    name: Site\n"
+        "    voice_aliases: []\n"
+        "    repo:\n"
+        "      provider: github\n"
+        "      project: w1do/chistotyumen\n"
+        "  - id: demo\n"
+        "    name: Demo\n"
+        "    voice_aliases: []\n"
+        "    repo:\n"
+        "      provider: gitlab\n"
+        "      project: group/demo\n" + TAIL
+    )
+
+    config = load_config(_write(tmp_path, body))
+
+    assert [ws.repo.provider for ws in config.workspaces] == ["github", "gitlab"]
 
 
 def test_sandbox_versions_and_turn_limit_have_pinned_defaults(tmp_path: Path) -> None:
@@ -293,7 +461,6 @@ def test_sandbox_version_override_is_read(tmp_path: Path) -> None:
     body = (
         _workspace_body(agent_max_turns=None)
         + "sandbox:\n  provider_id: sbx-1\n  claude_code_version: 2.2.0\n"
-        + "gitlab:\n  base_url: https://gitlab.example.com\n"
     )
 
     config = load_config(_write(tmp_path, body))
@@ -307,7 +474,7 @@ def _workspace_body(agent_max_turns: int | None) -> str:
         "  - id: demo\n"
         "    name: Demo\n"
         "    voice_aliases: []\n"
-        "    gitlab_project: group/demo\n"
+        "    repo:\n      provider: gitlab\n      project: group/demo\n"
     )
     if agent_max_turns is not None:
         body += f"    agent_max_turns: {agent_max_turns}\n"
@@ -321,7 +488,6 @@ def test_sandbox_version_must_be_semver(tmp_path: Path, version: str) -> None:
     body = (
         _workspace_body(agent_max_turns=None)
         + f"sandbox:\n  provider_id: sbx-1\n  claude_code_version: '{version}'\n"
-        + "gitlab:\n  base_url: https://gitlab.example.com\n"
     )
 
     with pytest.raises(ConfigError) as info:
@@ -335,39 +501,13 @@ WORKSPACE_ONLY = (
     "  - id: demo\n"
     "    name: Demo\n"
     "    voice_aliases: []\n"
-    "    gitlab_project: group/demo\n"
+    "    repo:\n      provider: gitlab\n      project: group/demo\n"
 )
-
-
-def test_gitlab_access_ref_accepts_vault_reference(tmp_path: Path) -> None:
-    body = WORKSPACE_ONLY + TAIL + "  access_ref: vault:demo/gitlab/main\n"
-
-    config = load_config(_write(tmp_path, body))
-
-    assert config.gitlab.access_ref == "vault:demo/gitlab/main"
-
-
-def test_gitlab_access_ref_must_be_vault_reference(tmp_path: Path) -> None:
-    body = WORKSPACE_ONLY + TAIL + "  access_ref: glpat-plain\n"
-
-    with pytest.raises(ConfigError) as info:
-        load_config(_write(tmp_path, body))
-
-    assert "access_ref" in str(info.value)
-    assert "glpat-plain" not in str(info.value)
 
 
 def _memory_body(memory_lines: str) -> str:
     """Конфиг с блоком sandbox.memory; memory_lines — строки под memory (с отступом 4)."""
-    return (
-        WORKSPACE_ONLY
-        + "sandbox:\n"
-        + "  provider_id: sbx-1\n"
-        + "  memory:\n"
-        + memory_lines
-        + "gitlab:\n"
-        + "  base_url: https://gitlab.example.com\n"
-    )
+    return WORKSPACE_ONLY + "sandbox:\n" + "  provider_id: sbx-1\n" + "  memory:\n" + memory_lines
 
 
 def test_memory_block_is_optional_and_parsed(tmp_path: Path) -> None:
@@ -452,8 +592,6 @@ def test_memory_embedding_ref_must_be_vault_reference(tmp_path: Path) -> None:
         + "  memory:\n"
         + f"    ref: {MEMORY_REF}\n"
         + "    embedding_ref: sk-plain-key-value\n"
-        + "gitlab:\n"
-        + "  base_url: https://gitlab.example.com\n"
     )
 
     with pytest.raises(ConfigError) as info:
@@ -474,7 +612,6 @@ def test_git_author_custom_values_accepted(tmp_path: Path) -> None:
         WORKSPACE_ONLY
         + "sandbox:\n  provider_id: sbx-1\n  git_author:\n    name: Agent Bot\n"
         + "    email: bot@example.com\n"
-        + "gitlab:\n  base_url: https://gitlab.example.com\n"
     )
 
     config = load_config(_write(tmp_path, body))
@@ -490,7 +627,6 @@ def test_git_author_name_rejected_when_blank_control_or_long(tmp_path: Path, nam
         + "sandbox:\n  provider_id: sbx-1\n  git_author:\n    name: "
         + json.dumps(name)
         + "\n"
-        + "gitlab:\n  base_url: https://gitlab.example.com\n"
     )
 
     with pytest.raises(ConfigError) as info:
@@ -506,10 +642,44 @@ def test_git_author_email_must_be_simple_address(tmp_path: Path, email: str) -> 
         + "sandbox:\n  provider_id: sbx-1\n  git_author:\n    email: "
         + repr(email)
         + "\n"
-        + "gitlab:\n  base_url: https://gitlab.example.com\n"
     )
 
     with pytest.raises(ConfigError) as info:
         load_config(_write(tmp_path, body))
 
     assert "git_author" in str(info.value)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://gitlab.example.com/..",
+        "https://gitlab.example.com/.",
+        "https://gitlab.example.com/a/../b",
+        "https://-gitlab.example.com",
+        "https://gitlab..example.com",
+        "https://gitlab.example.com/-x",
+    ],
+)
+def test_repo_base_url_rejects_dot_and_dash_segments(tmp_path: Path, url: str) -> None:
+    body = _workspace_with_repo(
+        f'      provider: gitlab\n      base_url: "{url}"\n      project: group/demo\n'
+    )
+
+    with pytest.raises(ConfigError) as info:
+        load_config(_write(tmp_path, body))
+
+    assert "repo.base_url" in str(info.value)
+
+
+def test_repo_base_url_accepts_ip_port_and_path(tmp_path: Path) -> None:
+    body = _workspace_with_repo(
+        "      provider: gitlab\n"
+        "      base_url: https://10.0.0.5:8443/git-lab\n"
+        "      project: group/demo\n"
+    )
+
+    config = load_config(_write(tmp_path, body))
+
+    repo = config.workspaces[0].repo
+    assert repo.base_url == "https://10.0.0.5:8443/git-lab"

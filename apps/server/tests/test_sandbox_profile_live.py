@@ -15,20 +15,19 @@
   LIVE_NOVITA_DOMAIN (необязательная)
   VAULT_MCP_URL, VAULT_MCP_TOKEN          адрес и токен vault (https)
   LIVE_EMBEDDING_REF                      ссылка vault:<проект>/<сервис>/<имя> на ключ embeddings
-  LIVE_GITLAB_ACCESS_REF (необязательная) ссылка на ключ GitLab. Для workspace на GitHub
-                                          и других хостингов НЕ задавать: тогда клоны и fetch
-                                          анонимные (без заголовка), vault по GitLab не нужен
+  LIVE_REPO_ACCESS_REF (необязательная)   ссылка vault на ключ записи репозитория (repo.access_ref).
+                                          Без неё клоны и fetch анонимные (только публичный
+                                          репозиторий)
   LIVE_MEMORY_REF                         полный sha коммита memory-agent (D-51)
   LIVE_MEMORY_REPO (необязательная)       GitHub-репозиторий memory-agent
                                           (по умолчанию w1do/memory-agent)
-  LIVE_GITLAB_PROJECT                     репозиторий workspace, например w1do/chistotyumen
-  LIVE_GITLAB_BASE_URL (необязательная)   адрес хостинга, например https://github.com
+  LIVE_REPO_PROVIDER (необязательная)     github | gitlab, по умолчанию gitlab (D-60)
+  LIVE_REPO_PROJECT                       репозиторий workspace, например w1do/chistotyumen
   LIVE_DEFAULT_BRANCH (необязательная)    ветка для worktree, по умолчанию main
   TEST_DATABASE_URL или Docker            Postgres для теста 5.7
 
-Авторизация git (D-52): заголовок с токеном уходит только на префикс `gitlab.base_url`,
-а это же адрес клонов. Поэтому для workspace на GitHub LIVE_GITLAB_ACCESS_REF не задаётся,
-и bootstrap с activate работают без токена (публичный репозиторий, анонимный git).
+Авторизация git (D-52, D-60): заголовок с ключом уходит только на префикс адреса репозитория
+workspace. Без LIVE_REPO_ACCESS_REF bootstrap и activate работают анонимно (публичный репозиторий).
 Перед bootstrap проверяется, что репозиторий доступен без ключа (`git ls-remote`).
 """
 
@@ -51,9 +50,9 @@ import pytest
 import pytest_asyncio
 from harness_server.adapters.novita import ExecResult, NovitaSandboxProvider, SandboxProvider
 from harness_server.adapters.vault import McpSecretVault
-from harness_server.config import HarnessConfig, SandboxMemoryConfig, load_config
+from harness_server.config import HarnessConfig, RepoConfig, SandboxMemoryConfig, load_config
 from harness_server.security.redaction import redact
-from harness_server.services import sandboxes
+from harness_server.services import git_access, sandboxes
 from harness_server.services import secrets as secret_refs
 from harness_server.services.agent_result import AgentRun, AgentState
 from harness_server.services.sandboxes import AgentStartState
@@ -78,7 +77,7 @@ REQUIRED_ENV: Final = (
     "VAULT_MCP_TOKEN",
     "LIVE_EMBEDDING_REF",
     "LIVE_MEMORY_REF",
-    "LIVE_GITLAB_PROJECT",
+    "LIVE_REPO_PROJECT",
 )
 # Многоходовая задача с инструментами (как в test_novita_live.py).
 MULTI_TURN_PROMPT = (
@@ -111,12 +110,12 @@ class LiveEnv:
     domain: str | None
     vault_url: str
     vault_token: str = field(repr=False)
-    gitlab_ref: str | None
+    repo_ref: str | None
     embedding_ref: str
     memory_ref: str
     memory_repo: str
-    gitlab_project: str
-    gitlab_base_url: str | None
+    repo_provider: str
+    repo_project: str
     default_branch: str
 
 
@@ -128,7 +127,7 @@ class Prepared:
     provider: SandboxProvider
     config: HarnessConfig
     script: str
-    # None — публичный репозиторий без ключа GitLab (LIVE_GITLAB_ACCESS_REF не задан).
+    # None — публичный репозиторий без ключа записи (LIVE_REPO_ACCESS_REF не задан).
     gitlab: SecretStr | None
     embedding: SecretStr
     home: str
@@ -153,28 +152,26 @@ def _live_env() -> LiveEnv:
         domain=os.environ.get("LIVE_NOVITA_DOMAIN") or None,
         vault_url=os.environ["VAULT_MCP_URL"],
         vault_token=os.environ["VAULT_MCP_TOKEN"],
-        gitlab_ref=os.environ.get("LIVE_GITLAB_ACCESS_REF") or None,
+        repo_ref=os.environ.get("LIVE_REPO_ACCESS_REF") or None,
         embedding_ref=os.environ["LIVE_EMBEDDING_REF"],
         memory_ref=os.environ["LIVE_MEMORY_REF"],
         memory_repo=os.environ.get("LIVE_MEMORY_REPO") or DEFAULT_MEMORY_REPO,
-        gitlab_project=os.environ["LIVE_GITLAB_PROJECT"],
-        gitlab_base_url=os.environ.get("LIVE_GITLAB_BASE_URL") or None,
+        repo_provider=os.environ.get("LIVE_REPO_PROVIDER") or "gitlab",
+        repo_project=os.environ["LIVE_REPO_PROJECT"],
         default_branch=os.environ.get("LIVE_DEFAULT_BRANCH") or DEFAULT_BRANCH,
     )
 
 
 def _live_config(env: LiveEnv) -> HarnessConfig:
-    """Конфиг из примера с живыми значениями: песочница, память, ссылка vault, репозиторий."""
+    """Конфиг из примера с живыми значениями: песочница, память, репозиторий workspace (D-60)."""
     base = load_config(EXAMPLE_CONFIG)
-    gitlab_update: dict[str, Any] = {}
-    if env.gitlab_ref is not None:
-        gitlab_update["access_ref"] = env.gitlab_ref
-    if env.gitlab_base_url is not None:
-        gitlab_update["base_url"] = env.gitlab_base_url
+    repo = RepoConfig.model_validate(
+        {"provider": env.repo_provider, "project": env.repo_project, "access_ref": env.repo_ref}
+    )
     workspace = base.workspaces[0].model_copy(
         update={
             "id": WORKSPACE_ID,
-            "gitlab_project": env.gitlab_project,
+            "repo": repo,
             "default_branch": env.default_branch,
         }
     )
@@ -188,13 +185,7 @@ def _live_config(env: LiveEnv) -> HarnessConfig:
             ),
         }
     )
-    return base.model_copy(
-        update={
-            "workspaces": [workspace],
-            "gitlab": base.gitlab.model_copy(update=gitlab_update),
-            "sandbox": sandbox,
-        }
-    )
+    return base.model_copy(update={"workspaces": [workspace], "sandbox": sandbox})
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -228,26 +219,27 @@ async def prepared(live_env: LiveEnv) -> AsyncIterator[Prepared]:
     """Ключи из vault тем же путём, что в проде, и первый bootstrap с памятью."""
     provider = NovitaSandboxProvider(api_key=live_env.api_key, domain=live_env.domain)
     vault = McpSecretVault(live_env.vault_url, SecretStr(live_env.vault_token))
-    # Без LIVE_GITLAB_ACCESS_REF ключ GitLab не нужен: публичный репозиторий клонируется анонимно
-    # (gitlab_token=None в bootstrap и activate, D-52) и из vault он не запрашивается.
+    # Без LIVE_REPO_ACCESS_REF ключ не нужен: публичный репозиторий клонируется анонимно (D-60).
     gitlab: SecretStr | None = None
-    if live_env.gitlab_ref is not None:
-        gitlab = await secret_refs.resolve(vault, live_env.gitlab_ref, fallback=None)
+    if live_env.repo_ref is not None:
+        gitlab = await secret_refs.resolve(vault, live_env.repo_ref, fallback=None)
         if gitlab is None:
-            pytest.fail("vault не вернул ключ GitLab")
+            pytest.fail("vault не вернул ключ репозитория")
     embedding = await secret_refs.resolve(vault, live_env.embedding_ref, fallback=None)
     if embedding is None:
         pytest.fail("vault не вернул ключ embeddings")
     config = _live_config(live_env)
-    if not _anonymous_reachable(sandboxes.clone_url(config, config.workspaces[0])):
+    if not _anonymous_reachable(git_access.clone_url(config.workspaces[0].repo)):
         pytest.fail(
             "репозиторий workspace недоступен без ключа: сделайте его публичным или проверьте адрес"
         )
     script = BOOTSTRAP_PATH.read_text(encoding="utf-8")
-    # Заголовок Basic и его base64-часть — секреты, если задан ключ GitLab (D-52).
+    # Заголовок Basic и его base64-часть — секреты, если задан ключ репозитория (D-52, D-60).
     gitlab_values: tuple[str, ...] = ()
     if gitlab is not None:
-        gitlab_values = sandboxes.git_auth_secret_values(gitlab.get_secret_value())
+        gitlab_values = git_access.git_auth_secret_values(
+            config.workspaces[0].repo.provider, gitlab.get_secret_value()
+        )
         gitlab_values = (gitlab.get_secret_value(), *gitlab_values)
     values = (*gitlab_values, embedding.get_secret_value(), live_env.oauth_token)
     result = await sandboxes.bootstrap(
@@ -255,7 +247,7 @@ async def prepared(live_env: LiveEnv) -> AsyncIterator[Prepared]:
         live_env.sandbox_id,
         config,
         script=script,
-        gitlab_token=gitlab,
+        repo_tokens={WORKSPACE_ID: gitlab} if gitlab is not None else {},
         memory_ref=live_env.memory_ref,
         memory_repo=live_env.memory_repo,
         embedding_key=embedding,
@@ -283,7 +275,7 @@ def _labelled_secrets(p: Prepared) -> list[tuple[str, str]]:
         ("OAuth-токена", p.env.oauth_token),
     ]
     if p.gitlab is not None:
-        pairs.append(("ключа GitLab", p.gitlab.get_secret_value()))
+        pairs.append(("ключа репозитория", p.gitlab.get_secret_value()))
     return pairs
 
 
@@ -400,7 +392,7 @@ async def test_5_1_second_bootstrap_is_idempotent(prepared: Prepared) -> None:
         prepared.env.sandbox_id,
         prepared.config,
         script=prepared.script,
-        gitlab_token=prepared.gitlab,
+        repo_tokens={WORKSPACE_ID: prepared.gitlab} if prepared.gitlab is not None else {},
         memory_ref=prepared.env.memory_ref,
         memory_repo=prepared.env.memory_repo,
         embedding_key=prepared.embedding,
@@ -635,8 +627,8 @@ async def test_5_7_activation_with_memory_commits_in_worktree(
             task,
             base_ref=workspace.default_branch,
             timeout_min=AGENT_TIMEOUT_MIN,
-            gitlab_token=p.gitlab,
-            gitlab_base_url=p.config.gitlab.base_url,
+            repo=p.config.workspaces[0].repo,
+            repo_token=p.gitlab,
             default_branch=workspace.default_branch,
             memory_envs={"EMBEDDING_API_KEY": p.embedding.get_secret_value()},
         )

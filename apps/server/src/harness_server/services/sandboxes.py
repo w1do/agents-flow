@@ -2,11 +2,10 @@
 
 Публичные функции, которые работают с БД, — одна транзакция с commit (D-24). Долгие операции в
 песочнице (exec, опрос агента) выполняются вне транзакции: их вызывает worker между коммитами.
-Значения токенов, ключей и GITLAB_TOKEN в исключения и логи не попадают: в логах только
+Значения токенов и ключей репозиториев в исключения и логи не попадают: в логах только
 идентификаторы, роли и коды; текст из песочницы — только после redaction.
 """
 
-import base64
 import json
 import logging
 import shlex
@@ -25,11 +24,12 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from harness_server.adapters.novita import ExecResult, SandboxError, SandboxProvider
-from harness_server.config import GitAuthorConfig, HarnessConfig, WorkspaceConfig
+from harness_server.config import GitAuthorConfig, HarnessConfig, RepoConfig, WorkspaceConfig
 from harness_server.db.models import Sandbox, Task, TaskToken
 from harness_server.domain.errors import UnknownWorkspace, UnsupportedKind
 from harness_server.security import tokens
 from harness_server.security.redaction import redact
+from harness_server.services import git_access
 from harness_server.services.agent_result import (
     LOG_TEXT_LIMIT,
     USAGE_LIMIT_REASON,
@@ -53,6 +53,9 @@ BOOTSTRAP_SCRIPT_PREFIX: Final = "/tmp/harness-bootstrap-"
 BOOTSTRAP_TIMEOUT_SEC: Final = 900
 # С памятью первый memory init индексирует проекты: без запаса по времени он оборвётся (D-47).
 BOOTSTRAP_MEMORY_TIMEOUT_SEC: Final = 1800
+# Фазы bootstrap.sh (D-62): setup — установки без ключей, memory — индексация клонов.
+BOOTSTRAP_PHASE_SETUP: Final = "setup"
+BOOTSTRAP_PHASE_MEMORY: Final = "memory"
 # Роль агента по типу задачи (design 7): план — planner, реализация — implementer.
 _ROLE_BY_KIND: Final = {
     TaskKind.PLAN: AgentRole.PLANNER,
@@ -112,36 +115,6 @@ async def revoke_task_tokens(
     logger.info("task tokens revoked task=%s", task_id)
 
 
-def clone_url(config: HarnessConfig, workspace: WorkspaceConfig) -> str:
-    """Адрес клона репозитория workspace: base_url GitLab + проект. Учётных данных в адресе нет."""
-    return f"{config.gitlab.base_url.rstrip('/')}/{workspace.gitlab_project}.git"
-
-
-def git_auth_header(token: str) -> str:
-    """Заголовок Basic для git: oauth2:<token> в base64 (D-52). Значение — секрет."""
-    basic = base64.b64encode(f"oauth2:{token}".encode()).decode("ascii")
-    return f"Authorization: Basic {basic}"
-
-
-def git_auth_env(base_url: str, token: str) -> dict[str, str]:
-    """env git-команды: заголовок только для URL, начинающихся с base_url (D-52).
-
-    GIT_CONFIG_* передаются через env, а не argv и не файлы; git сопоставляет http.<url>.*
-    по префиксу
-    URL, поэтому другой хост заголовка не получает. Требуется git >= 2.31 (Ubuntu 24.04 — 2.43).
-    """
-    prefix = f"{base_url.rstrip('/')}/"
-    # Редиректы выключены, чтобы заголовок не ушёл на другой хост (D-52).
-    return {
-        "GIT_CONFIG_COUNT": "2",
-        "GIT_CONFIG_KEY_0": f"http.{prefix}.extraHeader",
-        "GIT_CONFIG_VALUE_0": git_auth_header(token),
-        "GIT_CONFIG_KEY_1": "http.followRedirects",
-        "GIT_CONFIG_VALUE_1": "false",
-        "GIT_TERMINAL_PROMPT": "0",
-    }
-
-
 def git_author_env(author: GitAuthorConfig) -> dict[str, str]:
     """env агента для коммитов: автор и коммиттер из sandbox.git_author (env запуска, не файл)."""
     return {
@@ -152,12 +125,6 @@ def git_author_env(author: GitAuthorConfig) -> dict[str, str]:
     }
 
 
-def git_auth_secret_values(token: str) -> tuple[str, str]:
-    """Секреты заголовка для redaction: полная строка заголовка и bare base64 из неё (D-52)."""
-    header = git_auth_header(token)
-    return header, header.removeprefix("Authorization: Basic ")
-
-
 async def _remove_bootstrap_script(provider: SandboxProvider, sandbox_id: str, path: str) -> None:
     """Удаляет временный скрипт bootstrap. Сбой rm не меняет исход, текст не логируется."""
     try:
@@ -166,61 +133,166 @@ async def _remove_bootstrap_script(provider: SandboxProvider, sandbox_id: str, p
         logger.warning("bootstrap script cleanup failed type=%s", type(exc).__name__)
 
 
+def _merge_results(results: Sequence[ExecResult]) -> ExecResult:
+    """Итог шагов bootstrap: код первого неуспешного шага (или 0), вывод шагов по порядку."""
+    exit_code = next((item.exit_code for item in results if item.exit_code != 0), 0)
+    stdout = "\n".join(item.stdout.rstrip("\n") for item in results if item.stdout.strip())
+    stderr = "\n".join(item.stderr.rstrip("\n") for item in results if item.stderr.strip())
+    return ExecResult(exit_code=exit_code, stdout=stdout, stderr=stderr)
+
+
+async def _sync_clone(
+    provider: SandboxProvider,
+    sandbox_id: str,
+    *,
+    workspace_id: str,
+    repo_dir: str,
+    repo: RepoConfig,
+    token: SecretStr | None,
+) -> ExecResult:
+    """Клон или fetch одного workspace командами с ключом только этого workspace (D-62).
+
+    Каталога нет — clone; есть клон — set-url origin без ключа, затем fetch по адресу из конфига;
+    каталог без .git — код 1. Ключ передаётся только в env команды clone или fetch.
+    """
+    state = await provider.exec(
+        sandbox_id,
+        f"if [ -d {shlex.quote(repo_dir + '/.git')} ]; then echo repo; "
+        f"elif [ -e {shlex.quote(repo_dir)} ]; then echo other; else echo absent; fi",
+        timeout_s=SHORT_TIMEOUT_SEC,
+    )
+    if state.exit_code != 0:
+        return ExecResult(
+            exit_code=1, stdout="", stderr=f"workspace {workspace_id}: каталог клона не проверен"
+        )
+    kind = state.stdout.strip()
+    if kind == "other":
+        return ExecResult(
+            exit_code=1, stdout="", stderr=f"{repo_dir} существует и не является git-репозиторием"
+        )
+    if token is not None:
+        envs = git_access.git_auth_env(repo, token.get_secret_value())
+    else:
+        envs = git_access.anonymous_git_env()
+    if kind == "repo":
+        progress = ExecResult(exit_code=0, stdout=f"обновляю {workspace_id}", stderr="")
+        remote = await provider.exec(
+            sandbox_id,
+            git_access.set_origin_command(repo, repo_dir),
+            envs=git_access.anonymous_git_env(),
+            timeout_s=SHORT_TIMEOUT_SEC,
+        )
+        if remote.exit_code != 0:
+            return _merge_results([progress, remote])
+        fetched = await provider.exec(
+            sandbox_id,
+            git_access.fetch_command(repo, repo_dir),
+            envs=envs,
+            timeout_s=GIT_TIMEOUT_SEC,
+        )
+        return _merge_results([progress, remote, fetched])
+    # Каталога нет: clone. Если каталог всё же появился, git clone откажет и не перезапишет его.
+    progress = ExecResult(exit_code=0, stdout=f"клонирую {workspace_id}", stderr="")
+    cloned = await provider.exec(
+        sandbox_id,
+        git_access.clone_command(repo, repo_dir),
+        envs=envs,
+        timeout_s=GIT_TIMEOUT_SEC,
+    )
+    return _merge_results([progress, cloned])
+
+
 async def bootstrap(
     provider: SandboxProvider,
     sandbox_id: str,
     config: HarnessConfig,
     *,
     script: str,
-    gitlab_token: SecretStr | None,
+    repo_tokens: Mapping[str, SecretStr],
     memory_ref: str | None = None,
     memory_repo: str | None = None,
     embedding_key: SecretStr | None = None,
 ) -> ExecResult:
-    """Подготавливает песочницу скриптом deploy/sandbox/bootstrap.sh (design 16, 3).
+    """Готовит песочницу в три шага (design 16, 3; D-62) и возвращает их общий результат.
 
-    Скрипт записывается в песочницу как есть и запускается с версиями и парами <id>=<url> из
-    конфига. memory_ref — полный sha коммита memory-agent, memory_repo — его GitHub-репозиторий
-    (D-51): задаются вместе, иначе ValueError до любого вызова провайдера. Тогда bootstrap ставит
-    Docker и memory-agent и индексирует клоны (D-47). Ключи (GitLab и embeddings) передаются только
-    в env этой команды: в скрипт и файлы они не попадают. Возвращает результат команды; код
-    ненулевой — ответственность вызывающего (CLI). Вывод команды вызывающий должен пропустить через
-    redaction, прежде чем показать.
+    1. bootstrap.sh --phase setup без ключей в env: установки, каталоги, mcp.json, memory-agent.
+    2. Для каждого workspace — clone или set-url и fetch отдельными git-командами; ключ из
+       repo_tokens (по id workspace) уходит только в env git-команд своего workspace, без ключа
+       клон анонимный (D-60).
+    3. При памяти — bootstrap.sh --phase memory с EMBEDDING_API_KEY: индексация клонов (D-47).
+
+    Шаг с ненулевым кодом останавливает следующие. Ключ неизвестного workspace и memory_ref без
+    memory_repo (и наоборот) — ValueError до любого вызова провайдера (D-51). Не удалось узнать
+    домашний каталог — SandboxStepError("home"). Вывод вызывающий пропускает через redaction.
     """
     if (memory_ref is None) != (memory_repo is None):
         raise ValueError("memory_ref и memory_repo задаются вместе")
+    known_ids = {ws.id for ws in config.workspaces}
+    if set(repo_tokens) - known_ids:
+        raise ValueError("repo_tokens: ключ для неизвестного workspace")
     args = [
         "--claude-version",
         config.sandbox.claude_code_version,
         "--openspec-version",
         config.sandbox.openspec_version,
     ]
-    # Токен GitLab уходит только на префикс базового адреса GitLab (D-52): заголовок строит скрипт.
-    args += ["--gitlab-url", config.gitlab.base_url]
     if memory_ref is not None and memory_repo is not None:
         args += ["--memory-ref", memory_ref, "--memory-repo", memory_repo]
-    args += [f"{ws.id}={clone_url(config, ws)}" for ws in config.workspaces]
+    args += [f"{ws.id}={git_access.clone_url(ws.repo)}" for ws in config.workspaces]
     script_path = f"{BOOTSTRAP_SCRIPT_PREFIX}{uuid.uuid4().hex}.sh"
-    command = shlex.join(["bash", script_path, *args])
 
-    # GITLAB_TOKEN нужен скрипту, чтобы собрать заголовок git; скрипт снимает его из env сразу.
-    # Без токена (публичные репозитории) переменной нет: клоны идут анонимно.
+    def script_command(phase: str) -> str:
+        return shlex.join(["bash", script_path, "--phase", phase, *args])
+
     # HARNESS_SANDBOX_BOOTSTRAP — защита скрипта от запуска вне песочницы (ревью, D-52).
-    envs = {"GIT_TERMINAL_PROMPT": "0", "HARNESS_SANDBOX_BOOTSTRAP": "1"}
-    if gitlab_token is not None:
-        envs["GITLAB_TOKEN"] = gitlab_token.get_secret_value()
-    if embedding_key is not None:
-        envs["EMBEDDING_API_KEY"] = embedding_key.get_secret_value()
-    # Память без таймаута памяти оборвёт первый memory init на большом проекте.
-    timeout_s = BOOTSTRAP_TIMEOUT_SEC if memory_ref is None else BOOTSTRAP_MEMORY_TIMEOUT_SEC
+    script_envs = {"GIT_TERMINAL_PROMPT": "0", "HARNESS_SANDBOX_BOOTSTRAP": "1"}
+    # Установка Docker и memory-agent дольше обычной: таймаут памяти (D-47).
+    setup_timeout_s = BOOTSTRAP_TIMEOUT_SEC if memory_ref is None else BOOTSTRAP_MEMORY_TIMEOUT_SEC
+    results: list[ExecResult] = []
 
     await provider.connect(sandbox_id)
     try:
         await provider.write_file(sandbox_id, script_path, script)
-        result = await provider.exec(sandbox_id, command, envs=envs, timeout_s=timeout_s)
+        # Установки без ключей в env: postinst apt и lifecycle npm не видят ни одного ключа (D-62).
+        results.append(
+            await provider.exec(
+                sandbox_id,
+                script_command(BOOTSTRAP_PHASE_SETUP),
+                envs=dict(script_envs),
+                timeout_s=setup_timeout_s,
+            )
+        )
+        if results[-1].exit_code == 0:
+            home = await home_dir(provider, sandbox_id)
+            for ws in config.workspaces:
+                results.append(
+                    await _sync_clone(
+                        provider,
+                        sandbox_id,
+                        workspace_id=ws.id,
+                        repo_dir=f"{home}/work/{ws.id}",
+                        repo=ws.repo,
+                        token=repo_tokens.get(ws.id),
+                    )
+                )
+                if results[-1].exit_code != 0:
+                    break
+        if memory_ref is not None and all(item.exit_code == 0 for item in results):
+            memory_envs = dict(script_envs)
+            if embedding_key is not None:
+                memory_envs["EMBEDDING_API_KEY"] = embedding_key.get_secret_value()
+            results.append(
+                await provider.exec(
+                    sandbox_id,
+                    script_command(BOOTSTRAP_PHASE_MEMORY),
+                    envs=memory_envs,
+                    timeout_s=BOOTSTRAP_MEMORY_TIMEOUT_SEC,
+                )
+            )
     finally:
         # Скрипт не остаётся в песочнице и при сбое записи или запуска (ревью, D-52).
         await _remove_bootstrap_script(provider, sandbox_id, script_path)
+    result = _merge_results(results)
     logger.info("sandbox bootstrap finished sandbox=%s exit_code=%s", sandbox_id, result.exit_code)
     return result
 
@@ -482,16 +554,19 @@ async def activate(
     *,
     base_ref: str,
     timeout_min: int,
-    gitlab_token: SecretStr | None,
-    gitlab_base_url: str | None = None,
+    repo: RepoConfig,
+    repo_token: SecretStr | None,
     default_branch: str = "main",
     memory_envs: Mapping[str, str] | None = None,
 ) -> None:
-    """Подключает песочницу, продлевает её жизнь, обновляет репозиторий и создаёт worktree (design
-    10, 4).
+    """Подключает песочницу, продлевает её жизнь, обновляет репозиторий и создаёт worktree.
 
-    Идемпотентно: если worktree уже на ветке task/<id>, worktree add не выполняется. Токен GitLab
-    передаётся только в env git-команд. Исключения — SandboxError (провайдер) или SandboxStepError.
+    design 10, 4. repo и repo_token — репозиторий workspace задачи и его ключ (D-60); без ключа
+    fetch анонимный. Перед fetch origin клона возвращается на адрес из конфига, а fetch идёт по
+    этому адресу с перекрытиями конфига git (D-62): ключ не уходит на адрес или в программу, которые
+    агент записал в клон. Ключ передаётся только в env команды fetch. Идемпотентно: если worktree
+    уже на ветке task/<id>, worktree add не выполняется. Исключения — SandboxError (провайдер) или
+    SandboxStepError.
 
     memory_envs не None — память проекта включена: после fetch индекс клона обновляется командой
     memory sync (D-47). Сбой этого шага не роняет задачу: пишется предупреждение без вывода.
@@ -499,29 +574,32 @@ async def activate(
     """
     if task.workspace_id is None:
         raise SandboxStepError("no_workspace")
-    # Токен без адреса GitLab: заголовок некуда привязать, а без привязки токен не уходит никуда.
-    # Ошибка до любого вызова провайдера (D-52, ревью).
-    if gitlab_token is not None and gitlab_base_url is None:
-        raise ValueError("gitlab_token задан без gitlab_base_url: заголовок некуда привязать")
     await provider.connect(provider_id)
     # Новосоздаваемая песочница Novita живёт по таймауту (D-19): продлеваем на лимит агента + запас.
     await provider.extend_timeout(provider_id, (timeout_min + 10) * 60)
 
     home = await home_dir(provider, provider_id)
-    repo = f"{home}/work/{task.workspace_id}"
+    repo_dir = f"{home}/work/{task.workspace_id}"
     worktree = worktree_dir(home, task.id)
     branch = f"task/{task.id}"
-    # Заголовок только на префикс базового адреса GitLab (D-52). Без адреса заголовка нет:
-    # fetch пойдёт анонимно и упадёт на приватном репозитории, токен никуда не уходит.
-    # Без токена (публичный репозиторий) заголовка нет: fetch анонимный (D-52).
-    if gitlab_token is not None and gitlab_base_url is not None:
-        git_envs = git_auth_env(gitlab_base_url, gitlab_token.get_secret_value())
+    # Заголовок — только на префикс адреса репозитория этого workspace (D-60), без ключа — анонимно.
+    # set-url идёт без ключа; fetch — по адресу из конфига, а не по имени origin (D-62).
+    if repo_token is not None:
+        git_envs = git_access.git_auth_env(repo, repo_token.get_secret_value())
     else:
-        git_envs = {"GIT_TERMINAL_PROMPT": "0"}
+        git_envs = git_access.anonymous_git_env()
     await _exec_ok(
         provider,
         provider_id,
-        f"git -C {shlex.quote(repo)} fetch origin",
+        git_access.set_origin_command(repo, repo_dir),
+        reason="remote",
+        envs=git_access.anonymous_git_env(),
+        timeout_s=SHORT_TIMEOUT_SEC,
+    )
+    await _exec_ok(
+        provider,
+        provider_id,
+        git_access.fetch_command(repo, repo_dir),
         reason="fetch",
         envs=git_envs,
         timeout_s=GIT_TIMEOUT_SEC,
@@ -532,7 +610,7 @@ async def activate(
             provider_id,
             task,
             home=home,
-            repo=repo,
+            repo=repo_dir,
             default_branch=default_branch,
             envs=memory_envs,
         )
@@ -553,7 +631,7 @@ async def activate(
     await _exec_ok(
         provider,
         provider_id,
-        f"git -C {shlex.quote(repo)} worktree add -B {shlex.quote(branch)} "
+        f"git -C {shlex.quote(repo_dir)} worktree add -B {shlex.quote(branch)} "
         f"{shlex.quote(worktree)} {shlex.quote(base_ref)}",
         reason="worktree",
         timeout_s=GIT_TIMEOUT_SEC,
