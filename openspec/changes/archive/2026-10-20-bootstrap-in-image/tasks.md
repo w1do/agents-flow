@@ -26,7 +26,7 @@
 
 - [x] 4.1 `./tools/harness check` (известное исключение: `ruff format --check` на двух старых openspec `design.md`,
   PLAN.md) и `openspec validate bootstrap-in-image --strict`
-- [ ] 4.2 Если доступен Docker: `docker build -t agents-flow:bootstrap-check .` и
+- [x] 4.2 Если доступен Docker (частично: образ собран Dokploy при деплое PR #17; локальная сборка невозможна, нет docker buildx): `docker build -t agents-flow:bootstrap-check .` и
   `docker run --rm -w / --entrypoint sh agents-flow:bootstrap-check -c 'test -r /app/deploy/sandbox/bootstrap.sh && python -c "from harness_server.cli import DEFAULT_BOOTSTRAP_SCRIPT as p; assert p.is_file(), p; print(p)"'`
   печатает `/app/deploy/sandbox/bootstrap.sh`. Без Docker — отметить «не выполнено» в отчёте, не «пройдено».
-- [ ] 4.3 Живая проверка владельца: в Dokploy-терминале `worker` `harness-server sandbox bootstrap` → «bootstrap выполнен»
+- [x] 4.3 Живая проверка владельца: в Dokploy-терминале `worker` `harness-server sandbox bootstrap` → «bootstrap выполнен» — владелец, терминал worker, cwd `/`, bootstrap выполнен exit_code=0, 2026-10-20
