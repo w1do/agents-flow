@@ -39,6 +39,16 @@
 Сборка без реестра: образ каждый раз пересобирается при деплое из текущего `main`. Когда появится реестр GitLab (CI),
 `build` в Compose и `HARNESS_IMAGE` переводятся на `registry.gitlab.com/…:main` (см. раздел «CI»).
 
+### Выкат обновлений
+
+Панель Dokploy — `https://deploy.w1do.ru`, проект `agents-flow`, Compose `harness`. Автодеплой на push в `main`
+выключен: слияние PR прод не меняет, выкат — только кнопкой Deploy или API (`POST /api/compose.deploy` с
+`composeId` стека, заголовок `x-api-key` — ключ из vault `Deploy/Dokploy/prod`; File Mount правится через
+`POST /api/mounts.update`). Поэтому изменение, ломающее `harness.yaml`, выкатывается так: слить PR → поправить
+File Mount → Deploy (так выкачен D-60). После деплоя: `https://flow.w1do.ru/health` и, если менялась песочница,
+`harness-server sandbox bootstrap` в терминале контейнера `server` или `worker`. Ключ Dokploy в документацию и
+репозиторий не пишется.
+
 ## CI (`.gitlab-ci.yml`)
 
 ```
