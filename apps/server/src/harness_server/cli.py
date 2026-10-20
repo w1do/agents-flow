@@ -27,6 +27,12 @@ from harness_server.services.webhook import register_webhook, webhook_url
 from harness_server.settings import Settings, SettingsError, load_settings
 from harness_server.worker import serve_worker
 
+# Корень приложения: uv ставит workspace editable, поэтому cli.py лежит в
+# <root>/apps/server/src/harness_server/ и в репозитории, и в образе (/app). Путь не зависит от cwd:
+# терминал Dokploy открывается в / (bootstrap-in-image, D-63).
+_APP_ROOT = Path(__file__).resolve().parents[4]
+DEFAULT_BOOTSTRAP_SCRIPT = _APP_ROOT / "deploy" / "sandbox" / "bootstrap.sh"
+
 app = typer.Typer(
     help="agents-flow harness: сервер, worker, миграции, проверка конфигурации.",
     no_args_is_help=True,
@@ -234,7 +240,7 @@ async def _resolve_repo_keys(
 
 
 @sandbox_app.command("bootstrap")
-def sandbox_bootstrap(script: Path = Path("deploy/sandbox/bootstrap.sh")) -> None:
+def sandbox_bootstrap(script: Path = DEFAULT_BOOTSTRAP_SCRIPT) -> None:
     """Подготавливает песочницу: установки, клоны workspace и память (bootstrap.sh и git, D-62).
 
     Ключи репозиториев (repo.access_ref) и embeddings берутся из vault по ссылкам harness.yaml и

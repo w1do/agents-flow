@@ -14,7 +14,7 @@
 | `harness-server migrate` | `alembic upgrade head`, нужен `DATABASE_URL` |
 | `harness-server telegram set-webhook` | Регистрирует webhook в Telegram: адрес `HARNESS_PUBLIC_URL` + `/telegram/webhook` (только https), секрет из `TELEGRAM_WEBHOOK_SECRET`. Выполняется после деплоя и при смене адреса; ошибки — код 1 без токена и секрета в выводе |
 | `harness-server sandbox status` | Строка песочницы из `harness.yaml`: статус и закреплённая задача (нужен `DATABASE_URL`) |
-| `harness-server sandbox bootstrap [--script deploy/sandbox/bootstrap.sh]` | Подготавливает песочницу скриптом: версии `claude`/`openspec`, каталоги, клоны. Нужны `NOVITA_API_KEY`, `GITLAB_TOKEN`; вывод проходит redaction |
+| `harness-server sandbox bootstrap [--script PATH]` | Подготавливает песочницу скриптом: версии `claude`/`openspec`, каталоги, клоны. По умолчанию `deploy/sandbox/bootstrap.sh` от корня приложения (`/app` в образе), не от cwd. Нужен `NOVITA_API_KEY`; ключи репозиториев и embeddings берутся из vault по ссылкам `repo.access_ref` (D-60); вывод проходит redaction |
 | `harness-server sandbox pause` / `resume` | Пауза и возобновление песочницы. Пауза отказывает (код 1), если за песочницей закреплена задача; `resume` сбрасывает `error` в `paused` после успешного connect, если за песочницей не закреплена задача; иначе — ручной разбор (см. [docs/deployment.md](../../docs/deployment.md)) |
 
 ## HTTP-эндпоинты задач

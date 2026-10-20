@@ -17,11 +17,11 @@
   },
   {
     "relativePath": "ARCHITECTURE.md",
-    "summary": "Архитектура харнесса: §7 авторизация git (клоны и fetch делает сервер отдельной командой, фазы bootstrap, перекрытия конфига, остаточный риск R-1), §9 конфигурация workspaces[].repo (D-60, D-62).",
+    "summary": "Архитектура harness: компоненты, статусы, ENV и эндпоинты; раздел git-провайдера (GitHub или GitLab по workspace, D-60) и авторизации git по префиксу репозитория (D-62).",
     "role": "doc",
     "contentHash": "00785d1a4522c864390cc980a681107030e0b21b5c1b52c88e7060c1ae46189b",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:07:23.187Z"
+    "updatedAt": "2026-10-20T04:19:53.295Z"
   },
   {
     "relativePath": "CLAUDE.md",
@@ -33,27 +33,27 @@
   },
   {
     "relativePath": "Dockerfile",
-    "summary": "Multi-stage образ сервера: сборка uv 0.13.1, Python 3.12, запуск non-root пользователем. Общий образ для server, worker и migrate.",
+    "summary": "Multi-stage образ (builder uv sync, runtime app). Builder копирует deploy/sandbox в /app/deploy/sandbox для bootstrap песочницы (bootstrap-in-image, D-63).",
     "role": "config",
-    "contentHash": "0e93011db73f0f34b6ad26f369d195dff7664cc6ab8c0b522cdc711451c48095",
+    "contentHash": "7df5bd831bf7361eaf10ee570f2f00ee662346d67bf1d6f64c7a064c4d07e593",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:59:48.754Z"
+    "updatedAt": "2026-10-20T04:54:59.890Z"
   },
   {
     "relativePath": "PLAN.md",
-    "summary": "План проекта: 6e git-providers в review (ждёт live владельца), Следующее, ограничение ruff format на openspec design.md, строка keyed-git-outside-sandbox (R-1) в волне 5.",
+    "summary": "План MVP и таблица изменений OpenSpec. Строка 6f bootstrap-in-image (статус review) после 6e git-providers (D-63).",
     "role": "doc",
-    "contentHash": "55f0c4f9cffc9765c6995fc0c4811340559a55f69d5e5a9983c1731c461b404f",
+    "contentHash": "152f6aacd758e2df35d2b772e73e14857450fe37beed77e30ae76d13646b6052",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:16:26.469Z"
+    "updatedAt": "2026-10-20T04:55:00.083Z"
   },
   {
     "relativePath": "apps/server/README.md",
-    "summary": "README сервера: запуск, тесты и настройки harness.yaml, включая пункт про repo.access_ref (ключ записи workspace, поведение без ключа, env git-команд) (D-60, D-62).",
+    "summary": "README сервера и worker: команды CLI, таблица sandbox bootstrap с путём по умолчанию от корня приложения и ключами из vault (D-60, D-63).",
     "role": "doc",
-    "contentHash": "343bd412ab02232524433f2fba1e3ee891bf6121d094141bd864c5650862d05f",
+    "contentHash": "0daa0e306bd46041853b8c75eb065dfcbd2290c043c4df09415d869bde17d929",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:07:23.245Z"
+    "updatedAt": "2026-10-20T04:55:00.007Z"
   },
   {
     "relativePath": "apps/server/pyproject.toml",
@@ -305,11 +305,11 @@
   },
   {
     "relativePath": "apps/server/src/harness_server/cli.py",
-    "summary": "CLI harness-server: команда sandbox bootstrap берёт ключи из vault в env, вывод через redaction, SandboxStepError выводится как причина с кодом 1 (D-62).",
+    "summary": "Typer CLI harness-server. DEFAULT_BOOTSTRAP_SCRIPT от _APP_ROOT = parents[4] (корень приложения, не cwd) для sandbox bootstrap; --script переопределяет (D-63).",
     "role": "module",
-    "contentHash": "84925afbfbbb2faad92829cda1359e33676e7594f4384bded77667d9c3449f94",
+    "contentHash": "bec445edda68076be2cc1dee6102869947545e6bb8350b8db4597c672ddefaa1",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:07:22.930Z"
+    "updatedAt": "2026-10-20T04:54:59.919Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/config.py",
@@ -425,11 +425,11 @@
   },
   {
     "relativePath": "apps/server/src/harness_server/security/redaction.py",
-    "summary": "Redacts secrets before output leaves the system: redact(text, extra_values) replaces exact values ≥8 chars and token patterns (Telegram, GitLab, GitHub, Anthropic, Bearer, Basic, URL passwords).",
+    "summary": "Удаление секретов из текста, уходящего наружу (Telegram, логи, БД): шаблоны токенов GitHub и GitLab, точные значения из настроек, заголовок Basic для git (D-62).",
     "role": "module",
     "contentHash": "4353c3493f938b4b00045857c0cd81944c52b335464e2da1183cdc0e39f6f017",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:14:58.640Z"
+    "updatedAt": "2026-10-20T04:19:53.412Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/security/tokens.py",
@@ -513,11 +513,11 @@
   },
   {
     "relativePath": "apps/server/src/harness_server/services/sandboxes.py",
-    "summary": "Жизненный цикл песочницы: bootstrap в три шага (setup без ключей, _sync_clone на workspace, memory), activate с fetch по адресу из конфига, _merge_results, SandboxStepError (D-62).",
+    "summary": "Сервис песочниц: bootstrap в фазах setup и memory, activate с fetch по адресу репозитория и ключом workspace, запуск агента, очистка (mvp-06, git-providers D-60, D-62).",
     "role": "module",
     "contentHash": "9cb6cebf190f2560d9bf8af281bdcc4a2265107cc6396a86a03830a55aaed70c",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:07:22.888Z"
+    "updatedAt": "2026-10-20T04:19:53.437Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/secrets.py",
@@ -617,19 +617,19 @@
   },
   {
     "relativePath": "apps/server/src/harness_server/worker/dispatcher.py",
-    "summary": "Диспетчер песочницы: резерв задачи, ключ записи из vault по repo.access_ref до активации, секреты токена и заголовка в redaction runner, без ключа — error (D-60, D-62).",
+    "summary": "Диспетчер песочницы: восстановление, reserve, activate, run, cleanup, pause (mvp-06); при activate ключ репозитория берётся по workspace (D-62).",
     "role": "module",
     "contentHash": "6fe11e0f478bacdf32e5ce413716944d482c9ff3489f06c05a3b55a09fe26756",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:07:22.908Z"
+    "updatedAt": "2026-10-20T04:19:53.460Z"
   },
   {
     "relativePath": "apps/server/tests/conftest.py",
-    "summary": "Общие фикстуры тестов: фабрика BotContext и WorkspaceConfig с RepoConfig (gitlab group/demo, group/shop).",
+    "summary": "Общие фикстуры тестов: изоляция ENV, пример harness.yaml, Postgres (TEST_DATABASE_URL или контейнер testcontainers).",
     "role": "test",
     "contentHash": "af2a61eab1179f7947756942100ec6ee4b8ffcbb99732df212f7d5521b3bce1a",
     "author": "agent",
-    "updatedAt": "2026-10-20T02:09:04.052Z"
+    "updatedAt": "2026-10-20T04:19:53.477Z"
   },
   {
     "relativePath": "apps/server/tests/test_agent_result.py",
@@ -641,19 +641,19 @@
   },
   {
     "relativePath": "apps/server/tests/test_agent_runtime_live.py",
-    "summary": "Live-тест среды агента: activate с repo и repo_token для локального origin, заголовок не уходит на чужой адрес.",
+    "summary": "Живой тест рантайма агента (mvp-06, 6.12) на настоящей песочнице; маркер live, по умолчанию не запускается.",
     "role": "test",
     "contentHash": "10efd83b0331bbdf555a15a80d5a8029ed84aa1091474ae2b78f4069bc9cfe55",
     "author": "agent",
-    "updatedAt": "2026-10-20T02:09:04.070Z"
+    "updatedAt": "2026-10-20T04:19:53.505Z"
   },
   {
     "relativePath": "apps/server/tests/test_cli.py",
-    "summary": "Тесты CLI: sandbox bootstrap берёт ключи из vault в env клона, анонимный клон с предупреждением, причина SandboxStepError в выводе с кодом 1, редакция base64 заголовка (D-62).",
+    "summary": "Тесты CLI через CliRunner: песочница, vault-ключи, bootstrap. Добавлены test_default_bootstrap_script_is_repo_file и test_sandbox_bootstrap_default_script_does_not_depend_on_cwd (D-63).",
     "role": "test",
-    "contentHash": "e91fec1aeeb59bbb6e5849ab253d067deb3964f657c6a76d06cea0e54d654541",
+    "contentHash": "63dfc8c8a437e053b84d487c9e0c35e1398fbfe4a24d9acb54cdaff582243562",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:07:23.161Z"
+    "updatedAt": "2026-10-20T04:54:59.943Z"
   },
   {
     "relativePath": "apps/server/tests/test_compose.py",
@@ -665,27 +665,35 @@
   },
   {
     "relativePath": "apps/server/tests/test_config.py",
-    "summary": "Тесты загрузки harness.yaml: RepoConfig, legacy-форма, отклонение base_url с метками «.»/«-» и принятие IP:порт с путём (D-62).",
+    "summary": "Тесты harness.yaml: сценарии platform-config (секреты не в YAML, уникальность id workspace, repo с provider, base_url, access_ref, отказ от gitlab:).",
     "role": "test",
     "contentHash": "66dc54d85dfc296ae0052497f561c34edd0670398383bbae38ffa4dc0a136d45",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:07:23.002Z"
+    "updatedAt": "2026-10-20T04:19:53.528Z"
   },
   {
     "relativePath": "apps/server/tests/test_dispatcher.py",
-    "summary": "Тесты диспетчера: fetch привязан к префиксу репозитория по fetch_command, секреты токена и base64 редактируются из вывода агента (D-60, D-62).",
+    "summary": "Тесты диспетчера песочницы на FakeSandbox и настоящих коммитах Postgres (mvp-06, 4.1).",
     "role": "test",
     "contentHash": "23858134e96234869c293ce1852a95064cc2bd868987925eba8f6c5962510924",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:07:23.133Z"
+    "updatedAt": "2026-10-20T04:19:53.551Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_dockerfile.py",
+    "summary": "Текстовые тесты образа: builder копирует deploy/sandbox, .dockerignore не исключает скрипт, Dockerfile без --no-editable (D-63). Читает файлы из корня репо, без Docker.",
+    "role": "test",
+    "contentHash": "c729f51fa04e67541c8b965d9e5cf6efe2421bfb661f0668918b0e8a242b72a8",
+    "author": "agent",
+    "updatedAt": "2026-10-20T04:54:59.967Z"
   },
   {
     "relativePath": "apps/server/tests/test_git_access.py",
-    "summary": "Тесты git_access: env с перекрытиями, команды clone/set-url/fetch, redaction; интеграционные тесты с настоящим git (пропуск при git ниже 2.32) на приоритет конфига (D-62).",
+    "summary": "Тесты services/git_access: адрес клона без учётных данных, заголовок Basic на префикс репозитория, перекрытия GIT_CONFIG_*, анонимный env (D-52, D-60, D-62).",
     "role": "test",
     "contentHash": "ea80e43ca5add6ea28abfe6bb833964eafcd074522e60564679f00f8ba7cafbc",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:07:30.213Z"
+    "updatedAt": "2026-10-20T04:19:53.585Z"
   },
   {
     "relativePath": "apps/server/tests/test_health.py",
@@ -753,11 +761,11 @@
   },
   {
     "relativePath": "apps/server/tests/test_polza_live.py",
-    "summary": "Live-тест Polza: WorkspaceConfig с RepoConfig (gitlab group/demo, group/shop) вместо gitlab_project.",
+    "summary": "Живой тест маршрутизатора Polza с ключом и моделью владельца из ENV; без них тест пропускается, значения в коде не хранятся.",
     "role": "test",
     "contentHash": "98166f9b87ec36d12e9f6964b362488abe51c739fbb11614e5596205d2a03b3c",
     "author": "agent",
-    "updatedAt": "2026-10-20T02:09:04.095Z"
+    "updatedAt": "2026-10-20T04:19:53.610Z"
   },
   {
     "relativePath": "apps/server/tests/test_recovery.py",
@@ -769,11 +777,11 @@
   },
   {
     "relativePath": "apps/server/tests/test_redaction.py",
-    "summary": "Тесты redaction: Basic любого регистра, токены после «_», пароль в URL, Bearer и точные значения extra_values (D-62).",
+    "summary": "Тесты фильтра секретов: шаблоны токенов, включая GitHub и GitLab, и точные значения из настроек.",
     "role": "test",
     "contentHash": "47d229ec4d9af55f924c82bb2109456fcf730ea833e402ea6469f938b5229ddc",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:07:23.043Z"
+    "updatedAt": "2026-10-20T04:19:53.638Z"
   },
   {
     "relativePath": "apps/server/tests/test_routing_models.py",
@@ -785,11 +793,11 @@
   },
   {
     "relativePath": "apps/server/tests/test_routing_service.py",
-    "summary": "Тесты маршрутизации: workspace demo и shop с RepoConfig вместо gitlab_project.",
+    "summary": "Тесты сервиса маршрутизации: промпт, разбор ответа, классификация с фейковым адаптером, запись в routings.",
     "role": "test",
     "contentHash": "4cf086f5e1e9951ab501f4c646f9c79f945f3208b336284a609c1158d6d13fc8",
     "author": "agent",
-    "updatedAt": "2026-10-20T02:09:04.116Z"
+    "updatedAt": "2026-10-20T04:19:53.669Z"
   },
   {
     "relativePath": "apps/server/tests/test_sandbox_bootstrap.py",
@@ -897,11 +905,11 @@
   },
   {
     "relativePath": "apps/server/tests/test_telegram_render.py",
-    "summary": "Тесты рендера Telegram: фабрика WorkspaceConfig с RepoConfig вместо gitlab_project.",
+    "summary": "Тесты чистых функций рендера Telegram: заголовки, строки этапов, callback_data и клавиатура.",
     "role": "test",
     "contentHash": "d2377ddcccecf2a0e555414d4a96e75583b42c397097758728ff80ed0997d64f",
     "author": "agent",
-    "updatedAt": "2026-10-20T02:09:04.187Z"
+    "updatedAt": "2026-10-20T04:19:53.704Z"
   },
   {
     "relativePath": "apps/server/tests/test_telegram_webhook.py",
@@ -961,11 +969,11 @@
   },
   {
     "relativePath": "config/harness.example.yaml",
-    "summary": "Пример harness.yaml: workspace demo с блоком repo (gitlab, group/demo), закомментированный пример GitHub-workspace; секция gitlab удалена.",
+    "summary": "Пример несекретного harness.yaml: workspaces[].repo (provider, base_url, project, access_ref) вместо gitlab:, секреты только ссылками на vault.",
     "role": "config",
     "contentHash": "f0eb008503f24a8a68e7ecfcb3f9632fd4e10e7b16da2091b9008c08bbe97d3a",
     "author": "agent",
-    "updatedAt": "2026-10-20T02:08:54.826Z"
+    "updatedAt": "2026-10-20T04:19:53.738Z"
   },
   {
     "relativePath": "db/README.md",
@@ -1025,19 +1033,19 @@
   },
   {
     "relativePath": "deploy/sandbox/bootstrap.sh",
-    "summary": "Sandbox bootstrap script (mvp-06): installs Docker and acl, writes MCP config, sets up memory_ref, ensure_acl and setfacl on docker.sock.",
-    "role": "config",
+    "summary": "Скрипт bootstrap песочницы: фазы --phase setup и memory, клон и fetch по ключу workspace через заголовок, проверки HOME и секретных env (D-62).",
+    "role": "other",
     "contentHash": "5b926de6a560ef7d525f1858dabd1cf48405f3c2de48dc2a8114c1132a719ecb",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:14:55.879Z"
+    "updatedAt": "2026-10-20T04:19:53.802Z"
   },
   {
     "relativePath": "docker-compose.yml",
-    "summary": "Compose стек: общий блок ENV сервера без GITLAB_URL/GITLAB_TOKEN (D-60); остальные ENV без изменений.",
+    "summary": "Стек harness для Dokploy: сервисы migrate, server и worker; Postgres в отдельном стеке deploy/db.",
     "role": "config",
     "contentHash": "5af122e6796f6acae8f0d74224fd39b62e0c5b38bd171197e5879564f0f21403",
     "author": "agent",
-    "updatedAt": "2026-10-20T03:31:24.439Z"
+    "updatedAt": "2026-10-20T04:19:53.827Z"
   },
   {
     "relativePath": "docs/README.md",
@@ -1049,19 +1057,19 @@
   },
   {
     "relativePath": "docs/decisions.md",
-    "summary": "ADR-лог: D-60 провайдер репозитория, D-62 ключ git в песочнице; в D-62 ответ владельца 2026-10-19 — риск R-1 принят для 6e.",
+    "summary": "ADR-лог: таблица решений D-NN. Добавлен D-63: скрипт bootstrap в образе, путь по умолчанию от корня приложения через parents[4], без ENV.",
     "role": "doc",
-    "contentHash": "da4b555336065299a5e39508404f521f53aedd2189502726d5a74fc1b95e5cf5",
+    "contentHash": "f02890809ef92bd08c66a5d2defca8b163769ac9f2b00258985ca1ca8ac92e78",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:16:26.381Z"
+    "updatedAt": "2026-10-20T04:55:00.050Z"
   },
   {
     "relativePath": "docs/deployment.md",
-    "summary": "Деплой Dokploy и bootstrap песочницы: три шага (setup без ключей, клоны сервером с ключом workspace, memory), анонимный клон без ключа (D-62), переход на D-60.",
+    "summary": "Инструкция деплоя Dokploy и GitLab CI. Шаг 3 «Первый запуск» описывает sandbox bootstrap из терминала Dokploy и путь /app/deploy/sandbox/bootstrap.sh (D-63).",
     "role": "doc",
-    "contentHash": "d78b13036f88230b02cc8aee72de86e74fb79e5e29959624149de000572ad6e2",
+    "contentHash": "4820b19216d658b77a00ca8e09ec89238ff81a3742e597a5b604166b7a4d7cd9",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:16:26.351Z"
+    "updatedAt": "2026-10-20T04:54:59.989Z"
   },
   {
     "relativePath": "docs/development.md",
@@ -1073,11 +1081,11 @@
   },
   {
     "relativePath": "docs/glossary.md",
-    "summary": "Глоссарий: термин MR (merge request GitLab или pull request GitHub, change_request_label) и провайдер репозитория GitProviderName (D-60).",
+    "summary": "Словарь терминов проекта: workspace, задача, песочница, репозиторий и провайдер git (GitHub или GitLab) с принятыми названиями.",
     "role": "doc",
     "contentHash": "4fe98952876064a4bcd417eb02e9979c3cb738439d6272f193af7062556d0b7f",
     "author": "agent",
-    "updatedAt": "2026-10-20T02:08:55.100Z"
+    "updatedAt": "2026-10-20T04:19:53.891Z"
   },
   {
     "relativePath": "docs/mcp-agents-flow.md",
@@ -1342,6 +1350,38 @@
     "contentHash": "e5286d88b7cc13f3865c9fe6d831d9d92d2d4e529802e90804d5a5fbe06c6f2b",
     "author": "agent",
     "updatedAt": "2026-10-19T19:07:48.332Z"
+  },
+  {
+    "relativePath": "openspec/changes/bootstrap-in-image/design.md",
+    "summary": "Design bootstrap-in-image: cli.py _APP_ROOT=Path(__file__).parents[4], DEFAULT_BOOTSTRAP_SCRIPT; Dockerfile COPY deploy/sandbox; тесты test_cli и test_dockerfile.py; docs, PLAN 6f, D-63",
+    "role": "doc",
+    "contentHash": "c66c5af6e67a217501580e948210e18814f1764d0f41920a8b39143fa0891b88",
+    "author": "agent",
+    "updatedAt": "2026-10-20T04:49:23.063Z"
+  },
+  {
+    "relativePath": "openspec/changes/bootstrap-in-image/proposal.md",
+    "summary": "OpenSpec 6f bootstrap-in-image: sandbox bootstrap падает в Dokploy (нет deploy/ в образе, путь от cwd). COPY deploy/sandbox в Dockerfile, DEFAULT_BOOTSTRAP_SCRIPT от корня, без ENV, D-63",
+    "role": "doc",
+    "contentHash": "6e2f0f797d1d680520f24ceda4e23f525714100dd8d13bed77a348b06dd0c140",
+    "author": "agent",
+    "updatedAt": "2026-10-20T04:49:23.042Z"
+  },
+  {
+    "relativePath": "openspec/changes/bootstrap-in-image/specs/sandbox-profile/spec.md",
+    "summary": "Delta sandbox-profile: ADDED требование «Скрипт bootstrap в образе сервера» — /app/deploy/sandbox/bootstrap.sh, путь от корня приложения не от cwd, --script, без новой ENV",
+    "role": "doc",
+    "contentHash": "db19db82af30daed1e0af48ec1a51646f04b81c737e828f46f961b70dc72311b",
+    "author": "agent",
+    "updatedAt": "2026-10-20T04:49:23.141Z"
+  },
+  {
+    "relativePath": "openspec/changes/bootstrap-in-image/tasks.md",
+    "summary": "Чеклист OpenSpec bootstrap-in-image (D-63): задачи 1.1–4.1 отмечены выполненными; 4.2 (Docker build) и 4.3 (живая проверка владельца) открыты.",
+    "role": "doc",
+    "contentHash": "ad97917ddbfb779f37f24452fa89e6ae5b764052fa4bb9ca4156e15c96a1481f",
+    "author": "agent",
+    "updatedAt": "2026-10-20T04:55:00.101Z"
   },
   {
     "relativePath": "openspec/changes/budget-usage/.openspec.yaml",
@@ -1809,11 +1849,11 @@
   },
   {
     "relativePath": "openspec/changes/git-providers/specs/sandbox-runtime/spec.md",
-    "summary": "Дельта sandbox-runtime: ключ repo.access_ref перед задачей (error repo_access_ref), redaction токенов GitHub/GitLab, Basic любой регистр, пароль в URL",
+    "summary": "Дельта sandbox-runtime (ADDED) для git-providers: требования к запуску песочницы и bootstrap с ключами репозиториев по workspace.",
     "role": "doc",
     "contentHash": "b6528fdc54195237517645fcdd916f357c51b5ef9893f6bb120f7b46d9359e7d",
     "author": "agent",
-    "updatedAt": "2026-10-20T03:53:00.400Z"
+    "updatedAt": "2026-10-20T04:19:53.926Z"
   },
   {
     "relativePath": "openspec/changes/git-providers/tasks.md",
