@@ -75,7 +75,7 @@ Job `deploy:dokploy` не добавляет `curl -v` и `--trace`: при ош
    из конфига и парами `<workspace_id>=<clone_url>`. Bootstrap идёт в три шага: `--phase setup` без ключей, затем
    клоны и fetch делает сервер отдельной git-командой на каждый workspace с ключом только этого workspace, затем
    `--phase memory` с индексацией памяти (только с `EMBEDDING_API_KEY`). Workspace без ключа клонируется анонимно (D-62).
-   Скрипт идемпотентен: повторный запуск безопасен.
+   Скрипт идемпотентен: повторный запуск безопасен. Команда запускается в терминале Dokploy контейнера `server` или `worker` (из любого каталога): `harness-server sandbox bootstrap`; скрипт лежит в образе — `/app/deploy/sandbox/bootstrap.sh`, другой путь — `--script <путь>` (D-63).
 4. `harness-server sandbox pause` — песочница уходит в простой до первой задачи.
 
 ### Песочница в `error` с закреплённой задачей

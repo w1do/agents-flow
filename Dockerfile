@@ -28,6 +28,8 @@ COPY apps ./apps
 COPY shared ./shared
 COPY db ./db
 COPY alembic.ini ./
+# Скрипт bootstrap песочницы: CLI читает его из образа (bootstrap-in-image, D-63).
+COPY deploy/sandbox ./deploy/sandbox
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --package harness-server

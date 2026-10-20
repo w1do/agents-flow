@@ -14,7 +14,7 @@ from harness_server import wiring
 from harness_server.adapters.novita import FakeSandbox
 from harness_server.adapters.telegram import FakeTelegramClient, TelegramError
 from harness_server.adapters.vault import FakeVault, VaultError
-from harness_server.cli import _configure_logging, app
+from harness_server.cli import DEFAULT_BOOTSTRAP_SCRIPT, _configure_logging, app, sandbox_bootstrap
 from harness_server.config import load_config
 from harness_server.services import git_access, sandboxes
 from harness_server.services.tasks import create_task
@@ -374,6 +374,46 @@ def test_sandbox_bootstrap_takes_keys_from_vault_into_env(
     expected = f"--memory-ref {MEMORY_REF} --memory-repo w1do/memory-agent"
     assert expected in " ".join(e.cmd or "" for e in fake.journal)
     assert VAULT_EMBEDDING not in result.output
+
+
+def test_default_bootstrap_script_is_repo_file() -> None:
+    expected = Path(__file__).resolve().parents[3] / "deploy" / "sandbox" / "bootstrap.sh"
+
+    assert expected == DEFAULT_BOOTSTRAP_SCRIPT
+    assert DEFAULT_BOOTSTRAP_SCRIPT.is_absolute()
+    assert DEFAULT_BOOTSTRAP_SCRIPT.is_file()
+    assert inspect.signature(sandbox_bootstrap).parameters["script"].default == (
+        DEFAULT_BOOTSTRAP_SCRIPT
+    )
+
+
+def test_sandbox_bootstrap_default_script_does_not_depend_on_cwd(
+    valid_env: dict[str, str],
+    monkeypatch: MonkeyPatch,
+    migrated_database_url: str,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", migrated_database_url)
+    monkeypatch.delenv("GITLAB_TOKEN", raising=False)
+    monkeypatch.setenv(
+        "HARNESS_CONFIG", str(_write_vault_config(tmp_path, valid_env, memory=False))
+    )
+    fake = FakeSandbox(
+        sandbox_id=load_config(Path(valid_env["HARNESS_CONFIG"])).sandbox.provider_id
+    )
+    fake.respond('printf %s "$HOME"', stdout="/home/sbx")
+    vault = FakeVault({VaultRef("demo", "gitlab", "main"): VAULT_GITLAB})
+    monkeypatch.setattr(wiring, "build_sandbox_provider", lambda settings: fake)
+    monkeypatch.setattr(wiring, "build_vault", lambda settings: vault)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+
+    result = runner.invoke(app, ["sandbox", "bootstrap"])
+
+    assert result.exit_code == 0, result.output
+    assert "не читается скрипт" not in result.output
+    assert "bootstrap выполнен" in result.output
 
 
 def test_sandbox_bootstrap_vault_error_exits_before_provider(
