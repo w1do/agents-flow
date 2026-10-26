@@ -15,17 +15,22 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import pytest_asyncio
+from catalog import DEMO, seed_workspaces
 from harness_server.adapters.sandbox import ExecResult, FakeSandbox
 from harness_server.adapters.vault import FakeVault, McpSecretVault, VaultError
 from harness_server.config import HarnessConfig, SandboxMemoryConfig, load_config
 from harness_server.db.models import Task, TaskToken
 from harness_server.db.session import create_engine, create_session_factory
 from harness_server.services import git_access, sandboxes
+from harness_server.services.projects import update_project
 from harness_server.services.tasks import create_task, get_task, list_task_events
 from harness_server.settings import Settings, load_settings
 from harness_server.vault_ref import VaultRef
+from harness_server.worker import _build_dispatch
 from harness_server.worker.dispatcher import DispatchContext, build_dispatch_context, dispatch_once
 from harness_server.worker.pipeline import AgentRunner, Outcome
+from harness_shared.projects import ProjectRepo, ProjectUpdate
 from harness_shared.sandboxes import AgentRole, SandboxStatus
 from harness_shared.tasks import TaskKind, TaskSource, TaskStatus
 from pydantic import SecretStr
@@ -35,6 +40,24 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 Factory = async_sessionmaker[AsyncSession]
+
+
+@pytest_asyncio.fixture(autouse=True, loop_scope="session")
+async def _demo_project(committed_session_factory: Factory) -> None:
+    """Проект demo заводится в каталог до каждого теста: диспетчер берёт access_ref из БД (D-65)."""
+    await seed_workspaces(committed_session_factory, DEMO)
+
+
+async def _drop_access_ref(factory: Factory) -> None:
+    """Снимает ключ записи у demo: задача такого проекта должна уходить в error (D-60)."""
+    async with factory() as session:
+        await update_project(
+            session,
+            "demo",
+            ProjectUpdate(repo=ProjectRepo(provider="gitlab", project="group/demo")),
+        )
+
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG: HarnessConfig = load_config(REPO_ROOT / "config" / "harness.example.yaml")
 PROVIDER_ID = CONFIG.sandbox.provider_id
@@ -750,13 +773,11 @@ MEMORY_REF = "0123456789abcdef0123456789abcdef01234567"
 def _vault_config(*, memory: bool) -> HarnessConfig:
     """Конфиг с ключом записи workspace из vault; memory — блок памяти с ключом embeddings из
     vault."""
-    repo = CONFIG.workspaces[0].repo.model_copy(update={"access_ref": GITLAB_REF})
-    workspace = CONFIG.workspaces[0].model_copy(update={"repo": repo})
     sandbox_update: dict[str, Any] = {}
     if memory:
         sandbox_update["memory"] = SandboxMemoryConfig(embedding_ref=EMBEDDING_REF)
     sandbox = CONFIG.sandbox.model_copy(update=sandbox_update)
-    return CONFIG.model_copy(update={"workspaces": [workspace], "sandbox": sandbox})
+    return CONFIG.model_copy(update={"sandbox": sandbox})
 
 
 async def test_repo_key_comes_from_workspace_access_ref(
@@ -789,6 +810,7 @@ async def test_task_without_access_ref_goes_to_error_with_reason(
     committed_session_factory: Factory,
 ) -> None:
     """Workspace без repo.access_ref: задача в error до активации, без fetch и worktree (D-60)."""
+    await _drop_access_ref(committed_session_factory)
     task = await _prepare(committed_session_factory)
     fake = _fake()
     pipeline = _Pipeline(fake, agent_finishes=True)
@@ -883,16 +905,19 @@ async def test_build_context_takes_vault_for_repo_keys(
     assert isinstance(ctx.vault, McpSecretVault)
 
 
-async def test_build_context_warns_about_workspace_without_key(
-    valid_env: dict[str, str], monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+async def test_dispatch_startup_warns_about_workspace_without_key(
+    valid_env: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    committed_session_factory: Factory,
 ) -> None:
+    await _drop_access_ref(committed_session_factory)
     settings = _dispatch_settings(valid_env, monkeypatch)
-    factory = create_session_factory(create_engine(UNREACHABLE_DATABASE_URL))
 
-    ctx = build_dispatch_context(settings, CONFIG, factory, FakeSandbox(sandbox_id=PROVIDER_ID))
+    step = await _build_dispatch(settings, CONFIG, committed_session_factory)
 
-    # Контекст создаётся: задачи без ключа уходят в error, остальные работают.
-    assert ctx is not None
+    # Диспетчер создаётся: задачи без ключа уходят в error, остальные работают. Список — из БД.
+    assert step is not None
     assert "repo.access_ref" in caplog.text
     assert "demo" in caplog.text
 

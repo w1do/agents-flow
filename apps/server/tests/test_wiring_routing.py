@@ -1,11 +1,8 @@
 """Сборка маршрутизатора в композиционном корне: только при ключе и модели (D-31, D-33)."""
 
-from pathlib import Path
-
 import httpx
 import pytest
 from harness_server.adapters.polza import POLZA_API_URL, PolzaRouter
-from harness_server.config import load_config
 from harness_server.settings import load_settings
 from harness_server.wiring import build_adapters, build_bot_context
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -13,7 +10,6 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 pytestmark = pytest.mark.asyncio
 
 POLZA_KEY = "test-polza-key-0123456789"
-EXAMPLE_CONFIG = Path(__file__).resolve().parents[3] / "config" / "harness.example.yaml"
 
 
 async def test_build_adapters_creates_router_when_configured(
@@ -47,13 +43,12 @@ async def test_bot_context_gets_router_and_threshold(
     monkeypatch.setenv("POLZA_AI_MODEL", "test/model")
     monkeypatch.setenv("ROUTING_MIN_CONFIDENCE", "0.75")
     settings = load_settings()
-    config = load_config(EXAMPLE_CONFIG)
     # Фабрика не подключается к БД при создании: тест не выполняет запросов.
     engine = create_async_engine("postgresql+asyncpg://u:p@127.0.0.1:1/x")
     try:
         async with httpx.AsyncClient() as http:
             adapters = build_adapters(settings, http)
-            ctx = build_bot_context(settings, config, async_sessionmaker(engine), adapters)
+            ctx = build_bot_context(settings, async_sessionmaker(engine), adapters)
     finally:
         await engine.dispose()
 

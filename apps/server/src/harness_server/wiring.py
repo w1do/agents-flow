@@ -7,6 +7,7 @@
 from dataclasses import dataclass
 
 import httpx
+from harness_shared.projects import Workspace
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -16,8 +17,8 @@ from harness_server.adapters.sandbox import SandboxProvider
 from harness_server.adapters.stt import OpenAiCompatibleStt, SpeechToText
 from harness_server.adapters.telegram import HttpxTelegramClient, TelegramClient
 from harness_server.adapters.vault import McpSecretVault, SecretVault
-from harness_server.config import HarnessConfig
 from harness_server.services.context import BotContext
+from harness_server.services.projects import list_workspaces
 from harness_server.settings import Settings
 
 # Соединение должно открываться быстро; ответ Bot API может идти дольше, поэтому таймауты разные.
@@ -96,16 +97,24 @@ def secret_values(settings: Settings) -> tuple[str, ...]:
 
 def build_bot_context(
     settings: Settings,
-    config: HarnessConfig,
     session_factory: async_sessionmaker[AsyncSession],
     adapters: BotAdapters,
 ) -> BotContext:
-    """Контекст сервисов бота: владелец из TELEGRAM_CHAT_ID, workspace из harness.yaml."""
+    """Контекст сервисов бота: владелец из TELEGRAM_CHAT_ID, проекты из каталога на сервере.
+
+    Проекты читаются при каждом обращении, а не один раз при старте: проект, заведённый в консоли,
+    сразу виден боту и маршрутизатору (project-catalog).
+    """
+
+    async def load_workspaces() -> tuple[Workspace, ...]:
+        async with session_factory() as session:
+            return tuple(await list_workspaces(session))
+
     return BotContext(
         session_factory=session_factory,
         telegram=adapters.telegram,
         stt=adapters.stt,
-        workspaces=tuple(config.workspaces),
+        load_workspaces=load_workspaces,
         owner_chat_id=int(settings.telegram_chat_id),
         secret_values=secret_values(settings),
         voice_max_bytes=settings.voice_max_bytes,

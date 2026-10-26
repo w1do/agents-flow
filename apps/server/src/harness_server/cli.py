@@ -19,6 +19,7 @@ from harness_server.app import create_app
 from harness_server.config import ConfigError, HarnessConfig, load_config
 from harness_server.db.session import create_engine, create_session_factory
 from harness_server.services import sandboxes
+from harness_server.services.projects import list_workspaces
 from harness_server.services.webhook import register_webhook, webhook_url
 from harness_server.settings import Settings, SettingsError, load_settings
 from harness_server.worker import serve_worker
@@ -95,9 +96,11 @@ def migrate(alembic_config: Path = Path("alembic.ini")) -> None:
 
 @app.command("check-config")
 def check_config() -> None:
-    """Проверяет ENV и harness.yaml и печатает список workspace."""
-    _, config = _load_or_exit()
-    for workspace in config.workspaces:
+    """Проверяет ENV и harness.yaml и печатает активные проекты из каталога на сервере."""
+    settings, _ = _load_or_exit()
+    _configure_logging()
+    workspaces = asyncio.run(_with_session(settings, list_workspaces))
+    for workspace in workspaces:
         typer.echo(f"{workspace.id} — {workspace.name}")
 
 

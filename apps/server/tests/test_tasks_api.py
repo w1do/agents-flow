@@ -7,6 +7,7 @@ from uuid import UUID
 import httpx
 import pytest
 from asgi_lifespan import LifespanManager
+from catalog import DEMO, seed_workspaces
 from fastapi import FastAPI
 from harness_server.app import create_app
 from harness_server.config import load_config
@@ -72,8 +73,8 @@ async def test_post_task_with_known_workspace(
     migrated_database_url: str,
     committed_session_factory: Factory,
 ) -> None:
-    settings = load_settings()
-    workspace_id = load_config(settings.harness_config).workspaces[0].id
+    await seed_workspaces(committed_session_factory, DEMO)
+    workspace_id = DEMO.id
 
     async with _app_client(monkeypatch, migrated_database_url) as (_, client):
         response = await client.post(

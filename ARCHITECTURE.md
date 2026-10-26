@@ -1,7 +1,7 @@
 # ARCHITECTURE — agents-flow harness
 
 Голосовой AI-харнесс: задача диктуется в Telegram, выполняется агентом (Claude Code) на локальной машине агента (D-64),
-результат приходит как Merge Request в GitLab или Pull Request в GitHub (провайдер задаёт `workspaces[].repo`, D-60), статус обновляется в том же чате.
+результат приходит как Merge Request в GitLab или Pull Request в GitHub (провайдер задаёт блок `repo` проекта, D-60, D-65), статус обновляется в том же чате.
 
 Источник требований: [`docs/tz/tz-v5.md`](docs/tz/tz-v5.md). Принятые решения: [`docs/decisions.md`](docs/decisions.md).
 План работ и статус: [`PLAN.md`](PLAN.md). Этот файл описывает **целевое** устройство системы и
@@ -46,7 +46,7 @@ apps/server/src/harness_server/
 ├── cli.py             # harness-server: serve | worker | migrate | check-config | telegram set-webhook | sandbox status|pause|resume | reset-password
 ├── agent_cli.py       # agent init <project>: вход на машине агента (D-64), без БД и Telegram
 ├── settings.py        # pydantic-settings: ENV, путь к config/harness.yaml
-├── config.py          # загрузка и валидация config/harness.yaml (workspaces, sandbox, gitlab)
+├── config.py          # загрузка и валидация config/harness.yaml (sandbox; проекты — в каталоге сервера, D-65)
 ├── wiring.py          # композиционный корень бота: httpx-клиент, BotAdapters, BotContext (D-29)
 ├── api/               # HTTP-входы: tasks (POST /tasks, GET /tasks/{id}), telegram_webhook (POST /telegram/webhook), deps (сессия, admin-токен, секрет webhook), health. Без бизнес-логики
 ├── mcp/               # MCP agents-flow: auth (токен задачи), tools. Без бизнес-логики
@@ -72,6 +72,7 @@ apps/server/src/harness_server/
 
 | Таблица | Ключевые поля | Назначение |
 |---|---|---|
+| `projects` | id (до 28 символов, D-28), name, voice_aliases, repo_provider, repo_base_url, repo_project, access_ref (ссылка vault или NULL — анонимный клон), default_branch, test_command, agent, agent_max_turns, status (`active`/`disabled`) | Каталог проектов (D-65): заводит оператор через консоль или API, ключ хранится только ссылкой |
 | `tasks` | id, kind (`plan`/`implement`/`check`), workspace_id, parent_id, text, status, priority, source (`telegram`/`spec`/`mcp`/`api`), spec_item_id, branch, mr_url, result, tests_state, created_at, updated_at | Задача и канбан (представление по статусам) |
 | `task_events` | id, task_id, status, text, source (`telegram`/`agent`/`worker`/`api`), created_at | Лента этапов для Telegram и журнала |
 | `routings` | id, task_id (NULL для status, unknown и ожидающего уточнения), command_class (`work`/`status`/`unknown`), decision (`auto`/`clarify`/`fallback`), options (JSON), chosen_workspace_id, raw_response, confidence, error (причина запасного пути), source_text (до нажатия «Сделать задачу», затем NULL), resolved_at | Решение Polza и выбор пользователя (mvp-05, D-32, миграция `0003`) |
@@ -90,7 +91,7 @@ CHECK `ck_<таблица>_<колонка>` (D-22); первичные ключ
 не резервируют. `LocalSandboxProvider.pause` — пустая операция; статус `paused` не означает остановку процессов
 или освобождение ресурсов ОС. Подробности об управлении CLI — в [apps/server/README.md](apps/server/README.md).
 
-Workspace и агенты в MVP берутся из `config/harness.yaml`; таблицы `workspaces`, `agents`, `skills`,
+Проекты (workspace) хранятся в таблице `projects` (D-65), а не в `config/harness.yaml`. Таблицы `agents`, `skills`,
 `integrations`, `mcp_servers`, `sandbox_profiles`, `processes`, `sessions`, `operator_tokens`,
 `audit_log` появляются в изменениях после MVP (см. PLAN.md).
 
@@ -224,9 +225,11 @@ implement:  backlog → active → testing → ready (MR создан) → merge
 
 ## 9. Конфигурация и ENV
 
+Каталог проектов (D-65): источник проектов — сервер. Проект заводится в консоли (`apps/console`, этап `mvp-10`) или через API `/api/console/projects` (`POST`, `GET`, `GET /{id}`, `PATCH /{id}`, `POST /{id}/disable`) под `HARNESS_ADMIN_TOKEN`. Ответ `GET /api/projects/{id}/settings` содержит поля локального конфига без значений ключей. Отключённый проект не принимает новые задачи и не выдаётся машине агента; задачи в работе доходят до своего статуса. `harness.yaml` с блоком `workspaces` или секцией `gitlab` сервер не загружает. `id` проекта: латиница, цифры и дефисы, не длиннее 28 символов.
+
 `config/harness.yaml` (путь в `HARNESS_CONFIG`, без секретов, пример — `config/harness.example.yaml`):
-workspaces (id, name, voice_aliases, repo, default_branch, test_command, agent), sandbox (provider_id,
-опционально `git_author` (`name`, `email`: автор коммитов агента, передаётся агенту env `GIT_AUTHOR_*`/`GIT_COMMITTER_*`, по умолчанию `agents-flow`), опционально `memory`: `embedding_ref` (поля `repo` и `ref` сняты, D-64)). У каждого workspace блок `repo` (D-60): `provider` (`github` | `gitlab`), `base_url`
+sandbox (provider_id,
+опционально `git_author` (`name`, `email`: автор коммитов агента, передаётся агенту env `GIT_AUTHOR_*`/`GIT_COMMITTER_*`, по умолчанию `agents-flow`), опционально `memory`: `embedding_ref` (поля `repo` и `ref` сняты, D-64)). Блок `repo` проекта (D-60): `provider` (`github` | `gitlab`), `base_url`
 (только https; по умолчанию `https://github.com` / `https://gitlab.com`), `project` (`owner/name` для GitHub,
 `group[/subgroup]/name` для GitLab), опционально `access_ref` — ссылка `vault:…` на ключ записи репозитория. Ключи с сегментами `token`/`tokens`, `key`, `password`/`passwd`/`pwd`, `secret`/`secrets`, `apikey`,
 `credential`/`credentials` сервер отклоняет на любом уровне. `repo.base_url` с учётными данными (`user@host`) тоже
@@ -260,8 +263,8 @@ workspaces (id, name, voice_aliases, repo, default_branch, test_command, agent),
 | `WORKER_POLL_INTERVAL_SEC` | Интервал опроса очереди worker, в секундах (по умолчанию 5) |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Консоль, `mvp-10` (`ADMIN_PASSWORD` — секрет) |
 
-Команда `agent init <project>` (D-64) читает только `HARNESS_CONFIG`, `VAULT_MCP_URL`, `VAULT_MCP_TOKEN` и
-`HARNESS_PUBLIC_URL` (задача 3.3): `DATABASE_URL` и Telegram ей не нужны. Значения секретов в документах не указываются.
+Команда `agent init <workspace>` (D-64, D-65) читает `HARNESS_CONFIG`, `VAULT_MCP_URL`, `VAULT_MCP_TOKEN`, `HARNESS_PUBLIC_URL` и
+`HARNESS_ADMIN_TOKEN`: настройки проекта запрашивает у сервера по `GET /api/projects/{id}/settings` (адрес https, http — только localhost), локальный конфиг пишет в `~/.harness/projects/<id>.yaml` с правами 0600 и пометкой «сгенерирован, не править». `DATABASE_URL` и Telegram ей не нужны. Значения секретов в документах не указываются.
 TODO: `AGENT_CLIENT_COMMAND` встречается в проверке prerequisites (задача 4.1), но как ENV не подтверждён, в таблицу не внесён.
 
 Новая переменная или сервис добавляется одним изменением в Compose, `.env.example` и эту таблицу.

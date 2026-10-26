@@ -72,7 +72,7 @@ class DispatchContext:
     poll_interval_sec: float
     # Значения всех секретов для redaction текста из песочницы и ошибок (design 14).
     secrets: tuple[str, ...] = field(default=())
-    # Vault для ссылок vault:… из harness.yaml; None, если VAULT_MCP_URL/TOKEN не заданы.
+    # Vault для ссылок vault:… (access_ref проектов, memory); None без VAULT_MCP_URL/TOKEN.
     vault: SecretVault | None = None
     clock: Callable[[], datetime] = _utc_now
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
@@ -92,15 +92,15 @@ class _Runner:
         self.secrets: tuple[str, ...] = ctx.secrets
 
     async def run_agent(self, prompt: str) -> AgentStart:
-        max_turns = sandboxes.workspace_for(self._ctx.config, self._task).agent_max_turns
         async with self._ctx.session_factory() as session:
+            workspace = await sandboxes.workspace_for(session, self._task)
             start = await sandboxes.run_agent(
                 session,
                 self._ctx.provider,
                 self._provider_id,
                 self._task,
                 prompt=prompt,
-                max_turns=max_turns,
+                max_turns=workspace.agent_max_turns,
                 timeout_min=self._ctx.timeout_min,
                 secret_key=self._ctx.secret_key,
                 oauth_token=self._ctx.oauth_token,
@@ -225,7 +225,8 @@ async def _run_reserved(ctx: DispatchContext, pipeline: Pipeline, reservation: R
         # Ключ записи — из vault по repo.access_ref workspace задачи, до активации: без него задача
         # сразу уходит в error, fetch и worktree не выполняются (D-60). Значения сразу попадают в
         # redaction очистки и ответа агента (design 6).
-        workspace = sandboxes.workspace_for(ctx.config, task)
+        async with ctx.session_factory() as session:
+            workspace = await sandboxes.workspace_for(session, task)
         repo_token = await secret_refs.resolve(ctx.vault, workspace.repo.access_ref, fallback=None)
         if repo_token is None:
             raise SandboxStepError(REPO_ACCESS_REF_REASON.format(workspace_id=workspace.id))
@@ -365,12 +366,7 @@ def build_dispatch_context(
         logger.warning("диспетчер песочницы не запущен: не заданы %s", ", ".join(missing))
         return None
     # Ключи репозиториев — в vault по repo.access_ref; ENV GITLAB_TOKEN не читается (D-60).
-    without_key = [ws.id for ws in config.workspaces if ws.repo.access_ref is None]
-    if without_key:
-        logger.warning(
-            "workspace без repo.access_ref, задачи по ним уходят в error: %s",
-            ", ".join(without_key),
-        )
+    # Проекты без ключа проверяет worker при старте (worker/__init__.py): список берётся из БД.
     assert settings.claude_code_oauth_token is not None
     assert settings.harness_public_url is not None
     return DispatchContext(

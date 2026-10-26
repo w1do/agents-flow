@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from typing import Final
 from urllib.parse import quote
 
-from harness_server.config import GitProviderName, RepoConfig
+from harness_shared.projects import GitProviderName, ProjectRepo
 
 # Пользователь Basic по провайдеру: GitLab принимает oauth2 (D-52, live 6c), GitHub — x-access-token
 # (тот же способ, что у actions/checkout; имя пользователя для PAT не используется, токен — пароль).
@@ -62,12 +62,12 @@ HARDENED_GIT_ENV: Final[Mapping[str, str]] = {
 }
 
 
-def clone_url(repo: RepoConfig) -> str:
+def clone_url(repo: ProjectRepo) -> str:
     """Адрес клона: base_url + проект + .git. Учётных данных в адресе нет."""
     return f"{repo.base_url}/{repo.project}.git"
 
 
-def auth_url_prefix(repo: RepoConfig) -> str:
+def auth_url_prefix(repo: ProjectRepo) -> str:
     """Префикс http.<url>.* для заголовка: только этот репозиторий (граница «/»).
 
     git сопоставляет http.<url>.* по префиксу на границе «/», поэтому с завершающим «/» заголовок
@@ -82,7 +82,7 @@ def git_auth_header(provider: GitProviderName, token: str) -> str:
     return f"Authorization: Basic {basic}"
 
 
-def git_auth_env(repo: RepoConfig, token: str) -> dict[str, str]:
+def git_auth_env(repo: ProjectRepo, token: str) -> dict[str, str]:
     """env git-команды с ключом: заголовок на префикс репозитория и перекрытия конфига (D-62).
 
     GIT_CONFIG_* передаются через env одной команды, а не argv и не файлы (D-52); git >= 2.32.
@@ -107,14 +107,14 @@ def anonymous_git_env() -> dict[str, str]:
     return dict(HARDENED_GIT_ENV)
 
 
-def clone_command(repo: RepoConfig, repo_dir: str) -> str:
+def clone_command(repo: ProjectRepo, repo_dir: str) -> str:
     """Клон по адресу из конфига без подмодулей: подмодуль запустил бы git с чужим конфигом."""
     return shlex.join(
         ["git", "clone", "--quiet", "--no-recurse-submodules", "--", clone_url(repo), repo_dir]
     )
 
 
-def set_origin_command(repo: RepoConfig, repo_dir: str) -> str:
+def set_origin_command(repo: ProjectRepo, repo_dir: str) -> str:
     """Возвращает origin клона на адрес из конфига: агент мог его поменять.
 
     Выполняется без ключа.
@@ -122,7 +122,7 @@ def set_origin_command(repo: RepoConfig, repo_dir: str) -> str:
     return shlex.join(["git", "-C", repo_dir, "remote", "set-url", "origin", clone_url(repo)])
 
 
-def fetch_command(repo: RepoConfig, repo_dir: str) -> str:
+def fetch_command(repo: ProjectRepo, repo_dir: str) -> str:
     """fetch по адресу из конфига с явной refspec и без подмодулей (D-62)."""
     return shlex.join(
         [

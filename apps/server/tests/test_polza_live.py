@@ -10,24 +10,24 @@ import os
 import httpx
 import pytest
 from harness_server.adapters.polza import POLZA_API_URL, PolzaRouter
-from harness_server.config import RepoConfig, WorkspaceConfig
 from harness_server.services.routing import build_system_prompt, parse_decision
+from harness_shared.projects import ProjectRepo, Workspace
 from harness_shared.routing import CommandClass
 
 pytestmark = [pytest.mark.live, pytest.mark.asyncio(loop_scope="session")]
 
 WORKSPACES = (
-    WorkspaceConfig(
+    Workspace(
         id="demo",
         name="Демо-проект",
         voice_aliases=[],
-        repo=RepoConfig(provider="gitlab", project="group/demo"),
+        repo=ProjectRepo(provider="gitlab", project="group/demo"),
     ),
-    WorkspaceConfig(
+    Workspace(
         id="shop",
         name="Магазин",
         voice_aliases=[],
-        repo=RepoConfig(provider="gitlab", project="group/shop"),
+        repo=ProjectRepo(provider="gitlab", project="group/shop"),
     ),
 )
 

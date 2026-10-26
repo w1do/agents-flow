@@ -13,8 +13,8 @@ from alembic.config import Config as AlembicConfig
 from harness_server.adapters.polza import Router
 from harness_server.adapters.stt import SpeechToText
 from harness_server.adapters.telegram import FakeTelegramClient
-from harness_server.config import RepoConfig, WorkspaceConfig
 from harness_server.services.context import BotContext
+from harness_shared.projects import ProjectRepo, Workspace
 from live_agent_env import LiveAgentEnvironment, capture_live_agent_environment
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
@@ -194,7 +194,7 @@ async def db_session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
 # Очистка после тестов с настоящими коммитами; порядок не важен, CASCADE снимает зависимости.
 TRUNCATE_ALL = (
     "TRUNCATE TABLE telegram_updates, telegram_messages, task_tokens, sandboxes, spec_items, "
-    "checkpoints, routings, task_events, tasks CASCADE"
+    "checkpoints, routings, task_events, tasks, projects CASCADE"
 )
 
 
@@ -221,31 +221,36 @@ def make_bot_context() -> Callable[..., BotContext]:
         *,
         telegram: FakeTelegramClient,
         stt: SpeechToText | None = None,
-        workspaces: tuple[WorkspaceConfig, ...] | None = None,
+        workspaces: tuple[Workspace, ...] | None = None,
         voice_max_bytes: int = DEFAULT_VOICE_MAX_BYTES,
         router: Router | None = None,
         routing_min_confidence: float = 0.6,
     ) -> BotContext:
         if workspaces is None:
             workspaces = (
-                WorkspaceConfig(
+                Workspace(
                     id="demo",
                     name="Демо-проект",
                     voice_aliases=[],
-                    repo=RepoConfig(provider="gitlab", project="group/demo"),
+                    repo=ProjectRepo(provider="gitlab", project="group/demo"),
                 ),
-                WorkspaceConfig(
+                Workspace(
                     id="shop",
                     name="Магазин",
                     voice_aliases=[],
-                    repo=RepoConfig(provider="gitlab", project="group/shop"),
+                    repo=ProjectRepo(provider="gitlab", project="group/shop"),
                 ),
             )
+        fixed = workspaces
+
+        async def load_workspaces() -> tuple[Workspace, ...]:
+            return fixed
+
         return BotContext(
             session_factory=factory,
             telegram=telegram,
             stt=stt,
-            workspaces=workspaces,
+            load_workspaces=load_workspaces,
             owner_chat_id=OWNER_CHAT_ID,
             secret_values=(VALID_WEBHOOK_SECRET,),
             voice_max_bytes=voice_max_bytes,

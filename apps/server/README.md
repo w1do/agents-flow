@@ -8,7 +8,7 @@
 | Команда | Что делает |
 |---|---|
 | `harness-server --help` | Справка по командам |
-| `harness-server check-config` | Проверяет ENV и `harness.yaml`, печатает список workspace |
+| `harness-server check-config` | Проверяет ENV и `harness.yaml`, печатает активные проекты из каталога на сервере (нужен `DATABASE_URL`) |
 | `harness-server serve --host 127.0.0.1 --port 8000` | HTTP-сервер: `GET /health`, `GET /health/ready`. По умолчанию слушает localhost; в контейнере `--host 0.0.0.0` |
 | `harness-server worker` | Цикл опроса очереди задач. При старте восстанавливает апдейты Telegram: необработанные старше 1 мин обрабатываются заново, старше 24 ч списываются без обработки (payload очищается), недостающие карточки досылаются. Остановка по SIGTERM |
 | `harness-server migrate` | `alembic upgrade head`, нужен `DATABASE_URL` |
@@ -16,18 +16,19 @@
 | `harness-server sandbox status` | Строка песочницы из `harness.yaml`: статус и закреплённая задача (нужен `DATABASE_URL`) |
 | `harness-server sandbox pause` / `resume` | Совместимые команды состояния песочницы. У локального провайдера `pause` — пустая операция; команда не останавливает процессы. `resume` проверяет подключение и сбрасывает состояние только если задача не закреплена (см. [docs/deployment.md](../../docs/deployment.md)) |
 
-### Команда `agent init <project>` (D-64)
+### Команда `agent init <workspace>` (D-64, D-65)
 
 Отдельный вход `agent` (`agent_cli.py`), не `harness-server`. Готовит проект на машине worker: проверка
 prerequisites, каталоги `~/.harness` и `~/work`, клон репозитория с ключом из vault, память (если задана в
-`sandbox.memory`), маркер `projects/<id>.ready`. Нужны `HARNESS_CONFIG`, `VAULT_MCP_URL`, `VAULT_MCP_TOKEN`,
-`HARNESS_PUBLIC_URL`; `DATABASE_URL` и Telegram не нужны.
+`sandbox.memory`), маркер `projects/<id>.ready`. Настройки проекта запрашиваются у сервера по `GET /api/projects/{id}/settings`
+(D-65) и пишутся в `~/.harness/projects/<id>.yaml` (0600, не править руками). Нужны `HARNESS_CONFIG`, `VAULT_MCP_URL`,
+`VAULT_MCP_TOKEN`, `HARNESS_PUBLIC_URL` (https; http — только localhost) и `HARNESS_ADMIN_TOKEN`; `DATABASE_URL` и Telegram не нужны.
 
 | Код | Значение |
 |---|---|
 | 0 | Проект подготовлен |
 | 1 | Ошибка шага (клон, память, vault) |
-| 2 | Неизвестный проект |
+| 2 | Проект не найден на сервере |
 | 3 | Не хватает prerequisites (один отчёт, без `sudo`) |
 
 Запускайте от непривилегированного пользователя. Инструменты ставит оператор, см. [docs/deployment.md](../../docs/deployment.md).
@@ -39,6 +40,11 @@ prerequisites, каталоги `~/.harness` и `~/work`, клон репози�
 |---|---|---|
 | `POST /tasks` | Создаёт задачу `plan` в статусе `new`, источник `api`. Тело: `text` (1–20 000 символов), необязательный `workspace_id` | `201` с задачей; `422` при `unknown_workspace` или пустом тексте |
 | `GET /tasks/{id}` | Задача и лента событий в хронологическом порядке | `200`; `404`, если задачи нет |
+| `POST /api/console/projects` | Заводит проект (каталог, D-65). Тело — поля проекта, блок `repo` с `access_ref` (ссылка vault) | `201` с проектом; `409` `project_conflict`; `422` с именами полей без значений |
+| `GET /api/console/projects`, `GET /api/console/projects/{id}` | Список и один проект, включая отключённые | `200`; `404` `not_found` |
+| `PATCH /api/console/projects/{id}` | Изменяет переданные поля; блок `repo` передаётся целиком | `200`; `404`; `422` |
+| `POST /api/console/projects/{id}/disable` | Отключает проект: новые задачи не принимаются | `200`; `404` |
+| `GET /api/projects/{id}/settings` | Настройки для `agent init` без значений ключей | `200`; `404`; `409` `project_disabled` |
 
 Оба требуют заголовок `Authorization: Bearer <HARNESS_ADMIN_TOKEN>` (временный доступ, D-23). Без заголовка,
 с другой схемой, неверным токеном или когда `HARNESS_ADMIN_TOKEN` не задан — `401` с `WWW-Authenticate: Bearer`
@@ -57,7 +63,7 @@ prerequisites, каталоги `~/.harness` и `~/work`, клон репози�
 
 - ENV: обязательные и опциональные переменные описаны в [ARCHITECTURE.md §9](../../ARCHITECTURE.md)
   и в `.env.example`. Секреты читаются как `SecretStr`.
-- `harness.yaml`: пример в `config/harness.example.yaml`. Файл с настройками workspace; ключи
+- `harness.yaml`: пример в `config/harness.example.yaml`. Глобальные настройки сервера и песочницы (проекты — в каталоге, D-65); ключи
   вида `token`, `key`, `password`, `secret`, `apikey`, `credential` (и их варианты во множественном числе,
   `passwd`, `pwd`) сервер отклоняет; `repo.base_url` с учётными данными тоже.
 - Ключ репозитория workspace — ссылка `repo.access_ref` (`vault:<project>/<service>/<name>`). Без неё задача по

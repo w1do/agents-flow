@@ -9,6 +9,7 @@ from pathlib import Path
 import httpx
 import pytest
 import respx
+from catalog import DEMO, SHOP, seeded_projects_sync
 from harness_server import wiring
 from harness_server.adapters.sandbox import FakeSandbox
 from harness_server.adapters.telegram import FakeTelegramClient, TelegramError
@@ -122,11 +123,18 @@ def test_set_webhook_reports_telegram_error(
     assert valid_env["TELEGRAM_BOT_TOKEN"] not in result.output
 
 
-def test_check_config_prints_workspaces(valid_env: dict[str, str]) -> None:
-    result = runner.invoke(app, ["check-config"])
+def test_check_config_prints_active_projects_from_catalog(
+    valid_env: dict[str, str], migrated_database_url: str, monkeypatch: MonkeyPatch
+) -> None:
+    # Проекты читаются из каталога на сервере, а не из harness.yaml (D-65).
+    monkeypatch.setenv("DATABASE_URL", migrated_database_url)
+
+    with seeded_projects_sync(migrated_database_url, DEMO, SHOP):
+        result = runner.invoke(app, ["check-config"])
 
     assert result.exit_code == 0, result.output
-    assert "demo" in result.output
+    assert "demo — Демо-проект" in result.output
+    assert "shop — Магазин" in result.output
 
 
 def test_check_config_fails_without_required_variable(
@@ -347,3 +355,35 @@ def test_set_webhook_uses_telegram_webhook_url_override(
         "https://tg-worker.example.com/tg-webhook"
     )
     assert valid_env["TELEGRAM_BOT_TOKEN"] not in result.output
+
+
+def test_serve_refuses_legacy_workspaces_config(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch, tmp_path: Path
+) -> None:
+    # Старая форма с блоком workspaces не запускает сервер и называет блок (platform-config, D-65).
+    legacy = tmp_path / "harness.yaml"
+    legacy.write_text(
+        "workspaces:\n  - id: demo\n    name: Demo\n    voice_aliases: []\n"
+        "    repo: {provider: github, project: owner/demo}\n"
+        "sandbox: {provider_id: local}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("HARNESS_CONFIG", str(legacy))
+
+    result = runner.invoke(app, ["serve"])
+
+    assert result.exit_code == 1
+    assert "workspaces" in result.output
+    assert "/api/console/projects" in result.output
+
+
+def test_serve_accepts_config_without_workspaces(
+    valid_env: dict[str, str], monkeypatch: MonkeyPatch
+) -> None:
+    # Новая форма без workspaces загружается: проверка конфига проходит до старта uvicorn.
+    from harness_server.settings import load_settings
+
+    settings = load_settings()
+    config = load_config(settings.harness_config)
+
+    assert config.sandbox.provider_id == "local"

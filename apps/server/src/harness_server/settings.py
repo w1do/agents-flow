@@ -56,6 +56,23 @@ class SettingsError(Exception):
     """Ошибка проверки ENV. Сообщение называет переменные, но не их значения."""
 
 
+def _check_admin_token(value: SecretStr | None) -> SecretStr | None:
+    """Токен даёт полный операторский доступ к /tasks и каталогу проектов; короткий легко подобрать.
+
+    Пробелы по краям — почти всегда ошибка копирования; 32 пробела иначе прошли бы проверку длины.
+    Сообщение не содержит значения токена.
+    """
+    if value is not None:
+        raw = value.get_secret_value()
+        if raw != raw.strip():
+            raise ValueError("не должна начинаться или заканчиваться пробельными символами")
+        if len(raw) < _ADMIN_TOKEN_MIN_LENGTH:
+            raise ValueError(
+                f"должна быть не короче {_ADMIN_TOKEN_MIN_LENGTH} символов (openssl rand -hex 32)"
+            )
+    return value
+
+
 class Settings(BaseSettings):
     """Переменные из ARCHITECTURE.md §9.
 
@@ -117,18 +134,7 @@ class Settings(BaseSettings):
     @field_validator("harness_admin_token")
     @classmethod
     def _check_admin_token_length(cls, value: SecretStr | None) -> SecretStr | None:
-        # Токен даёт полный операторский доступ к /tasks; короткий легко подобрать (D-23).
-        # Пробелы по краям — почти всегда ошибка копирования; 32 пробела иначе прошли бы
-        # проверку длины.
-        if value is not None:
-            raw = value.get_secret_value()
-            if raw != raw.strip():
-                raise ValueError("не должна начинаться или заканчиваться пробельными символами")
-        if value is not None and len(value.get_secret_value()) < _ADMIN_TOKEN_MIN_LENGTH:
-            raise ValueError(
-                f"должна быть не короче {_ADMIN_TOKEN_MIN_LENGTH} символов (openssl rand -hex 32)"
-            )
-        return value
+        return _check_admin_token(value)
 
     @field_validator("telegram_webhook_secret")
     @classmethod
@@ -217,3 +223,10 @@ class AgentSettings(BaseSettings):
     vault_mcp_url: str | None = None
     vault_mcp_token: SecretStr | None = None
     harness_public_url: str | None = None
+    # Операторский токен для запроса настроек проекта у сервера (project-catalog, D-23).
+    harness_admin_token: SecretStr | None = None
+
+    @field_validator("harness_admin_token")
+    @classmethod
+    def _check_admin_token_length(cls, value: SecretStr | None) -> SecretStr | None:
+        return _check_admin_token(value)

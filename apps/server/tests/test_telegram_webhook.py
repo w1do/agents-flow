@@ -10,7 +10,9 @@ from typing import Any
 
 import httpx
 import pytest
+import pytest_asyncio
 from asgi_lifespan import LifespanManager
+from catalog import DEMO, seed_workspaces
 from harness_server.adapters.telegram import FakeTelegramClient
 from harness_server.app import create_app
 from harness_server.config import load_config
@@ -23,6 +25,13 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
+
+
+@pytest_asyncio.fixture(autouse=True, loop_scope="session")
+async def _catalog(committed_session_factory: async_sessionmaker[AsyncSession]) -> None:
+    """Проект demo заводится в каталог: кнопки выбора строятся из БД (D-65)."""
+    await seed_workspaces(committed_session_factory, DEMO)
+
 
 SECRET_HEADER = "X-Telegram-Bot-Api-Secret-Token"
 CARD_LINE = "Задача [добавь экспорт в CSV] (выберите проект)"

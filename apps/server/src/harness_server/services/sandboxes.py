@@ -17,6 +17,7 @@ from enum import StrEnum
 from typing import Final, NoReturn, Protocol
 from uuid import UUID
 
+from harness_shared.projects import ProjectRepo, Workspace
 from harness_shared.sandboxes import AgentRole, SandboxStatus
 from harness_shared.tasks import TaskEventSource, TaskKind, TaskStatus
 from pydantic import SecretStr
@@ -24,9 +25,9 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from harness_server.adapters.sandbox import ExecResult, SandboxError, SandboxProvider
-from harness_server.config import GitAuthorConfig, HarnessConfig, RepoConfig, WorkspaceConfig
+from harness_server.config import GitAuthorConfig, HarnessConfig
 from harness_server.db.models import Sandbox, Task, TaskToken
-from harness_server.domain.errors import UnknownWorkspace, UnsupportedKind
+from harness_server.domain.errors import NotFound, UnknownWorkspace, UnsupportedKind
 from harness_server.security import tokens
 from harness_server.security.redaction import redact
 from harness_server.services import git_access
@@ -40,6 +41,7 @@ from harness_server.services.agent_result import (
     parse_result,
     truncate_log_text,
 )
+from harness_server.services.projects import get_workspace
 from harness_server.services.tasks import get_task, lock_next_task
 
 logger = logging.getLogger(__name__)
@@ -236,12 +238,15 @@ def worktree_dir(home: str, task_id: UUID) -> str:
     return f"{home}/.harness/worktrees/{task_id}"
 
 
-def workspace_for(config: HarnessConfig, task: Task) -> WorkspaceConfig:
-    """Workspace задачи из конфига. Нет workspace или id неизвестен — UnknownWorkspace."""
-    for workspace in config.workspaces:
-        if workspace.id == task.workspace_id:
-            return workspace
-    raise UnknownWorkspace(str(task.workspace_id))
+async def workspace_for(session: AsyncSession, task: Task) -> Workspace:
+    """Проект задачи из каталога на сервере, любого статуса: задача, принятая до отключения,
+    доводится до конца (project-catalog). Нет проекта или id неизвестен — UnknownWorkspace."""
+    if task.workspace_id is None:
+        raise UnknownWorkspace("")
+    try:
+        return await get_workspace(session, task.workspace_id)
+    except NotFound:
+        raise UnknownWorkspace(task.workspace_id) from None
 
 
 async def ensure_sandbox(session: AsyncSession, config: HarnessConfig) -> Sandbox:
@@ -391,7 +396,7 @@ async def activate(
     *,
     base_ref: str,
     timeout_min: int,
-    repo: RepoConfig,
+    repo: ProjectRepo,
     repo_token: SecretStr | None,
     default_branch: str = "main",
     memory_envs: Mapping[str, str] | None = None,

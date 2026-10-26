@@ -23,12 +23,13 @@ from pathlib import Path
 import pytest
 from harness_server.adapters.local import LocalSandboxProvider
 from harness_server.adapters.sandbox import ExecResult, SandboxProvider
-from harness_server.config import HarnessConfig, RepoConfig, load_config
+from harness_server.config import HarnessConfig, load_config
 from harness_server.db.models import Task, TaskToken
 from harness_server.services import sandboxes
 from harness_server.services.agent_result import AgentRun, AgentState
 from harness_server.services.sandboxes import AgentStartState
 from harness_server.services.tasks import create_task
+from harness_shared.projects import ProjectRepo
 from harness_shared.tasks import TaskKind, TaskSource, TaskStatus
 from live_agent_env import LiveAgentEnvironment, run_agent_init
 from pydantic import SecretStr
@@ -261,7 +262,7 @@ async def _activate(
         base_ref=DEFAULT_BRANCH,
         timeout_min=AGENT_TIMEOUT_MIN,
         # Fixture maps every helper to this test-owned bare origin; production stays HTTPS-only.
-        repo=RepoConfig(provider="gitlab", project="group/demo"),
+        repo=ProjectRepo(provider="gitlab", project="group/demo"),
         repo_token=None,
     )
 
