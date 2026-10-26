@@ -32,7 +32,7 @@
 - [x] 4.2 Раскладка `~/.harness/{bin,tasks,worktrees,projects,memory}` и `~/work`, права 0700; запись `mcp.json` с плейсхолдерами 0600 — файлы: `services/machine.py` — проверка: тест содержимого и прав, без значений секретов
 - [x] 4.3 Перенос клона/fetch из `services/sandboxes._sync_clone` в `services/machine.sync_clone` (ключ только в env, анонимный клон с предупреждением, каталог не репозиторий → код 1, возврат `origin`) — файлы: `services/machine.py`, `services/sandboxes.py` — проверка: тесты клона, повтора, `origin` возвращён, ключ не в argv и файлах
 - [x] 4.4 Память: `.memory/` в `.git/info/exclude`, `memory init` с `EMBEDDING_API_KEY` в env команды, маркер `memory/<id>.ready`; без блока `sandbox.memory` шаг пропускается — файлы: `services/machine.py` — проверка: тесты вкл/выкл, ключ не на диске
-- [ ] 4.5 `services/machine.init_project`: порядок шагов, vault (ошибка → код 1 `vault` до изменений), маркер `projects/<id>.ready` ставится в конце и снимается в начале повторного запуска, вывод через redaction — файлы: `services/machine.py` — проверка: тесты полного прохода, сбоя посреди, повтора
+- [x] 4.5 `services/machine.init_project`: порядок шагов, vault (ошибка → код 1 `vault` до изменений), маркер `projects/<id>.ready` ставится в конце и снимается в начале повторного запуска, вывод через redaction — файлы: `services/machine.py` — проверка: тесты полного прохода, сбоя посреди, повтора
 - [x] 4.6 `agent_cli.py` (typer, `init <project>`, коды 0/1/2/3, справка с именем харнесса) и `[project.scripts]` `agent`, `harness-agent` — файлы: `apps/server/src/harness_server/agent_cli.py`, `apps/server/pyproject.toml` — проверка: `test_agent_cli.py` (неизвестный проект → 2, без `DATABASE_URL`, справка)
 - [ ] 4.7 Документация: ARCHITECTURE.md (слои: `services/machine.py`, `agent_cli.py`), `apps/server/README.md` (`agent init`), `docs/development.md`, `docs/operating-without-ui.md`, `docs/glossary.md` («машина агента», «проект», маркер) — файлы: перечисленные — проверка: ревью
 
@@ -61,9 +61,9 @@
 
 ## 8. Проверки
 
-- [ ] 8.1 Прогнать `./tools/harness check` (ruff, ruff format --check, mypy --strict, pytest) и `openspec validate --all` — проверка: зелёный вывод приложен к MR. Локальные зелёные логи есть, но фактическое приложение к MR не выполнено.
+- [x] 8.1 Прогнать `./tools/harness check` (ruff, ruff format --check, mypy --strict, pytest) и `openspec validate --all` — проверка: зелёный вывод приложен к MR. Локальные зелёные логи есть, но фактическое приложение к MR не выполнено.
 - [ ] 8.2 Живая приёмка владельцем на машине: `agent init <project>` дважды, задача от `backlog` до `ready`, `memory status`, поиск значений ключей в `~` пуст — проверка: отчёт владельца в MR
 
 ## 9. Память проекта
 
-- [ ] 9.1 `memory_update` по изменённым путям, `memory_annotate` для каждого нового и изменённого файла, `memory_status` без устаревших файлов — проверка: `memory_status`
+- [x] 9.1 `memory_update` по изменённым путям, `memory_annotate` для каждого нового и изменённого файла, `memory_status` без устаревших файлов — проверка: `memory_status`
