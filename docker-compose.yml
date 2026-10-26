@@ -1,4 +1,5 @@
-# Стек Dokploy для migrate → server. Worker запускается systemd-пользователем на машине агента.
+# Стек Dokploy: postgres → migrate → server, плюс console (статика и прокси API).
+# Один `docker compose up` поднимает всё локально; в Dokploy Postgres тоже из этого стека.
 # Наружу порты не публикуются: домен и HTTPS выставляет Dokploy поверх expose.
 
 x-harness-common: &harness-common
@@ -10,8 +11,9 @@ x-harness-common: &harness-common
     dockerfile: Dockerfile
   image: ${HARNESS_IMAGE:-agents-flow:local}
   environment:
-    # Обязательные ENV (ядро и Telegram). Пустое значение считается отсутствующим, сервер не стартует.
-    DATABASE_URL: ${DATABASE_URL:-}
+    # DATABASE_URL из ENV Dokploy (или .env) переопределяет адрес встроенного postgres.
+    # Пароль обязателен и в URL подставляется как есть: используйте без `@ : / ? # %`.
+    DATABASE_URL: &database-url ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-harness}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-harness}}
     HARNESS_CONFIG: /app/config/harness.yaml
     HARNESS_SECRET_KEY: ${HARNESS_SECRET_KEY:-}
     TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
@@ -44,16 +46,38 @@ x-harness-common: &harness-common
   # File Mount Dokploy: config/harness.yaml из раздела Files стека попадает в ../files/.
   volumes:
     - ../files/harness.yaml:/app/config/harness.yaml:ro
+  # default — внутренняя сеть стека, по имени `postgres` и `server`; dokploy-network — для маршрутизации Dokploy.
   networks:
+    - default
     - dokploy-network
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    # Только внутренняя сеть стека (default): порты не публикуются, Dokploy-сеть не нужна.
+    # Стек, который уже работает с deploy/db, этим сервисом не заменяется: см. docs/deployment.md.
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-harness}
+      POSTGRES_USER: ${POSTGRES_USER:-harness}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   migrate:
     <<: *harness-common
     # Миграции нужен только DATABASE_URL: остальные секреты в контейнер migrate не передаются.
     environment:
-      DATABASE_URL: ${DATABASE_URL:-}
+      DATABASE_URL: *database-url
     command: ["harness-server", "migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: "no"
 
   server:
@@ -76,6 +100,25 @@ services:
       migrate:
         condition: service_completed_successfully
     restart: unless-stopped
+
+  console:
+    # Контекст — корень репозитория: Dockerfile консоли копирует packages/shared-types.
+    build:
+      context: .
+      dockerfile: apps/console/Dockerfile
+    # Порт наружу не публикуется: домен и HTTPS выставляет Dokploy на сервис console, порт 80.
+    expose:
+      - "80"
+    depends_on:
+      server:
+        condition: service_healthy
+    networks:
+      - default
+      - dokploy-network
+    restart: unless-stopped
+
+volumes:
+  pgdata:
 
 networks:
   dokploy-network:

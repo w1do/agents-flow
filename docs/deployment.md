@@ -44,11 +44,17 @@
 
 | Стек | Файл | Сервисы | Заметки |
 |---|---|---|---|
-| БД | `deploy/db/docker-compose.yml` | `postgres` | Отдельный Compose-сервис, volume; порт только на `127.0.0.1:5432` хоста |
-| Харнесс | `docker-compose.yml` | `migrate` → `server`; `console` после MVP | Образ migrate/server; worker запускается на хосте systemd user unit |
+| Харнесс (основной) | `docker-compose.yml` | `postgres` → `migrate` → `server`; `console` | Один стек: `docker compose up` поднимает всё. Worker запускается на хосте systemd user unit |
+| БД (отдельный, для host worker) | `deploy/db/docker-compose.yml` | `postgres` | Volume `pgdata`; порт только на `127.0.0.1:5432` хоста, нужен host worker. См. ниже |
 
-- Все сервисы в внешней сети `dokploy-network`; наружу только `expose`.
-- Домен и HTTPS — в Dokploy на `server` (и `console` позже). Агенту на машине агента нужен публичный HTTPS `/mcp` (адрес `HARNESS_PUBLIC_URL` + `/mcp`, A2, D-38).
+- `server` и `console` подключены к внешней сети `dokploy-network` (маршрутизация Dokploy); `postgres` доступен только
+  внутри стека (сеть `default`) и наружу не публикуется. Наружу только `expose`.
+- Домен и HTTPS — в Dokploy: `console` (порт 80) для UI и `server` (порт 8000) для API и `/mcp`. Агенту на машине агента
+  нужен публичный HTTPS `/mcp` (адрес `HARNESS_PUBLIC_URL` + `/mcp`, A2, D-38).
+- `console` — nginx со статикой SPA; `/api/` и `/health` проксируются на `server:8000` внутри стека (`apps/console/nginx.conf`).
+- `DATABASE_URL` по умолчанию указывает на `postgres` стека; ENV `DATABASE_URL` переопределяет его.
+  `POSTGRES_PASSWORD` обязателен: без него Compose не стартует. Используйте пароль без символов `@ : / ? # %`,
+  иначе URL сломается (он подставляется в строку как есть).
 - `migrate` — одноразовый (`alembic upgrade head`); `server` стартует после успешного `migrate`. Worker не входит в Compose.
 - Секреты приложения — только в Environment Dokploy. `config/harness.yaml` — File Mount Dokploy.
 
@@ -57,12 +63,18 @@
 Реестра GitLab пока нет: CI не запускался, remote репозитория — GitHub (D-59). Dokploy собирает образ сам
 из `Dockerfile` по `docker-compose.yml`, поэтому `HARNESS_IMAGE` не задаётся. Раздел «CI» ниже — цель после переноса в GitLab.
 
-1. **Postgres.** Разверните `deploy/db/docker-compose.yml`: volume сохраняет данные, порт опубликован только на loopback `127.0.0.1:5432`, сервис подключён к `dokploy-network`. `DATABASE_URL` контейнера server указывает на DB в общей Docker-сети; host worker использует `127.0.0.1:5432`. Пользователь,
-   пароль и база — из его настроек. Пароль в документацию и репозиторий не пишется.
+1. **Postgres и ENV БД.** Postgres входит в стек `docker-compose.yml`: задайте в Environment Dokploy `POSTGRES_PASSWORD`
+   (обязательно), при необходимости `POSTGRES_USER` (по умолчанию `harness`) и `POSTGRES_DB` (по умолчанию `harness`).
+   `DATABASE_URL` задавать не нужно: он собирается из этих значений. Пароль в документацию и репозиторий не пишется.
+   Если host worker должен ходить в ту же БД по `127.0.0.1:5432`, остаётся `deploy/db/docker-compose.yml`: его volume
+   и порт на loopback не меняются. Тогда задайте `DATABASE_URL` явно на адрес этой БД (порт опубликован только на loopback
+   хоста, `postgres` стека его не видит) и не запускайте второй экземпляр БД для тех же данных.
 2. **Стек харнесса.** Dokploy → Compose → Source: GitHub `w1do/agents-flow`, ветка `main`, Compose Path `docker-compose.yml`.
-   Dokploy выполняет `build` из `Dockerfile`; образ получает локальный тег `agents-flow:local`, общий для migrate и server.
+   Dokploy выполняет `build` из `Dockerfile` (migrate, server) и `apps/console/Dockerfile` (console, контекст — корень репозитория);
+   образ server получает локальный тег `agents-flow:local`, общий для migrate и server.
 3. **Домен.** Домен `flow.w1do.ru` привязать к сервису `server`, порт `8000`, HTTPS: Let's Encrypt.
-   `HARNESS_PUBLIC_URL=https://flow.w1do.ru`.
+   `HARNESS_PUBLIC_URL=https://flow.w1do.ru`. Консоль выставляется отдельным доменом на сервис `console`, порт `80`:
+   она ходит к API через nginx, `HARNESS_PUBLIC_URL` для неё не нужен.
 4. **File Mount.** Файл `harness.yaml` с боевыми значениями (ссылки `vault:…`, workspace, sandbox) — путь монтирования
    `config/harness.yaml`. Образец — `config/harness.example.yaml`; боевой файл в репозиторий не коммитится.
 5. **ENV.** Environment стека в Dokploy: обязательные и опциональные переменные из ARCHITECTURE.md §9, которые нужны
@@ -126,7 +138,8 @@ Worker запускается на этой же машине как systemd use
 
 ## Первый запуск
 
-1. Задеплоить стек БД, затем стек харнесса с ENV из ARCHITECTURE.md §9.
+1. Задеплоить стек харнесса (`docker-compose.yml`) с ENV из ARCHITECTURE.md §9 и `POSTGRES_PASSWORD`. Для прода с
+   host worker, который уже работает с `deploy/db`, см. пункт 1 «Первого деплоя».
 2. `harness-server telegram set-webhook` — регистрирует `${HARNESS_PUBLIC_URL}/telegram/webhook` с секретом
    `TELEGRAM_WEBHOOK_SECRET`. Запускается в контейнере `server` после деплоя и при каждой смене `HARNESS_PUBLIC_URL`
    или секрета. `HARNESS_PUBLIC_URL` должен быть https без учётных данных, иначе команда завершится с кодом 1 и

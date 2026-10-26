@@ -24,6 +24,11 @@ SPA-маршрутов и проксировать `/api` на API сервер�
 `default-src 'self'`, `X-Frame-Options`, `Referrer-Policy` настраиваются на хосте;
 деплой в этот этап не входит.
 
+Образ собирается из корня репозитория (контекст нужен для `packages/shared-types`):
+`docker compose build console` (сервис `console` в `docker-compose.yml`, Dockerfile
+`apps/console/Dockerfile`). Внутри образа nginx (`apps/console/nginx.conf`) отдаёт `dist`,
+проксирует `/api/` и `/health` на сервис `server:8000` и слушает порт 80 без публикации наружу.
+
 ## Проверки
 
 Все команды выполняются из `apps/console`:
