@@ -24,7 +24,9 @@ async def test_live_send_and_edit_message() -> None:
         pytest.skip(f"нужны переменные {_TOKEN_ENV} и {_CHAT_ENV}")
     chat_id = int(chat_id_raw)
 
-    async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=10.0)) as http:
+    # Прокси берём из отдельной live-переменной: conftest очищает HTTPS_PROXY для всех тестов.
+    proxy = os.environ.get("LIVE_HTTPS_PROXY") or None
+    async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=10.0), proxy=proxy) as http:
         client = HttpxTelegramClient(token, http)
         message_id = await client.send_message(chat_id, "harness live: отправка")
         await client.edit_message_text(chat_id, message_id, "harness live: правка")

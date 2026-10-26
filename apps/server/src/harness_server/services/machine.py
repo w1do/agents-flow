@@ -17,6 +17,8 @@ from harness_server.services import git_access
 from harness_server.services import secrets as secret_refs
 
 AGENT_CLIENT_COMMAND = "claude"
+# Первичная индексация с эмбеддингами длится минуты; общий таймаут exec (60 с) её обрывает.
+MEMORY_INIT_TIMEOUT_S = 1800
 
 
 class RootUserError(Exception):
@@ -252,6 +254,7 @@ async def init_memory(
             envs=(
                 {"EMBEDDING_API_KEY": embedding.get_secret_value()} if embedding is not None else {}
             ),
+            timeout_s=MEMORY_INIT_TIMEOUT_S,
         )
         if result.exit_code:
             raise MachineError(1, "memory")

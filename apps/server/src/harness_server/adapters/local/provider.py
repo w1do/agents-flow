@@ -15,6 +15,17 @@ from harness_server.adapters.sandbox.protocol import ExecResult
 from harness_server.services.machine import RootUserError, require_non_root
 
 _ENV_KEY_RE: Final = re.compile(r"^[A-Z_][A-Z0-9_]*$")
+# Прокси нужны машине агента для выхода в сеть; это не секреты и не значения ключей.
+_PROXY_ENV_NAMES: Final = (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+    "no_proxy",
+)
 _OUTPUT_LIMIT_BYTES: Final = 1_048_576
 _READ_CHUNK_BYTES: Final = 65_536
 
@@ -111,7 +122,8 @@ class LocalSandboxProvider:
         environment = {
             key: value
             for key, value in os.environ.items()
-            if key in {"PATH", "HOME", "USER", "LOGNAME", "LANG", "TERM"} or key.startswith("LC_")
+            if key in {"PATH", "HOME", "USER", "LOGNAME", "LANG", "TERM", *_PROXY_ENV_NAMES}
+            or key.startswith("LC_")
         }
         if "HOME" not in environment:
             environment["HOME"] = str(Path.home())
