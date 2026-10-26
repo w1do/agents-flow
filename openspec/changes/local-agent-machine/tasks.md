@@ -8,7 +8,7 @@
 
 ## 1. Решение и общий протокол (до удаления Novita)
 
-- [ ] 1.1 Записать D-NN в `docs/decisions.md`: отказ от Novita и bootstrap, локальная машина, `agent init`, очищенное окружение подпроцессов, worker на хосте, закрытие `mvp-06b-vps-provider`/`sandbox-timeout-extend`/`cli-version-pin` — файлы: `docs/decisions.md` — проверка: ревью записи, ссылки на заменяемые D-35…D-38, D-40, D-47, D-51, D-62, D-63
+- [x] 1.1 Записать D-NN в `docs/decisions.md`: отказ от Novita и bootstrap, локальная машина, `agent init`, очищенное окружение подпроцессов, worker на хосте, закрытие `mvp-06b-vps-provider`/`sandbox-timeout-extend`/`cli-version-pin` — файлы: `docs/decisions.md` — проверка: ревью записи, ссылки на заменяемые D-35…D-38, D-40, D-47, D-51, D-62, D-63
 - [x] 1.2 Перенести `protocol.py`, `errors.py`, `fake.py` из `adapters/novita` в `adapters/sandbox`, удалить `extend_timeout` из Protocol и `FakeSandbox`, перевести импорты в `services`, `worker`, `cli`, `wiring`, тестах — файлы: `apps/server/src/harness_server/adapters/sandbox/`, перечисленные модули — проверка: `test_sandbox_fake.py` (бывший `test_novita_fake.py`), mypy зелёный
 
 ## 2. LocalSandboxProvider
