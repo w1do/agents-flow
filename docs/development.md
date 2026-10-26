@@ -34,15 +34,34 @@ curl -fsS localhost:8000/health/ready # в другом терминале: 200 
 Webhook Telegram локально — через публичный туннель на `/telegram/webhook`; адрес в `HARNESS_PUBLIC_URL`.
 Пошаговая работа без веб-панели (Telegram и CLI, проверка, частые проблемы): [operating-without-ui.md](operating-without-ui.md).
 
+## Машина агента и worker (D-64)
+
+- Worker запускает агента на локальной машине оператора (D-64).
+- Перед первым проектом оператор ставит на машине `git`, Node.js не ниже 22.13, `npm`, клиент Claude и
+  `openspec`. Если включена память проекта, нужны ещё `memory` и Docker Compose v2. Агент сам инструменты не ставит.
+- Подготовка проекта выполняется от непривилегированного пользователя (root не допускается):
+
+```bash
+agent init <project>                  # проверка prerequisites, каталоги ~/.harness и ~/work, клон, память
+```
+
+- Коды выхода: 0 — успех, 1 — ошибка шага, 2 — неизвестный проект, 3 — не хватает prerequisites.
+  Подробности — в [apps/server/README.md](../apps/server/README.md).
+- Задача по проекту без маркера `projects/<id>.ready` не запускается: причина `project_not_initialized`.
+  Сначала выполните `agent init <project>`.
+- В проде worker работает как systemd user unit на хосте, в Compose его нет. Инструкция — в
+  [deploy/worker/README.md](../deploy/worker/README.md). Локально `./tools/harness dev` запускает server и worker
+  в одном окне, как и раньше.
+
 ## Тесты
 
 | Уровень | Что | Как |
 |---|---|---|
 | domain | переходы статусов, redaction | чистые unit-тесты |
 | services | бизнес-логика | фейковые адаптеры + реальный Postgres (testcontainers) |
-| adapters | контракты Telegram, Polza, STT, GitLab, Novita | respx / записанные ответы |
+| adapters | контракты Telegram, Polza, STT, GitLab; `LocalSandboxProvider` (`adapters/local`) | respx / записанные ответы; провайдер — реальные локальные процессы (`test_local_provider.py`) |
 | api / mcp | авторизация, валидация, коды ответов | httpx AsyncClient + MCP-клиент SDK |
-| live | реальная песочница, бот, GitLab | `pytest -m live`, вручную, ключи из ENV |
+| live | машина агента (`agent init`), бот, GitLab | `pytest -m live`, вручную, ключи из ENV |
 
 ## Стиль
 

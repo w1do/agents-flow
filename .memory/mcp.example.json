@@ -5,7 +5,7 @@
       "args": [
         "mcp",
         "--project",
-        "/root/agent-workflow"
+        "/home/dev/opensource/agents-flow"
       ]
     }
   }

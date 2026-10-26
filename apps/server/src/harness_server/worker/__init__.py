@@ -2,7 +2,7 @@
 
 При старте дообрабатывает апдейты Telegram и досылает карточки, брошенные до рестарта (D-27).
 Ошибка восстановления логируется и не мешает запуску цикла. Если песочница настроена
-(NOVITA_API_KEY),
+(local provider),
 на каждом шаге цикла запускается диспетчер: без реестра пайплайнов он ничего не делает.
 Публичный API пакета (run_worker, start_worker, serve_worker) сохранён после переноса из worker.py.
 """
@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from harness_server.config import HarnessConfig
 from harness_server.db.session import create_engine, create_session_factory
 from harness_server.services.intake import recover_pending
+from harness_server.services.machine import require_non_root
 from harness_server.services.sandboxes import ensure_sandbox
 from harness_server.settings import Settings
 from harness_server.wiring import (
@@ -65,6 +66,7 @@ async def start_worker(
 
     adapters — фейки в тестах; без него строятся реальные адаптеры из настроек.
     """
+    require_non_root()
     engine = create_engine(settings.database_url.get_secret_value())
     factory = create_session_factory(engine)
     http = build_http_client()
@@ -91,10 +93,7 @@ async def _build_dispatch(
     settings: Settings, config: HarnessConfig, factory: async_sessionmaker[AsyncSession]
 ) -> Callable[[], Awaitable[bool]] | None:
     """Диспетчер песочницы, если песочница настроена; иначе None и worker работает как прежде."""
-    provider = build_sandbox_provider(settings)
-    if provider is None:
-        logger.info("песочница не настроена (NOVITA_API_KEY), диспетчер не запускается")
-        return None
+    provider = build_sandbox_provider(settings, config.sandbox.provider_id)
     ctx = build_dispatch_context(settings, config, factory, provider)
     if ctx is None:
         return None

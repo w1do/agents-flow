@@ -10,8 +10,9 @@ import httpx
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from harness_server.adapters.novita import NovitaSandboxProvider, SandboxProvider
+from harness_server.adapters.local import LocalSandboxProvider
 from harness_server.adapters.polza import POLZA_API_URL, PolzaRouter, Router
+from harness_server.adapters.sandbox import SandboxProvider
 from harness_server.adapters.stt import OpenAiCompatibleStt, SpeechToText
 from harness_server.adapters.telegram import HttpxTelegramClient, TelegramClient
 from harness_server.adapters.vault import McpSecretVault, SecretVault
@@ -68,15 +69,9 @@ def build_adapters(settings: Settings, http: httpx.AsyncClient) -> BotAdapters:
     return BotAdapters(telegram=telegram, stt=stt, router=router)
 
 
-def build_sandbox_provider(settings: Settings) -> SandboxProvider | None:
-    """Провайдер песочницы Novita из настроек; None, если NOVITA_API_KEY не задан (песочница не
-    настроена)."""
-    if settings.novita_api_key is None:
-        return None
-    return NovitaSandboxProvider(
-        api_key=settings.novita_api_key.get_secret_value(),
-        domain=settings.novita_domain,
-    )
+def build_sandbox_provider(settings: Settings, provider_id: str = "local") -> SandboxProvider:
+    """The configured logical machine is always a local provider."""
+    return LocalSandboxProvider(provider_id)
 
 
 def build_vault(settings: Settings) -> SecretVault | None:

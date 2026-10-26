@@ -39,10 +39,6 @@ _SECRET_SEGMENTS = frozenset(
 _SEGMENT_SPLIT = re.compile(r"[_-]")
 # Граница camelCase: accessToken → access_Token, чтобы сегмент token не терялся внутри слова.
 _CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
-# Версия пакета в bootstrap подставляется в команду npm: принимаем только X.Y.Z (D-38).
-_SEMVER_PATTERN = r"^\d+\.\d+\.\d+$"
-# memory-agent ставится по полному sha: теги и ветки изменяемы, короткий sha неоднозначен (D-51).
-_GIT_SHA_PATTERN = r"^[0-9a-f]{40}$"
 # Сегмент начинается и заканчивается буквой или цифрой: ./. и ../.. не проходят (L1).
 _GITHUB_REPO_SEGMENT = r"[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?"
 _GITHUB_REPO_PATTERN = rf"^{_GITHUB_REPO_SEGMENT}/{_GITHUB_REPO_SEGMENT}$"
@@ -160,16 +156,23 @@ class WorkspaceConfig(BaseModel):
 
 
 class SandboxMemoryConfig(BaseModel):
-    """Память проекта в песочнице (memory-agent, D-47). Нет блока — память выключена."""
+    """Память проекта на машине агента. Нет блока — память выключена."""
 
     model_config = ConfigDict(extra="forbid")
 
-    # GitHub-репозиторий memory-agent (D-51).
-    repo: str = Field(default="w1do/memory-agent", pattern=_GITHUB_REPO_PATTERN)
-    # Полный sha коммита memory-agent, тег и ветка не принимаются (D-51). Обязателен.
-    ref: str = Field(pattern=_GIT_SHA_PATTERN)
     # Ключ embeddings — только ссылка vault:…; без неё поиск лексический.
     embedding_ref: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_removed_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            for field in ("repo", "ref"):
+                if field in data:
+                    raise ValueError(
+                        f"sandbox.memory.{field} удалён: версии и установка — на машине владельца"
+                    )
+        return data
 
     @field_validator("embedding_ref")
     @classmethod
@@ -178,11 +181,11 @@ class SandboxMemoryConfig(BaseModel):
 
 
 class GitAuthorConfig(BaseModel):
-    """Автор коммитов агента в песочнице: git config --global при bootstrap (найдено live 5.7)."""
+    """Автор коммитов агента, передаваемый только через env процесса."""
 
     model_config = ConfigDict(extra="forbid")
 
-    # Без управляющих символов и перевода строки: значение идёт в git config и команду bootstrap.
+    # Без управляющих символов и перевода строки: значение идёт в env git-процесса.
     name: str = Field(
         default="agents-flow", min_length=1, max_length=100, pattern=_GIT_NAME_PATTERN
     )
@@ -204,9 +207,18 @@ class SandboxConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     provider_id: str = Field(min_length=1)
-    # Версии ставятся в песочницу bootstrap-скриптом и закреплены здесь, а не «latest» (D-38).
-    claude_code_version: str = Field(default="2.1.292", pattern=_SEMVER_PATTERN)
-    openspec_version: str = Field(default="1.14.3", pattern=_SEMVER_PATTERN)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_removed_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            for field in ("claude_code_version", "openspec_version"):
+                if field in data:
+                    raise ValueError(
+                        f"sandbox.{field} удалён: версии и установка — на машине владельца"
+                    )
+        return data
+
     memory: SandboxMemoryConfig | None = None
     git_author: GitAuthorConfig = Field(default_factory=GitAuthorConfig)
 

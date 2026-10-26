@@ -7,14 +7,19 @@ run.sh в песочнице. Проверяется резервировани�
 import asyncio
 import base64
 import json
+import os
 import shlex
+import signal
+import sys
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import pytest
-from harness_server.adapters.novita import FakeSandbox
+from harness_server.adapters.local import LocalSandboxProvider
+from harness_server.adapters.sandbox import ExecResult, FakeSandbox, SandboxUnavailable
 from harness_server.config import GitAuthorConfig, HarnessConfig, RepoConfig, load_config
 from harness_server.db.models import Task, TaskToken
 from harness_server.security import tokens
@@ -49,6 +54,7 @@ GITHUB = "github_pat_test-token-0123456789abcdef"
 REPO_CONFIG = RepoConfig(
     provider="gitlab", base_url="https://gitlab.example.com", project="group/demo"
 )
+PROBE_PREFIX = shlex.quote(sys.executable) + " -c"
 
 
 class _Stage:
@@ -75,6 +81,51 @@ def _fake(
     if launch_stdout is not None:
         fake.respond("setsid nohup", stdout=launch_stdout)
     return fake
+
+
+class _CleanupFake(FakeSandbox):
+    """A process-group fake whose liveness changes only after its own kill command."""
+
+    def __init__(
+        self,
+        *,
+        group_alive: bool,
+        kill_makes_dead: bool = True,
+        pid_unreadable: bool = False,
+        probe_result: ExecResult | None = None,
+    ) -> None:
+        super().__init__(sandbox_id=PROVIDER_ID)
+        self.group_alive = group_alive
+        self.kill_makes_dead = kill_makes_dead
+        self.pid_unreadable = pid_unreadable
+        self.probe_result = probe_result
+        self.respond('printf %s "$HOME"', stdout=HOME)
+
+    async def exec(
+        self,
+        sandbox_id: str,
+        cmd: str,
+        *,
+        envs: dict[str, str] | None = None,
+        cwd: str | None = None,
+        timeout_s: float = 60,
+    ) -> ExecResult:
+        result = await super().exec(sandbox_id, cmd, envs=envs, cwd=cwd, timeout_s=timeout_s)
+        if cmd.startswith("kill -TERM -- -4242") and self.kill_makes_dead and result.exit_code == 0:
+            self.group_alive = False
+            return result
+        if cmd == "kill -0 -- -4242":
+            return ExecResult(0 if self.group_alive else 1, "", "")
+        if cmd.startswith(PROBE_PREFIX):
+            if self.probe_result is not None:
+                return self.probe_result
+            return ExecResult(0 if self.group_alive else 3, "", "")
+        return result
+
+    async def read_file(self, sandbox_id: str, path: str) -> str | None:
+        if self.pid_unreadable and path.endswith("/pid"):
+            raise SandboxUnavailable("unreadable")
+        return await super().read_file(sandbox_id, path)
 
 
 def _orphan_task(workspace: str | None = "demo") -> Task:
@@ -267,7 +318,7 @@ async def test_parallel_reserve_takes_one_sandbox(committed_session_factory: Fac
 # --- 3.4 Активация ---
 
 
-async def test_activate_extends_timeout_and_creates_worktree() -> None:
+async def test_activate_creates_worktree_without_timeout_extension() -> None:
     task = _orphan_task()
     fake = _fake()
 
@@ -281,7 +332,7 @@ async def test_activate_extends_timeout_and_creates_worktree() -> None:
         repo_token=SecretStr(GITLAB),
     )
 
-    assert fake.timeout_s == 70 * 60
+    assert all(entry.method != "extend_timeout" for entry in fake.journal)
     adds = [e for e in fake.journal if e.cmd and "worktree add -B" in e.cmd]
     assert len(adds) == 1
     assert f"task/{task.id}" in (adds[0].cmd or "")
@@ -819,15 +870,17 @@ async def test_cleanup_kills_agent_group_only_when_recorded_and_alive(
     без kill: очистка не ждёт KILL_GRACE_SEC впустую."""
     await _ensure(committed_session_factory)
     task = await _task(committed_session_factory)
-    await _set_agent_run(committed_session_factory, started_at=datetime.now(UTC), pid=agent_pid)
-    fake = _fake()
-    if agent_pid is not None and not group_alive:
-        fake.respond("kill -0 -- -4242", exit_code=1)
+    await _set_agent_run(
+        committed_session_factory,
+        started_at=datetime.now(UTC) if agent_pid is not None else None,
+        pid=agent_pid,
+    )
+    fake = _CleanupFake(group_alive=group_alive)
 
     async with committed_session_factory() as session:
         await sandboxes.cleanup_task(session, fake, PROVIDER_ID, task, secrets=())
 
-    probes = [e for e in fake.journal if e.cmd and "kill -0" in e.cmd]
+    probes = [e for e in fake.journal if e.cmd and e.cmd.startswith(PROBE_PREFIX)]
     kills = [i for i, e in enumerate(fake.journal) if e.cmd and "kill -TERM -- -4242" in e.cmd]
     removals = [i for i, e in enumerate(fake.journal) if e.cmd and e.cmd.startswith("rm -rf")]
     assert bool(probes) == (agent_pid is not None)
@@ -835,6 +888,469 @@ async def test_cleanup_kills_agent_group_only_when_recorded_and_alive(
     assert removals
     if kills:
         assert kills[0] < removals[0]
+
+
+async def test_cleanup_recovers_crash_window_pid_before_deleting_evidence(
+    committed_session_factory: Factory,
+) -> None:
+    await _ensure(committed_session_factory)
+    task = await _task(committed_session_factory)
+    async with committed_session_factory() as session:
+        reservation = await sandboxes.reserve(session, _Stage())
+        await sandboxes.issue_task_token(
+            session, task.id, secret_key=SECRET_KEY, agent_run_timeout_min=60
+        )
+    assert reservation is not None
+    await _set_agent_run(committed_session_factory, started_at=datetime.now(UTC), pid=None)
+    fake = _CleanupFake(group_alive=True)
+    pid_path = f"{sandboxes.task_dir(HOME, task.id)}/pid"
+    await fake.write_file(PROVIDER_ID, pid_path, "4242\n")
+
+    async with committed_session_factory() as session:
+        await sandboxes.cleanup_task(session, fake, PROVIDER_ID, task, secrets=())
+
+    entries = fake.journal
+    recovered = next(
+        i
+        for i, entry in enumerate(entries)
+        if entry.method == "read_file" and entry.cmd == pid_path
+    )
+    killed = next(
+        i for i, entry in enumerate(entries) if entry.cmd and "kill -TERM -- -4242" in entry.cmd
+    )
+    removed = next(
+        i for i, entry in enumerate(entries) if entry.cmd and entry.cmd.startswith("rm -rf")
+    )
+    assert recovered < killed < removed
+    async with committed_session_factory() as session:
+        row = await sandboxes.sandbox_status(session, PROVIDER_ID)
+        tokens = (
+            await session.execute(select(TaskToken).where(TaskToken.task_id == task.id))
+        ).scalars()
+    assert row is not None and row.agent_pid == 4242
+    assert all(token.revoked_at is not None for token in tokens)
+
+
+@pytest.mark.parametrize(
+    ("pid_text", "pid_unreadable"),
+    [(None, False), ("bad-pid", False), ("4242", True)],
+    ids=["missing", "invalid", "unreadable"],
+)
+async def test_cleanup_crash_window_unknown_pid_keeps_evidence_and_reservation(
+    committed_session_factory: Factory, pid_text: str | None, pid_unreadable: bool
+) -> None:
+    await _ensure(committed_session_factory)
+    task = await _task(committed_session_factory)
+    async with committed_session_factory() as session:
+        reservation = await sandboxes.reserve(session, _Stage())
+        await sandboxes.issue_task_token(
+            session, task.id, secret_key=SECRET_KEY, agent_run_timeout_min=60
+        )
+    assert reservation is not None
+    await _set_agent_run(committed_session_factory, started_at=datetime.now(UTC), pid=None)
+    fake = _CleanupFake(group_alive=True, pid_unreadable=pid_unreadable)
+    pid_path = f"{sandboxes.task_dir(HOME, task.id)}/pid"
+    if pid_text is not None:
+        await fake.write_file(PROVIDER_ID, pid_path, pid_text)
+
+    with pytest.raises(CleanupFailed):
+        async with committed_session_factory() as session:
+            await sandboxes.cleanup_task(session, fake, PROVIDER_ID, task, secrets=())
+
+    assert not [entry for entry in fake.journal if entry.cmd and entry.cmd.startswith("rm -rf")]
+    async with committed_session_factory() as session:
+        row = await sandboxes.sandbox_status(session, PROVIDER_ID)
+        tokens = (
+            await session.execute(select(TaskToken).where(TaskToken.task_id == task.id))
+        ).scalars()
+    assert row is not None and (row.status, row.current_task_id) == (SandboxStatus.ERROR, task.id)
+    assert all(token.revoked_at is not None for token in tokens)
+
+
+@pytest.mark.parametrize(
+    "read_error", [PermissionError(), UnicodeDecodeError("utf-8", b"\xff", 0, 1, "bad")]
+)
+async def test_cleanup_crash_window_pid_read_errors_fail_closed(
+    committed_session_factory: Factory, read_error: Exception, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await _ensure(committed_session_factory)
+    task = await _task(committed_session_factory)
+    async with committed_session_factory() as session:
+        reservation = await sandboxes.reserve(session, _Stage())
+        await sandboxes.issue_task_token(
+            session, task.id, secret_key=SECRET_KEY, agent_run_timeout_min=60
+        )
+    assert reservation is not None
+    await _set_agent_run(committed_session_factory, started_at=datetime.now(UTC), pid=None)
+    fake = _CleanupFake(group_alive=True)
+
+    async def fail_pid_read(_: str, path: str) -> str | None:
+        if path.endswith("/pid"):
+            raise read_error
+        return None
+
+    monkeypatch.setattr(fake, "read_file", fail_pid_read)
+
+    with pytest.raises(CleanupFailed):
+        async with committed_session_factory() as session:
+            await sandboxes.cleanup_task(session, fake, PROVIDER_ID, task, secrets=())
+
+    assert not [entry for entry in fake.journal if entry.cmd and entry.cmd.startswith("rm -rf")]
+    async with committed_session_factory() as session:
+        row = await sandboxes.sandbox_status(session, PROVIDER_ID)
+        tokens = (
+            await session.execute(select(TaskToken).where(TaskToken.task_id == task.id))
+        ).scalars()
+    assert row is not None and (row.status, row.current_task_id) == (SandboxStatus.ERROR, task.id)
+    assert all(token.revoked_at is not None for token in tokens)
+
+
+async def test_cleanup_refuses_to_remove_evidence_when_killed_group_stays_alive(
+    committed_session_factory: Factory,
+) -> None:
+    await _ensure(committed_session_factory)
+    task = await _task(committed_session_factory)
+    async with committed_session_factory() as session:
+        reservation = await sandboxes.reserve(session, _Stage())
+    assert reservation is not None
+    await _set_agent_run(committed_session_factory, started_at=datetime.now(UTC), pid=4242)
+    fake = _CleanupFake(group_alive=True, kill_makes_dead=False)
+
+    with pytest.raises(CleanupFailed):
+        async with committed_session_factory() as session:
+            await sandboxes.cleanup_task(session, fake, PROVIDER_ID, task, secrets=())
+
+    assert not [entry for entry in fake.journal if entry.cmd and entry.cmd.startswith("rm -rf")]
+    async with committed_session_factory() as session:
+        row = await sandboxes.sandbox_status(session, PROVIDER_ID)
+    assert row is not None and (row.status, row.current_task_id) == (SandboxStatus.ERROR, task.id)
+
+
+async def test_cleanup_kill_command_error_keeps_evidence_and_reservation(
+    committed_session_factory: Factory,
+) -> None:
+    await _ensure(committed_session_factory)
+    task = await _task(committed_session_factory)
+    async with committed_session_factory() as session:
+        reservation = await sandboxes.reserve(session, _Stage())
+    assert reservation is not None
+    await _set_agent_run(committed_session_factory, started_at=datetime.now(UTC), pid=4242)
+    fake = _CleanupFake(group_alive=True)
+    fake.respond("kill -TERM -- -4242", exit_code=1)
+
+    with pytest.raises(CleanupFailed):
+        async with committed_session_factory() as session:
+            await sandboxes.cleanup_task(session, fake, PROVIDER_ID, task, secrets=())
+
+    assert not [entry for entry in fake.journal if entry.cmd and entry.cmd.startswith("rm -rf")]
+    async with committed_session_factory() as session:
+        row = await sandboxes.sandbox_status(session, PROVIDER_ID)
+    assert row is not None and (row.status, row.current_task_id) == (SandboxStatus.ERROR, task.id)
+
+
+async def test_cleanup_permission_denied_probe_is_not_treated_as_dead(
+    committed_session_factory: Factory,
+) -> None:
+    await _ensure(committed_session_factory)
+    task = await _task(committed_session_factory)
+    async with committed_session_factory() as session:
+        reservation = await sandboxes.reserve(session, _Stage())
+    assert reservation is not None
+    await _set_agent_run(committed_session_factory, started_at=datetime.now(UTC), pid=4242)
+    fake = _CleanupFake(group_alive=True, probe_result=ExecResult(0, "unknown", ""))
+
+    with pytest.raises(CleanupFailed):
+        async with committed_session_factory() as session:
+            await sandboxes.cleanup_task(session, fake, PROVIDER_ID, task, secrets=())
+
+    assert not [entry for entry in fake.journal if entry.cmd and entry.cmd.startswith("rm -rf")]
+    async with committed_session_factory() as session:
+        row = await sandboxes.sandbox_status(session, PROVIDER_ID)
+    assert row is not None and (row.status, row.current_task_id) == (SandboxStatus.ERROR, task.id)
+
+
+@pytest.mark.parametrize(
+    "probe_result",
+    [
+        ExecResult(127, "", "command not found"),
+        ExecResult(1, "", "доступ запрещён"),
+        ExecResult(0, "", ""),
+    ],
+    ids=["command_missing", "localized_permission", "empty_output"],
+)
+async def test_cleanup_unknown_probe_never_means_dead(
+    committed_session_factory: Factory, probe_result: ExecResult
+) -> None:
+    await _ensure(committed_session_factory)
+    task = await _task(committed_session_factory)
+    async with committed_session_factory() as session:
+        reservation = await sandboxes.reserve(session, _Stage())
+    assert reservation is not None
+    await _set_agent_run(committed_session_factory, started_at=datetime.now(UTC), pid=4242)
+    fake = _CleanupFake(group_alive=True, probe_result=probe_result)
+
+    with pytest.raises(CleanupFailed):
+        async with committed_session_factory() as session:
+            await sandboxes.cleanup_task(session, fake, PROVIDER_ID, task, secrets=())
+
+    assert not [entry for entry in fake.journal if entry.cmd and entry.cmd.startswith("rm -rf")]
+
+
+async def test_cleanup_ignores_pid_file_without_recorded_launch(
+    committed_session_factory: Factory,
+) -> None:
+    await _ensure(committed_session_factory)
+    task = await _task(committed_session_factory)
+    fake = _CleanupFake(group_alive=True)
+    await fake.write_file(PROVIDER_ID, f"{sandboxes.task_dir(HOME, task.id)}/pid", "4242")
+
+    async with committed_session_factory() as session:
+        await sandboxes.cleanup_task(session, fake, PROVIDER_ID, task, secrets=())
+
+    assert not [entry for entry in fake.journal if entry.cmd and entry.cmd.startswith(PROBE_PREFIX)]
+    assert not [entry for entry in fake.journal if entry.cmd and "kill -TERM" in entry.cmd]
+
+
+async def _start_leaderless_group(provider: LocalSandboxProvider) -> int:
+    result = await provider.exec(
+        PROVIDER_ID, "setsid sh -c 'sleep 30 & exit 0' >/dev/null 2>&1 & echo $!"
+    )
+    pgid = parse_pid(result.stdout)
+    assert result.exit_code == 0 and pgid is not None
+    for _ in range(50):
+        try:
+            os.kill(pgid, 0)
+        except ProcessLookupError:
+            os.killpg(pgid, 0)
+            return pgid
+        await asyncio.sleep(0.01)
+    pytest.fail("leader of owned process group did not exit")
+
+
+async def _kill_owned_group(pgid: int) -> None:
+    try:
+        os.killpg(pgid, signal.SIGKILL)
+    except ProcessLookupError:
+        return
+    for _ in range(50):
+        try:
+            os.killpg(pgid, 0)
+        except ProcessLookupError:
+            return
+        await asyncio.sleep(0.01)
+    pytest.fail("owned process group did not terminate")
+
+
+def _controlled_probe_command(command: str, mode: str) -> str:
+    """Inject a test-only errno before the production inline probe body executes."""
+    args = shlex.split(command)
+    if mode == "missing_interpreter":
+        args[0] = "/missing/python-for-probe-test"
+        return shlex.join(args)
+    injection = {
+        "esrch": "import os\ndef _probe(*_): raise ProcessLookupError\nos.killpg = _probe\n",
+        "permission": "import os\ndef _probe(*_): raise PermissionError\nos.killpg = _probe\n",
+        "unknown": "import os\ndef _probe(*_): raise OSError\nos.killpg = _probe\n",
+        "mixed_permission": (
+            "import os\nprint('No such process; permission denied')\n"
+            "def _probe(*_): raise PermissionError\nos.killpg = _probe\n"
+        ),
+    }[mode]
+    code_index = args.index("-c") + 1
+    args[code_index] = injection + args[code_index]
+    return shlex.join(args)
+
+
+@pytest.mark.parametrize(
+    "mode",
+    ["missing_interpreter", "permission", "unknown", "mixed_permission"],
+)
+async def test_cleanup_inline_probe_failure_keeps_leaderless_group_evidence_and_reservation(
+    committed_session_factory: Factory,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mode: str,
+) -> None:
+    """The production Python probe must not call a leaderless group gone on uncertainty."""
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setattr("harness_server.adapters.local.provider.require_non_root", lambda: None)
+    provider = LocalSandboxProvider(PROVIDER_ID)
+    leaderless = await _start_leaderless_group(provider)
+    unrelated = await _start_leaderless_group(provider)
+    try:
+        assert await sandboxes._probe_group(provider, PROVIDER_ID, leaderless) is True
+        original_exec = provider.exec
+        probe_commands: list[str] = []
+
+        async def controlled_probe(
+            sandbox_id: str,
+            cmd: str,
+            *,
+            envs: dict[str, str] | None = None,
+            cwd: str | None = None,
+            timeout_s: int = 60,
+        ) -> ExecResult:
+            if cmd.startswith(PROBE_PREFIX):
+                probe_commands.append(cmd)
+                cmd = _controlled_probe_command(cmd, mode)
+            return await original_exec(sandbox_id, cmd, envs=envs, cwd=cwd, timeout_s=timeout_s)
+
+        monkeypatch.setattr(provider, "exec", controlled_probe)
+        await _ensure(committed_session_factory)
+        task = await _task(committed_session_factory)
+        async with committed_session_factory() as session:
+            reservation = await sandboxes.reserve(session, _Stage())
+            db_task = await get_task(session, task.id)
+            db_task.workspace_id = None
+            await sandboxes.issue_task_token(
+                session, task.id, secret_key=SECRET_KEY, agent_run_timeout_min=60
+            )
+            await session.commit()
+        assert reservation is not None
+        task.workspace_id = None
+        await _set_agent_run(
+            committed_session_factory, started_at=datetime.now(UTC), pid=leaderless
+        )
+        artifact = Path(sandboxes.task_dir(str(home), task.id)) / "evidence"
+        await provider.write_file(PROVIDER_ID, str(artifact), "evidence")
+
+        with pytest.raises(CleanupFailed):
+            async with committed_session_factory() as session:
+                await sandboxes.cleanup_task(session, provider, PROVIDER_ID, task, secrets=())
+
+        assert probe_commands
+        assert artifact.exists()
+        os.killpg(leaderless, 0)
+        os.killpg(unrelated, 0)
+        async with committed_session_factory() as session:
+            row = await sandboxes.sandbox_status(session, PROVIDER_ID)
+            revoked = (
+                await session.execute(select(TaskToken).where(TaskToken.task_id == task.id))
+            ).scalars()
+        assert row is not None
+        assert (row.status, row.current_task_id) == (SandboxStatus.ERROR, task.id)
+        assert all(token.revoked_at is not None for token in revoked)
+    finally:
+        await _kill_owned_group(leaderless)
+        await _kill_owned_group(unrelated)
+    normal_provider = LocalSandboxProvider(PROVIDER_ID)
+    assert await sandboxes._probe_group(normal_provider, PROVIDER_ID, leaderless) is False
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected"),
+    [
+        ("esrch", False),
+        ("permission", None),
+        ("unknown", None),
+        ("missing_interpreter", None),
+    ],
+)
+async def test_probe_group_uses_inline_errno_exit_protocol(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mode: str,
+    expected: bool | None,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setattr("harness_server.adapters.local.provider.require_non_root", lambda: None)
+    provider = LocalSandboxProvider(PROVIDER_ID)
+    original_exec = provider.exec
+    commands: list[str] = []
+
+    async def controlled_probe(
+        sandbox_id: str,
+        cmd: str,
+        *,
+        envs: dict[str, str] | None = None,
+        cwd: str | None = None,
+        timeout_s: int = 60,
+    ) -> ExecResult:
+        if cmd.startswith(PROBE_PREFIX):
+            commands.append(cmd)
+            cmd = _controlled_probe_command(cmd, mode)
+        return await original_exec(sandbox_id, cmd, envs=envs, cwd=cwd, timeout_s=timeout_s)
+
+    monkeypatch.setattr(provider, "exec", controlled_probe)
+    assert await sandboxes._probe_group(provider, PROVIDER_ID, 4242) is expected
+    assert commands and shlex.split(commands[0])[-1] == "4242"
+
+
+async def test_cleanup_recovers_real_pid_file_group_without_touching_unrelated_group(
+    committed_session_factory: Factory,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A real fallback group dies; an independently created process group is never targeted."""
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setattr("harness_server.adapters.local.provider.require_non_root", lambda: None)
+    monkeypatch.setattr(sandboxes, "KILL_GRACE_SEC", 0)
+    provider = LocalSandboxProvider(PROVIDER_ID)
+    commands: list[str] = []
+    exec_provider = provider.exec
+
+    async def record_exec(
+        sandbox_id: str,
+        cmd: str,
+        *,
+        envs: dict[str, str] | None = None,
+        cwd: str | None = None,
+        timeout_s: int = 60,
+    ) -> ExecResult:
+        commands.append(cmd)
+        return await exec_provider(sandbox_id, cmd, envs=envs, cwd=cwd, timeout_s=timeout_s)
+
+    monkeypatch.setattr(provider, "exec", record_exec)
+
+    async def start_group() -> int:
+        result = await provider.exec(PROVIDER_ID, "setsid sleep 30 >/dev/null 2>&1 & echo $!")
+        pid = parse_pid(result.stdout)
+        assert result.exit_code == 0 and pid is not None
+        return pid
+
+    owned_pid = await start_group()
+    unrelated_pid = await start_group()
+    try:
+        await _ensure(committed_session_factory)
+        task = await _task(committed_session_factory)
+        async with committed_session_factory() as session:
+            reservation = await sandboxes.reserve(session, _Stage())
+            db_task = await get_task(session, task.id)
+            db_task.workspace_id = None
+            await sandboxes.issue_task_token(
+                session, task.id, secret_key=SECRET_KEY, agent_run_timeout_min=60
+            )
+            await session.commit()
+        assert reservation is not None
+        task.workspace_id = None
+        await _set_agent_run(committed_session_factory, started_at=datetime.now(UTC), pid=None)
+        directory = sandboxes.task_dir(str(home), task.id)
+        artifact = Path(directory) / "evidence"
+        await provider.write_file(PROVIDER_ID, f"{directory}/pid", str(owned_pid))
+        await provider.write_file(PROVIDER_ID, str(artifact), "evidence")
+
+        async with committed_session_factory() as session:
+            await sandboxes.cleanup_task(session, provider, PROVIDER_ID, task, secrets=())
+
+        killed = next(i for i, command in enumerate(commands) if command.startswith("kill -TERM"))
+        removed = next(i for i, command in enumerate(commands) if command.startswith("rm -rf"))
+        assert killed < removed
+        assert not await sandboxes._is_alive(provider, PROVIDER_ID, owned_pid)
+        assert await sandboxes._is_alive(provider, PROVIDER_ID, unrelated_pid)
+        assert not artifact.exists()
+        async with committed_session_factory() as session:
+            tokens = (
+                await session.execute(select(TaskToken).where(TaskToken.task_id == task.id))
+            ).scalars()
+        assert all(token.revoked_at is not None for token in tokens)
+    finally:
+        await provider.exec(PROVIDER_ID, f"kill -KILL -- -{unrelated_pid} 2>/dev/null || true")
 
 
 async def test_failed_cleanup_puts_sandbox_in_error(committed_session_factory: Factory) -> None:
@@ -985,7 +1501,44 @@ async def test_resume_active_without_task_repairs(committed_session_factory: Fac
     assert row is not None and row.status == SandboxStatus.PAUSED
 
 
-# --- sandbox-profile: память проекта, extra_envs, bootstrap с памятью (design 3, 4) ---
+# Restored scoped git/memory regressions, migrated for local provider.
+
+
+async def test_failed_memory_sync_does_not_fail_activation() -> None:
+    task = _orphan_task()
+    fake = _fake()
+    fake.respond("if [ -f", exit_code=1, stderr="memory failed")
+    await sandboxes.activate(
+        fake,
+        PROVIDER_ID,
+        task,
+        base_ref="main",
+        timeout_min=60,
+        repo=REPO_CONFIG,
+        repo_token=SecretStr(GITLAB),
+        memory_envs={},
+    )
+    assert [entry for entry in fake.journal if entry.cmd and "worktree add -B" in entry.cmd]
+
+
+async def test_run_agent_passes_extra_envs_and_memory_project_to_launch_only(
+    committed_session_factory: Factory,
+) -> None:
+    task = await _task(committed_session_factory)
+    fake = _fake()
+    await _start_with(committed_session_factory, fake, task, memory_enabled=True)
+    launch = [entry for entry in fake.journal if entry.cmd and "setsid nohup" in entry.cmd]
+    assert "HARNESS_MEMORY_PROJECT" in launch[0].env_keys
+    assert fake.received_env("HARNESS_MEMORY_PROJECT") == REPO
+
+
+async def test_run_agent_extra_env_is_launch_only(committed_session_factory: Factory) -> None:
+    task = await _task(committed_session_factory)
+    fake = _fake()
+    await _start_with(committed_session_factory, fake, task, extra={"EXTRA_VAR": "x-value"})
+    launch = [entry for entry in fake.journal if entry.cmd and "setsid nohup" in entry.cmd]
+    assert "EXTRA_VAR" in launch[0].env_keys
+
 
 EMBEDDING = "emb-test-value-0123456789abcdef"
 # Фиктивный sha для тестов (D-51): настоящий закреплённый коммит — только в harness.yaml и D-51.
@@ -1039,76 +1592,6 @@ async def test_activate_without_memory_envs_skips_memory_step() -> None:
     )
 
     assert not [e for e in fake.journal if e.cmd and "memory" in e.cmd]
-
-
-async def test_failed_memory_sync_does_not_fail_activation() -> None:
-    task = _orphan_task()
-    fake = _fake()
-    fake.respond("if [ -f", exit_code=1, stderr="memory failed")
-
-    await sandboxes.activate(
-        fake,
-        PROVIDER_ID,
-        task,
-        base_ref="main",
-        timeout_min=60,
-        repo=REPO_CONFIG,
-        repo_token=SecretStr(GITLAB),
-        memory_envs={},
-    )
-
-    assert [e for e in fake.journal if e.cmd and "worktree add -B" in e.cmd]
-
-
-async def test_run_agent_passes_extra_envs_and_memory_project_to_launch_only(
-    committed_session_factory: Factory,
-) -> None:
-    task = await _task(committed_session_factory)
-    fake = _fake()
-
-    await _start_with(committed_session_factory, fake, task, memory_enabled=True)
-
-    launch = [e for e in fake.journal if e.cmd and "setsid nohup" in e.cmd]
-    assert launch[0].env_keys == (
-        "AGENTS_FLOW_TOKEN",
-        "AGENTS_FLOW_URL",
-        "CLAUDE_CODE_OAUTH_TOKEN",
-        "HARNESS_MEMORY_PROJECT",
-    )
-    assert fake.received_env("HARNESS_MEMORY_PROJECT") == REPO
-    assert fake.files_containing(OAUTH) == []
-
-
-async def test_run_agent_without_memory_has_no_memory_project_env(
-    committed_session_factory: Factory,
-) -> None:
-    task = await _task(committed_session_factory)
-    fake = _fake()
-
-    await _start_with(committed_session_factory, fake, task, extra={"EXTRA_VAR": "x-value"})
-
-    launch = [e for e in fake.journal if e.cmd and "setsid nohup" in e.cmd]
-    assert "HARNESS_MEMORY_PROJECT" not in launch[0].env_keys
-    assert "EXTRA_VAR" in launch[0].env_keys
-
-
-async def test_bootstrap_with_memory_keeps_embedding_key_off_disk() -> None:
-    fake = FakeSandbox(sandbox_id=PROVIDER_ID)
-    fake.respond('printf %s "$HOME"', stdout=HOME)
-
-    await sandboxes.bootstrap(
-        fake,
-        PROVIDER_ID,
-        CONFIG,
-        script="echo\n",
-        repo_tokens={"demo": SecretStr(GITLAB)},
-        memory_ref=MEMORY_REF,
-        memory_repo="w1do/memory-agent",
-        embedding_key=SecretStr(EMBEDDING),
-    )
-
-    assert fake.files_containing(EMBEDDING) == []
-    assert EMBEDDING not in " ".join(e.cmd or "" for e in fake.journal)
 
 
 async def _start_with(
@@ -1166,6 +1649,85 @@ async def test_activate_resets_origin_before_fetch() -> None:
     # Перенастройка origin идёт без заголовка: адрес не секрет, ключ нужен только fetch.
     assert "GIT_CONFIG_VALUE_0" not in fake.journal[remote].env_keys
     assert all(GITLAB not in cmd for cmd in cmds)
+
+
+async def test_activate_uses_test_owned_local_origin_without_network(
+    committed_session_factory: Factory,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    owned_local_origin_git_access: Callable[[str], None],
+) -> None:
+    """The local-origin fixture maps set-url and fetch consistently for a real local provider."""
+    home = tmp_path / "home"
+    repo = home / "work" / "demo"
+    origin = tmp_path / "origin.git"
+    source = tmp_path / "source"
+
+    async def git(*command: str) -> None:
+        process = await asyncio.create_subprocess_exec(
+            *command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await process.communicate()
+        assert process.returncode == 0, stderr.decode()
+
+    for command in (
+        ["git", "init", "-q", "--bare", str(origin)],
+        ["git", "init", "-q", str(source)],
+        [
+            "git",
+            "-C",
+            str(source),
+            "-c",
+            "user.name=test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-qm",
+            "init",
+            "--allow-empty",
+        ],
+        ["git", "-C", str(source), "branch", "-M", "main"],
+        ["git", "-C", str(source), "remote", "add", "origin", str(origin)],
+        ["git", "-C", str(source), "push", "-q", "origin", "main"],
+        ["git", "clone", "-q", str(origin), str(repo)],
+    ):
+        await git(*command)
+    (home / ".harness" / "worktrees").mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setattr("harness_server.adapters.local.provider.require_non_root", lambda: None)
+    provider = LocalSandboxProvider(PROVIDER_ID)
+    commands: list[str] = []
+    exec_provider = provider.exec
+
+    async def record_exec(
+        sandbox_id: str,
+        cmd: str,
+        *,
+        envs: dict[str, str] | None = None,
+        cwd: str | None = None,
+        timeout_s: int = 60,
+    ) -> ExecResult:
+        commands.append(cmd)
+        return await exec_provider(sandbox_id, cmd, envs=envs, cwd=cwd, timeout_s=timeout_s)
+
+    monkeypatch.setattr(provider, "exec", record_exec)
+    owned_local_origin_git_access(str(origin))
+    task = await _task(committed_session_factory)
+
+    await sandboxes.activate(
+        provider,
+        PROVIDER_ID,
+        task,
+        base_ref="main",
+        timeout_min=60,
+        repo=REPO_CONFIG,
+        repo_token=None,
+    )
+
+    assert git_access.set_origin_command(REPO_CONFIG, str(repo)) in commands
+    assert git_access.fetch_command(REPO_CONFIG, str(repo)) in commands
 
 
 async def test_activate_fetch_env_carries_repo_scoped_auth_header() -> None:

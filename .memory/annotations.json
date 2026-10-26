@@ -5,63 +5,151 @@
     "role": "config",
     "contentHash": "629fc2f0d1c7d3e9224df550cfc1881766b4c36d2a3c71de243703c7a545b9cc",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:59:48.745Z"
+    "updatedAt": "2026-10-24T15:53:41.547Z"
+  },
+  {
+    "relativePath": ".memoryignore",
+    "summary": ".memoryignore: Files and folders that must not enter the memory index (gitignore-like syntax).",
+    "role": "other",
+    "contentHash": "e1f08e8503c8650c4a077f8eb6fb72c2372e21bcb718667339ad54783affe043",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.552Z"
+  },
+  {
+    "relativePath": ".worktrees/local-agent-machine-accessible/ARCHITECTURE.md",
+    "summary": "Accepted scope notes local config preparation and shared opt-in live-test fixture; no live worker/deployment execution claimed.",
+    "role": "doc",
+    "contentHash": "6344fadd655fb5870cce073386cff3f0ecf9beea8b68755213cd579c7f8a2182",
+    "author": "agent",
+    "updatedAt": "2026-10-25T11:28:58.846Z"
+  },
+  {
+    "relativePath": ".worktrees/local-agent-machine-accessible/PLAN.md",
+    "summary": "Plan records scoped accepted evidence; owner-only live, walkthrough, report, and full-change acceptance remain open.",
+    "role": "doc",
+    "contentHash": "8a1b8a8409b03b4ee829b33161b253d3afa9dc3f647ec943da631e3b18ab6924",
+    "author": "agent",
+    "updatedAt": "2026-10-25T11:28:58.869Z"
+  },
+  {
+    "relativePath": ".worktrees/local-agent-machine-accessible/apps/server/tests/live_agent_env.py",
+    "summary": "Shared live-test environment helper: explicit worktree agent CLI and opt-in live harness config capture; secret output withheld.",
+    "role": "test",
+    "contentHash": "ef6509abb0e516fa0cef0986529ecc27af475a8329da7aef08ae8b8726fd9f5a",
+    "author": "agent",
+    "updatedAt": "2026-10-25T11:28:58.811Z"
+  },
+  {
+    "relativePath": ".worktrees/local-agent-machine-accessible/apps/server/tests/local_config_preparation.py",
+    "summary": "Test helper: fail-closed legacy GitLab-to-local config mapping; atomic 0600 no-replace staging. Accepted scoped configuration-migration evidence.",
+    "role": "test",
+    "contentHash": "a463fd06972ef932361f89305c6ce3cf7a40c899671e8a660c03ac9deeb432be",
+    "author": "agent",
+    "updatedAt": "2026-10-25T11:28:58.792Z"
+  },
+  {
+    "relativePath": ".worktrees/local-agent-machine-accessible/apps/server/tests/test_agent_runtime_live.py",
+    "summary": "Live runtime cases updated to shared opt-in environment fixture; collected but not executed in accepted scoped pass.",
+    "role": "test",
+    "contentHash": "905e817ea4eef520e1ce506b1565faed4e78331504bc20f31c04cee90c4dc68d",
+    "author": "agent",
+    "updatedAt": "2026-10-25T11:28:58.829Z"
+  },
+  {
+    "relativePath": ".worktrees/local-agent-machine-accessible/apps/server/tests/test_live_agent_env.py",
+    "summary": "Hermetic/opt-in environment tests for live helper, including PATH poisoning and inherited-environment isolation.",
+    "role": "test",
+    "contentHash": "dd5424cbacc8583a065d44d0680c38e5eeddf2ac2455135fb555fa76e17c5cbc",
+    "author": "agent",
+    "updatedAt": "2026-10-25T11:28:58.819Z"
+  },
+  {
+    "relativePath": ".worktrees/local-agent-machine-accessible/apps/server/tests/test_local_config_preparation.py",
+    "summary": "Tests accepted local-config preparation: strict shape, malformed/secret/duplicate rejection; source remains unchanged and target behavior is safe.",
+    "role": "test",
+    "contentHash": "af51ff4979f1759be92f9d4f077ef58a5f874d97e0ec883ab85194bf32240576",
+    "author": "agent",
+    "updatedAt": "2026-10-25T11:28:58.801Z"
+  },
+  {
+    "relativePath": ".worktrees/local-agent-machine-accessible/apps/server/tests/test_sandbox_profile_live.py",
+    "summary": "Live profile cases updated to shared opt-in environment fixture; collected but not executed in accepted scoped pass.",
+    "role": "test",
+    "contentHash": "8e36c536ce3b4add6e061fd37d685fb909e6251450c6efd54ea01f73b0257a14",
+    "author": "agent",
+    "updatedAt": "2026-10-25T11:28:58.837Z"
+  },
+  {
+    "relativePath": ".worktrees/local-agent-machine-accessible/docs/deployment.md",
+    "summary": "Deployment documentation adds preflight/CLI guard guidance only; no deployment, worker, credentials, or private config was executed/read.",
+    "role": "doc",
+    "contentHash": "718c14d9c32a78d037543a09e3b9631da1631862c5e7cd61bb5a9514af16fea8",
+    "author": "agent",
+    "updatedAt": "2026-10-25T11:28:58.878Z"
+  },
+  {
+    "relativePath": ".worktrees/local-agent-machine-accessible/pyproject.toml",
+    "summary": "Root test configuration updated for mypy test import paths; no dependency or exclusion change is recorded in this scoped summary.",
+    "role": "config",
+    "contentHash": "82b7d566ed0a43a1d2da1cdab0410aebe5e19f65038fe740a5f7bba56202c0d4",
+    "author": "agent",
+    "updatedAt": "2026-10-25T11:28:58.885Z"
   },
   {
     "relativePath": "AGENTS.md",
-    "summary": "Правила для Codex и других агентов: ссылка на CLAUDE.md и краткая выжимка обязательных правил репозитория",
+    "summary": "Repository agent rules, including local-machine deployment reference.",
     "role": "doc",
-    "contentHash": "d6b8e03ea04b0c35d80688535a11c061cd5ff80817b0dc90ae81748bcf73b880",
+    "contentHash": "e5333d34b828194cb4a25333194b320af3dcb9c6950c5add9cb5a15f1cd3f940",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:26.888Z"
+    "updatedAt": "2026-10-26T02:36:56.977Z"
   },
   {
     "relativePath": "ARCHITECTURE.md",
-    "summary": "Архитектура harness: компоненты, статусы, ENV и эндпоинты; раздел git-провайдера (GitHub или GitLab по workspace, D-60) и авторизации git по префиксу репозитория (D-62).",
+    "summary": "Архитектура локальной машины агента, подготовки проекта, песочницы и host worker.",
     "role": "doc",
-    "contentHash": "00785d1a4522c864390cc980a681107030e0b21b5c1b52c88e7060c1ae46189b",
+    "contentHash": "e8e0cba56352b2e32498032af3f1163e20ac5ef6198543962c837ac7802dd94b",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:19:53.295Z"
+    "updatedAt": "2026-10-26T03:00:21.973Z"
   },
   {
     "relativePath": "CLAUDE.md",
-    "summary": "Правила агентов проекта: project-memory, OpenSpec-процесс, стек, жёсткие правила (services/adapters, статусы, секреты), тесты, ./tools/harness",
+    "summary": "Repository implementation rules and agent-machine commands.",
     "role": "doc",
-    "contentHash": "c5043fa6b70a38c2375889936d2cd9ece72c7e2be0b362e5e2473e6da1c8e2e4",
+    "contentHash": "14aea10a790d07507b5a588341dc1db1eefb1e9258a7c9824857c89770f4af00",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:26.920Z"
+    "updatedAt": "2026-10-26T02:36:57.277Z"
   },
   {
     "relativePath": "Dockerfile",
-    "summary": "Multi-stage образ (builder uv sync, runtime app). Builder копирует deploy/sandbox в /app/deploy/sandbox для bootstrap песочницы (bootstrap-in-image, D-63).",
+    "summary": "Application image for migrate and server.",
     "role": "config",
-    "contentHash": "7df5bd831bf7361eaf10ee570f2f00ee662346d67bf1d6f64c7a064c4d07e593",
+    "contentHash": "d1b426aa5acd991ffabf17a9904e390e35fe81fcb274b943877a89c0eb89e3a0",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:54:59.890Z"
+    "updatedAt": "2026-10-26T02:36:57.319Z"
   },
   {
     "relativePath": "PLAN.md",
-    "summary": "План MVP и таблица изменений OpenSpec. Строка 6f bootstrap-in-image (статус review) после 6e git-providers (D-63).",
+    "summary": "Plan status for local-agent-machine and subsequent work.",
     "role": "doc",
-    "contentHash": "152f6aacd758e2df35d2b772e73e14857450fe37beed77e30ae76d13646b6052",
+    "contentHash": "ba816f045bd559fd5f8dff21d27088482ed8beb391bcd4c6fb8c87207c110d3a",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:55:00.083Z"
+    "updatedAt": "2026-10-26T02:36:57.440Z"
   },
   {
     "relativePath": "apps/server/README.md",
-    "summary": "README сервера и worker: команды CLI, таблица sandbox bootstrap с путём по умолчанию от корня приложения и ключами из vault (D-60, D-63).",
+    "summary": "Справка по серверу и команде agent init для подготовки проекта на локальной машине.",
     "role": "doc",
-    "contentHash": "0daa0e306bd46041853b8c75eb065dfcbd2290c043c4df09415d869bde17d929",
+    "contentHash": "82f31eae7adbcf1cf57837bdc61b4ae4611b128e0faa69519d2edb3740b65620",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:55:00.007Z"
+    "updatedAt": "2026-10-26T03:00:21.989Z"
   },
   {
     "relativePath": "apps/server/pyproject.toml",
-    "summary": "Зависимости сервера харнесса: закреплённые mcp==2.3.0 (vault-клиент, D-45) и httpx2==2.14.0 напрямую; Python 3.12, FastAPI, SQLAlchemy, pytest/ruff/mypy.",
+    "summary": "Server package metadata and CLI entry points.",
     "role": "config",
-    "contentHash": "9a3955673e185eba493ddfd0ef0d10f9cca6e04d87dd034cd76f8a7504e942c9",
+    "contentHash": "ee4508c6d1b10a59ea4f667979ab254ce6d9b07eaa5066718dc032c8bda6603c",
     "author": "agent",
-    "updatedAt": "2026-10-19T12:54:18.666Z"
+    "updatedAt": "2026-10-26T02:36:56.986Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/__init__.py",
@@ -69,7 +157,7 @@
     "role": "module",
     "contentHash": "15eba8e6ca96f28e8b52a45b0f74bdcb8c9f337e4c5f0641aeb4b4d349298d88",
     "author": "agent",
-    "updatedAt": "2026-10-18T09:00:01.894Z"
+    "updatedAt": "2026-10-24T15:53:41.565Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/__init__.py",
@@ -77,23 +165,23 @@
     "role": "module",
     "contentHash": "e594c76c7b33bd2f3df674404569ada12b768a6c1caf71c90c4077001da9cafc",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:02.638Z"
+    "updatedAt": "2026-10-24T15:53:41.567Z"
   },
   {
-    "relativePath": "apps/server/src/harness_server/adapters/novita/__init__.py",
-    "summary": "Пакет адаптера Novita: реэкспорт SandboxProvider, ExecResult и SandboxError; сервисы импортируют пакет, а не SDK novita_sandbox напрямую.",
+    "relativePath": "apps/server/src/harness_server/adapters/local/__init__.py",
+    "summary": "Публичные экспорты локального sandbox-провайдера.",
     "role": "module",
-    "contentHash": "d913588ace8bb5b00bdf68aa923d4506b0bbe79cd11391b1939a2b3951a63f40",
+    "contentHash": "532d769612c398a57e9428ec11869b2253516cbc9adcda840f2bba0e9f073df8",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:50:34.110Z"
+    "updatedAt": "2026-10-26T03:00:22.106Z"
   },
   {
-    "relativePath": "apps/server/src/harness_server/adapters/novita/client.py",
-    "summary": "NovitaSandboxProvider: реализация SandboxProvider поверх SDK novita_sandbox (connect, exec, файлы, pause, extend_timeout); ключ берётся из ENV, не из кода.",
+    "relativePath": "apps/server/src/harness_server/adapters/local/provider.py",
+    "summary": "Локальный SandboxProvider с изолированной средой subprocess, таймаутами и безопасным файловым вводом-выводом.",
     "role": "module",
-    "contentHash": "ca189f489450471542149bb4f2265b884f3c69bb6d9ae6948634122a4204ed09",
+    "contentHash": "0c272127abed41b5da70f91a8024d009bd508b10c673757bebfbba14d418af06",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:50:34.144Z"
+    "updatedAt": "2026-10-26T03:00:22.120Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/novita/errors.py",
@@ -101,7 +189,15 @@
     "role": "module",
     "contentHash": "35f989559722893295f5345d1a7edd068cf5bd1303fbb061a0974df7dc469f74",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:50:34.127Z"
+    "updatedAt": "2026-10-24T15:53:41.571Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/adapters/novita/fake.py",
+    "summary": "fake.py: Фейк песочницы для тестов: файлы в памяти, журнал вызовов, программируемый exec. Без сети.",
+    "role": "module",
+    "contentHash": "4ae91b092880a9ac9532e082467a82f4c7192c23f25b6a79c28eaddaf7786e53",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.573Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/novita/protocol.py",
@@ -109,7 +205,7 @@
     "role": "module",
     "contentHash": "f9656c44a68190ba56c310f45f1f8f81e93a849d733e7d2701f9f2fa014eea8f",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:50:34.162Z"
+    "updatedAt": "2026-10-24T15:53:41.574Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/polza/__init__.py",
@@ -117,7 +213,7 @@
     "role": "module",
     "contentHash": "f5555b4c4fb4f318976e0b57bb053a843751491307885e48372039727d958a5c",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:47:45.346Z"
+    "updatedAt": "2026-10-24T15:53:41.576Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/polza/client.py",
@@ -125,7 +221,7 @@
     "role": "module",
     "contentHash": "626a67b3066846bd0b15801193a12e87fdaf4fc218c67234974d10a6efce76d7",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:47:45.388Z"
+    "updatedAt": "2026-10-24T15:53:41.577Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/polza/fake.py",
@@ -133,7 +229,7 @@
     "role": "module",
     "contentHash": "b51450a2b51775de4c2447d4451de738dcb53daf9aa2005e0cabfb6db2f19f8d",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.725Z"
+    "updatedAt": "2026-10-24T15:53:41.580Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/polza/protocol.py",
@@ -141,7 +237,39 @@
     "role": "module",
     "contentHash": "06cc665e270812067a6f5aebd6cdd8820e7deb6c90b157816fb25cbcf968d0ef",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:47:45.366Z"
+    "updatedAt": "2026-10-24T15:53:41.582Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/adapters/sandbox/__init__.py",
+    "summary": "Публичные экспорты нейтрального sandbox API.",
+    "role": "module",
+    "contentHash": "f80b5b93b1ca52ac4076853e782ec1dfa908063c6597d781a92e9835dcc29a7a",
+    "author": "agent",
+    "updatedAt": "2026-10-26T03:00:22.134Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/adapters/sandbox/errors.py",
+    "summary": "Ошибки провайдера песочницы, не зависящие от реализации.",
+    "role": "module",
+    "contentHash": "51fb23e3ae9b3ddf4815cc11f594bb2ea6bb61d87e7cf494b7e407c7aeb15c59",
+    "author": "agent",
+    "updatedAt": "2026-10-26T03:00:22.150Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/adapters/sandbox/fake.py",
+    "summary": "In-memory fake SandboxProvider для тестов сервисов.",
+    "role": "module",
+    "contentHash": "9851ef15ce3a197735cfa495d79914e5dc2caa3450787871f7e08417b1ab09c4",
+    "author": "agent",
+    "updatedAt": "2026-10-26T03:00:22.168Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/adapters/sandbox/protocol.py",
+    "summary": "Provider-neutral протокол и типы результатов операций с песочницей.",
+    "role": "module",
+    "contentHash": "00c398c316c31615a138dce9f0125db3a78f712a8fe1b150352ddfee7dc8a9dc",
+    "author": "agent",
+    "updatedAt": "2026-10-26T03:00:22.186Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/stt/__init__.py",
@@ -149,7 +277,7 @@
     "role": "module",
     "contentHash": "f9897c5b711f7b1918e7b9bd308976741742e01415bf9cb416517f57a11168c8",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:02.629Z"
+    "updatedAt": "2026-10-24T15:53:41.583Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/stt/fake.py",
@@ -157,7 +285,7 @@
     "role": "module",
     "contentHash": "a2e3c88a1e27314943612e80ecd3142c8ab99df47832e883f22afc161bf52e4d",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:02.619Z"
+    "updatedAt": "2026-10-24T15:53:41.585Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/stt/openai_compat.py",
@@ -165,7 +293,7 @@
     "role": "module",
     "contentHash": "38fb78f0a0b3f3a79ba792a5e220ac41f9cf8b115c08ca91e37aa2782899f792",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:02.610Z"
+    "updatedAt": "2026-10-24T15:53:41.586Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/stt/protocol.py",
@@ -173,7 +301,7 @@
     "role": "module",
     "contentHash": "a2d3d85ac0531367728d5fc9c06548e4bf307ab58072af96264bb214b9c24794",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:02.600Z"
+    "updatedAt": "2026-10-24T15:53:41.588Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/telegram/__init__.py",
@@ -181,7 +309,7 @@
     "role": "module",
     "contentHash": "85ad0760fea9cad433581e7014c2baa7ed1874383444db0691437392473c3603",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:02.590Z"
+    "updatedAt": "2026-10-24T15:53:41.589Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/telegram/client.py",
@@ -189,7 +317,7 @@
     "role": "module",
     "contentHash": "ab1acc73f49cdc32fcdf24e0c3aeccbe5ea4c14288d24d64c21a314df3b41e68",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:53:10.216Z"
+    "updatedAt": "2026-10-24T15:53:41.591Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/telegram/fake.py",
@@ -197,7 +325,7 @@
     "role": "module",
     "contentHash": "2f4e936703b13b22f76f909302e3121102eec99da13c372081adce3689262c4b",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:02.571Z"
+    "updatedAt": "2026-10-24T15:53:41.592Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/telegram/protocol.py",
@@ -205,7 +333,7 @@
     "role": "module",
     "contentHash": "86ee47987f45c1ce59df65bccf933db2139836fae963fbe35f78006092dacdc1",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:02.550Z"
+    "updatedAt": "2026-10-24T15:53:41.594Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/telegram/types.py",
@@ -213,7 +341,7 @@
     "role": "module",
     "contentHash": "7e7a39ed8eb6ea66d63c8abff478a6bbbe5702232ebd914fd893ed46314dd2a6",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:02.581Z"
+    "updatedAt": "2026-10-24T15:53:41.595Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/vault/__init__.py",
@@ -221,7 +349,7 @@
     "role": "module",
     "contentHash": "494dba4e8c1874c5e5d14a926551901d2220ac33b154ed1d2903e51c2e9b119d",
     "author": "agent",
-    "updatedAt": "2026-10-19T12:54:19.111Z"
+    "updatedAt": "2026-10-24T15:53:41.597Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/vault/errors.py",
@@ -229,7 +357,7 @@
     "role": "module",
     "contentHash": "617120b088e42e5314867abc253f4c49bf1be64a349afe35453c7c1ffd0cf181",
     "author": "agent",
-    "updatedAt": "2026-10-19T12:54:19.153Z"
+    "updatedAt": "2026-10-24T15:53:41.598Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/vault/fake.py",
@@ -237,7 +365,7 @@
     "role": "module",
     "contentHash": "76beb7ecaad9beec8dce911c6bd3da315419408d60361ef33324c24d8ccc0cbe",
     "author": "agent",
-    "updatedAt": "2026-10-19T12:54:19.177Z"
+    "updatedAt": "2026-10-24T15:53:41.600Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/vault/mcp_client.py",
@@ -245,7 +373,7 @@
     "role": "module",
     "contentHash": "56a12c286219bc441b8ef3fb55593638c137dc11e696305129b33af1add2fc37",
     "author": "agent",
-    "updatedAt": "2026-10-19T13:39:57.822Z"
+    "updatedAt": "2026-10-24T15:53:41.601Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/adapters/vault/protocol.py",
@@ -253,7 +381,15 @@
     "role": "module",
     "contentHash": "d4c36dd59381966f0b34f8afd3c420f21a16b6973cce09db721abcc8c2554e04",
     "author": "agent",
-    "updatedAt": "2026-10-19T12:54:19.132Z"
+    "updatedAt": "2026-10-24T15:53:41.602Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/agent_cli.py",
+    "summary": "CLI agent init: проверка проекта, подготовка машины и запуск инициализации.",
+    "role": "entry",
+    "contentHash": "48ff2ae8b7803cdf5f44f2128e87a0ca5e9433e0ab77356cc5cb4ac4a2520480",
+    "author": "agent",
+    "updatedAt": "2026-10-26T03:00:22.202Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/api/__init__.py",
@@ -261,7 +397,7 @@
     "role": "module",
     "contentHash": "c8826ed541631b9a6514f85ed8b6f84fb7b530c49e417feadbe6af948975dbe3",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:59:48.791Z"
+    "updatedAt": "2026-10-24T15:53:41.604Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/api/deps.py",
@@ -269,7 +405,7 @@
     "role": "module",
     "contentHash": "3b2d46a20ee3c2e1faaa115aaa40635d265ce70f5dc952c1a8ae46c45ab72dc4",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:42:29.261Z"
+    "updatedAt": "2026-10-24T15:53:41.605Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/api/health.py",
@@ -277,7 +413,7 @@
     "role": "module",
     "contentHash": "7e2079d2cfad7862809b456be9227cef5b1f528ff96ef5bd1ce7cce1cc4539b5",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:59:48.800Z"
+    "updatedAt": "2026-10-24T15:53:41.606Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/api/tasks.py",
@@ -285,7 +421,7 @@
     "role": "module",
     "contentHash": "ecb34b158795bcda7828fc4d05ddad844f7063d00cc4009c362f80641a432814",
     "author": "agent",
-    "updatedAt": "2026-10-18T11:49:57.695Z"
+    "updatedAt": "2026-10-24T15:53:41.608Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/api/telegram_webhook.py",
@@ -293,7 +429,7 @@
     "role": "entry",
     "contentHash": "6fede71fab285d742da6be39a331dee214afeb4da226187177225c5cb7323c0d",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:02.648Z"
+    "updatedAt": "2026-10-24T15:53:41.609Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/app.py",
@@ -301,23 +437,23 @@
     "role": "entry",
     "contentHash": "dfc610cfc34ff723fcec219bf1e7a6faf0536fa2b041e06490a4b76ecdfffbb1",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:42:29.270Z"
+    "updatedAt": "2026-10-24T15:53:41.611Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/cli.py",
-    "summary": "Typer CLI harness-server. DEFAULT_BOOTSTRAP_SCRIPT от _APP_ROOT = parents[4] (корень приложения, не cwd) для sandbox bootstrap; --script переопределяет (D-63).",
-    "role": "module",
-    "contentHash": "bec445edda68076be2cc1dee6102869947545e6bb8350b8db4597c672ddefaa1",
+    "summary": "Harness CLI without deprecated bootstrap commands.",
+    "role": "entry",
+    "contentHash": "c7b0bc0c521c121c0852d4bb377126915870e210b514966ec632b6e16029eeba",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:54:59.919Z"
+    "updatedAt": "2026-10-26T02:36:57.052Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/config.py",
-    "summary": "Конфиг harness.yaml: RepoConfig (provider, base_url, project, access_ref), валидация base_url с метками хоста и сегментами пути без «.»/«-» по краям (D-62 F3).",
-    "role": "module",
-    "contentHash": "323c9e0ae35d58d90e430a8d781424e8a49b4b5232be29c5c299e3adfccf6c8f",
+    "summary": "Sandbox configuration schema for local machine.",
+    "role": "config",
+    "contentHash": "2534006aad242976dbb1c0262af79d72b865d95bd92c451d6152598b4eef531e",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:07:22.820Z"
+    "updatedAt": "2026-10-26T02:36:57.064Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/db/__init__.py",
@@ -325,7 +461,7 @@
     "role": "module",
     "contentHash": "44a51991cd4fdfd8d8edaa85551526318903ee1cb9d80b1c80f87110b2bc1044",
     "author": "agent",
-    "updatedAt": "2026-10-18T11:49:57.687Z"
+    "updatedAt": "2026-10-24T15:53:41.616Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/db/base.py",
@@ -333,7 +469,7 @@
     "role": "module",
     "contentHash": "bee70d39a2a7c59bfef2eefded35122289f2a133258f849d1e4d9e3fa8564072",
     "author": "agent",
-    "updatedAt": "2026-10-18T11:51:26.252Z"
+    "updatedAt": "2026-10-24T15:53:41.618Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/db/ids.py",
@@ -341,7 +477,7 @@
     "role": "module",
     "contentHash": "2c2c3e559f796c09244616275f92235a30cda1ca7c4af36e47a5d93ad38e10fb",
     "author": "agent",
-    "updatedAt": "2026-10-18T11:51:26.265Z"
+    "updatedAt": "2026-10-24T15:53:41.619Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/db/models/__init__.py",
@@ -349,7 +485,7 @@
     "role": "module",
     "contentHash": "f9b2d7b9204c80370ab243826620cfcc7a6e20f96b38bd62241eb3002001f04f",
     "author": "agent",
-    "updatedAt": "2026-10-18T11:49:57.652Z"
+    "updatedAt": "2026-10-24T15:53:41.620Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/db/models/planning.py",
@@ -357,15 +493,15 @@
     "role": "module",
     "contentHash": "e910c382e5b08a349948b408434c8beab0d0a68025ddbb0ec501a2552bcbbe30",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:47:45.482Z"
+    "updatedAt": "2026-10-24T15:53:41.622Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/db/models/sandboxes.py",
-    "summary": "ORM Sandbox (status CHECK, UNIQUE provider_id, agent_started_at, agent_pid) и TaskToken (только token_hash, role CHECK, UNIQUE uq_task_tokens_token_hash).",
+    "summary": "Sandbox ORM state and provider identifier fields.",
     "role": "module",
-    "contentHash": "fa3d171dda4222b6f12bdd69cf47ec4c782cf0cec6983eef2510195dbdb43c43",
+    "contentHash": "641501b3c6a2537214a381a10983c33cc67ded031154324c2c340177dffa7a45",
     "author": "agent",
-    "updatedAt": "2026-10-19T07:53:10.043Z"
+    "updatedAt": "2026-10-26T02:36:57.073Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/db/models/tasks.py",
@@ -373,7 +509,7 @@
     "role": "module",
     "contentHash": "3b7552dec21885e02874448309a11b322661265eef3bfaba753609818fe5b7a0",
     "author": "agent",
-    "updatedAt": "2026-10-18T11:49:57.615Z"
+    "updatedAt": "2026-10-24T15:53:41.625Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/db/models/telegram.py",
@@ -381,7 +517,7 @@
     "role": "module",
     "contentHash": "ca5496547960f488d012bd9fed5282af524c8ae855153963d38fc9e5462e9d21",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:42:29.298Z"
+    "updatedAt": "2026-10-24T15:53:41.626Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/db/session.py",
@@ -389,7 +525,7 @@
     "role": "module",
     "contentHash": "02f641cc0ea33f253901be12ab47f2110708879393971bbf5d448ca10ad385db",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:42:29.306Z"
+    "updatedAt": "2026-10-24T15:53:41.628Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/domain/__init__.py",
@@ -397,7 +533,7 @@
     "role": "module",
     "contentHash": "b2998898cc7e6d654b4be39e7a5d75600e6d46338818467227a5254d457e8f5a",
     "author": "agent",
-    "updatedAt": "2026-10-18T11:49:57.606Z"
+    "updatedAt": "2026-10-24T15:53:41.629Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/domain/errors.py",
@@ -405,7 +541,7 @@
     "role": "module",
     "contentHash": "eb728e24c22a79034cf7ae159cc70633c93a1c34d406fe61808f73d8a5b9246f",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.597Z"
+    "updatedAt": "2026-10-24T15:53:41.630Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/domain/statuses.py",
@@ -413,7 +549,7 @@
     "role": "module",
     "contentHash": "7328d9796da1f588a26200cb1a53b151833fb0457b4581bc5a0e0f2d2f4c2cee",
     "author": "agent",
-    "updatedAt": "2026-10-18T11:49:57.588Z"
+    "updatedAt": "2026-10-24T15:53:41.632Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/security/__init__.py",
@@ -421,7 +557,7 @@
     "role": "module",
     "contentHash": "dfb46cc22e68e44ef2c9a5db61f4ed7939168b669fd46a6a08a097eeae3ff2e0",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:02.666Z"
+    "updatedAt": "2026-10-24T15:53:41.633Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/security/redaction.py",
@@ -429,7 +565,7 @@
     "role": "module",
     "contentHash": "4353c3493f938b4b00045857c0cd81944c52b335464e2da1183cdc0e39f6f017",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:19:53.412Z"
+    "updatedAt": "2026-10-24T15:53:41.635Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/security/tokens.py",
@@ -437,7 +573,7 @@
     "role": "module",
     "contentHash": "2e6b86c52648c5820feea7f2476359cace90df8eff040878f8601005a96daab2",
     "author": "agent",
-    "updatedAt": "2026-10-19T07:53:10.072Z"
+    "updatedAt": "2026-10-24T15:53:41.636Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/__init__.py",
@@ -445,7 +581,7 @@
     "role": "module",
     "contentHash": "cadb4e79c7482f146a8501ec3627e588ade348a1cc468303289697025f400630",
     "author": "agent",
-    "updatedAt": "2026-10-18T11:49:57.578Z"
+    "updatedAt": "2026-10-24T15:53:41.637Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/agent_result.py",
@@ -453,7 +589,7 @@
     "role": "module",
     "contentHash": "19fce5ecd8a0bcd84f57a5f8edf05e61a369c87aabe0a36d2ef744aa7b10e38d",
     "author": "agent",
-    "updatedAt": "2026-10-19T18:49:12.377Z"
+    "updatedAt": "2026-10-24T15:53:41.639Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/context.py",
@@ -461,7 +597,7 @@
     "role": "module",
     "contentHash": "c13b29ce3e5968a39663027b32f23c87aa12c993e9119d70251f91ce23fb104c",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:47:45.525Z"
+    "updatedAt": "2026-10-24T15:53:41.640Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/git_access.py",
@@ -469,7 +605,7 @@
     "role": "module",
     "contentHash": "a472d0935708752ddc33dcbce864d66ec57723892af74aac50a7042c47bc9de5",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:07:22.842Z"
+    "updatedAt": "2026-10-24T15:53:41.642Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/intake.py",
@@ -477,7 +613,15 @@
     "role": "module",
     "contentHash": "47269f5f0416d1ded64d27bf6d9062fe695046ad80794a2de3ba641e58b07386",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:47:45.500Z"
+    "updatedAt": "2026-10-24T15:53:41.643Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/services/machine.py",
+    "summary": "Подготовка локальной машины и проекта: зависимости, каталоги, clone, память и init orchestration.",
+    "role": "module",
+    "contentHash": "ac6564765f602707ced36122c6f48a0d91e93aaf88fd64306f5170541ad22f18",
+    "author": "agent",
+    "updatedAt": "2026-10-26T03:00:21.939Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/notify.py",
@@ -485,7 +629,7 @@
     "role": "module",
     "contentHash": "af57eb1892ac83ea56c4c7dd90a05e035753df2ad80e9108217e0c6a351bed8a",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.622Z"
+    "updatedAt": "2026-10-24T15:53:41.645Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/prompts/__init__.py",
@@ -493,7 +637,7 @@
     "role": "module",
     "contentHash": "650898cca526500572a6f64c86af3fbc04fc4fd013838a8b22781db3e2e88289",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.733Z"
+    "updatedAt": "2026-10-24T15:53:41.646Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/prompts/routing.md",
@@ -501,7 +645,7 @@
     "role": "config",
     "contentHash": "0275caa01c608767403a9fe9ac0d7018224c523605bbeb8e67f7bdfc1b249918",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:47:45.444Z"
+    "updatedAt": "2026-10-24T15:53:41.647Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/routing.py",
@@ -509,15 +653,15 @@
     "role": "module",
     "contentHash": "9d1fdeaf20bbdb1d9388e0120b660e78d303f41992b0ce087dc2a29a3c5f7049",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:47:45.407Z"
+    "updatedAt": "2026-10-24T15:53:41.649Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/sandboxes.py",
-    "summary": "Сервис песочниц: bootstrap в фазах setup и memory, activate с fetch по адресу репозитория и ключом workspace, запуск агента, очистка (mvp-06, git-providers D-60, D-62).",
+    "summary": "Sandbox runtime without provider bootstrap.",
     "role": "module",
-    "contentHash": "9cb6cebf190f2560d9bf8af281bdcc4a2265107cc6396a86a03830a55aaed70c",
+    "contentHash": "0b854ce96a453ce865e05581f7b04a38cac56f5bf806bc92bf1e5c99700e5a8f",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:19:53.437Z"
+    "updatedAt": "2026-10-26T02:36:57.089Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/secrets.py",
@@ -525,7 +669,7 @@
     "role": "module",
     "contentHash": "bb0507b6a94b50ba8e85ff6ac4f015229599e0fc98c10c6f09619a8311aeefc0",
     "author": "agent",
-    "updatedAt": "2026-10-19T12:54:19.226Z"
+    "updatedAt": "2026-10-24T15:53:41.652Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/status_report.py",
@@ -533,15 +677,15 @@
     "role": "module",
     "contentHash": "88be6d284f0541c2970dbe8176f8befc89a64c911bb9934e7e93b240dd562382",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:47:45.425Z"
+    "updatedAt": "2026-10-24T15:53:41.653Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/tasks.py",
     "summary": "Единственное место правил задачи: create_task, смена статуса, select_workspace (choosing→planning, FOR UPDATE), лента событий и очередь. Переходы через domain/statuses.py.",
     "role": "module",
-    "contentHash": "151ffc3e7be71e22935e1653b2578f068fe9d741e673fb6313313fb5c8001b3d",
+    "contentHash": "90d2222d68222bc8416e96a421873e29466e582a6bda632ffe22dd1bfd57afaf",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:42:29.315Z"
+    "updatedAt": "2026-10-24T15:53:41.654Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/services/webhook.py",
@@ -549,15 +693,15 @@
     "role": "module",
     "contentHash": "6f4feff6b730017d23a7cafc7813f1f942b6323836f33ab42f88297a172d49ba",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:02.695Z"
+    "updatedAt": "2026-10-24T15:53:41.656Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/settings.py",
-    "summary": "Настройки ENV сервера: удалены gitlab_url и gitlab_token (D-60); ключи репозиториев живут в vault по repo.access_ref.",
+    "summary": "Server and agent-init settings models.",
     "role": "config",
-    "contentHash": "77fdbf20c7a79f35ca3d489f080e110784b15db29cda070640415c15f7ef7298",
+    "contentHash": "756c6821f9a32a006155fb19851d68633f07c66ffbb29cfa68a43904025fefe3",
     "author": "agent",
-    "updatedAt": "2026-10-20T02:08:54.772Z"
+    "updatedAt": "2026-10-26T02:36:57.097Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/telegram/__init__.py",
@@ -565,7 +709,7 @@
     "role": "module",
     "contentHash": "a9104401a90075719ea6c15f9af99c43effd2972ce7dfb5002e107cad411c6a0",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:02.733Z"
+    "updatedAt": "2026-10-24T15:53:41.659Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/telegram/parse.py",
@@ -573,7 +717,7 @@
     "role": "module",
     "contentHash": "8bf051ca8053eab43ae91c1e00d2da1c47389385e84febf24d28a841b4688277",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:02.713Z"
+    "updatedAt": "2026-10-24T15:53:41.660Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/telegram/render.py",
@@ -581,7 +725,23 @@
     "role": "module",
     "contentHash": "5f0f31edeff7d14423536d2761bbc5542514cc6b3271687cca90e7815c5b8cf6",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.640Z"
+    "updatedAt": "2026-10-24T15:53:41.662Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/test_support/__init__.py",
+    "summary": "Экспорты общей тестовой поддержки.",
+    "role": "module",
+    "contentHash": "a3d59638f7a301552fecb9b76feb4e8934a25825afc4312772dc5541df7d0171",
+    "author": "agent",
+    "updatedAt": "2026-10-26T03:00:22.218Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/test_support/secret_scan.py",
+    "summary": "Тестовый сканер для обнаружения секретов в выводе и диагностике.",
+    "role": "module",
+    "contentHash": "c30dcf84ff0fab3e2041533404301db43e226b208aea6376dea614f7133c4a1b",
+    "author": "agent",
+    "updatedAt": "2026-10-26T03:00:22.233Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/vault_ref.py",
@@ -589,15 +749,15 @@
     "role": "module",
     "contentHash": "7ed2363f393f7650ec142e60365fe97cc0fd64c90b722b831b1b8929fff1a1ef",
     "author": "agent",
-    "updatedAt": "2026-10-19T12:54:19.079Z"
+    "updatedAt": "2026-10-24T15:53:41.664Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/wiring.py",
-    "summary": "Композиционный корень: сборка Telegram-клиента с telegram_api_url (прокси), build_vault, адаптеры и BotContext; без URL прокси используется официальный адрес Bot API (D-61).",
+    "summary": "Application provider wiring selects local sandbox.",
     "role": "module",
-    "contentHash": "96d3091038fccd04543f7a23882f674e9089b54becbd2c7f3fd7ae22ef2405bf",
+    "contentHash": "879fd76b6c6aa0bb44945b80bd83694dca816403d69d41d143f364d4de13d2a1",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:53:10.131Z"
+    "updatedAt": "2026-10-26T02:36:57.122Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/worker.py",
@@ -609,27 +769,51 @@
   },
   {
     "relativePath": "apps/server/src/harness_server/worker/__init__.py",
-    "summary": "Точка входа worker: запускает dispatch_once через build_dispatch_context в цикле опроса очереди задач; не блокирует webhook и MCP.",
-    "role": "entry",
-    "contentHash": "295163af63ca98b00e297d25d9f193153c23d94bceaa8f4578a02c50e12629da",
+    "summary": "Worker setup for local provider runtime.",
+    "role": "module",
+    "contentHash": "6d5531052da24e71b6f69441d4892da999344b0ebcad13d452f3af76a6995008",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:50:34.227Z"
+    "updatedAt": "2026-10-26T02:37:21.791Z"
   },
   {
     "relativePath": "apps/server/src/harness_server/worker/dispatcher.py",
-    "summary": "Диспетчер песочницы: восстановление, reserve, activate, run, cleanup, pause (mvp-06); при activate ключ репозитория берётся по workspace (D-62).",
+    "summary": "Worker dispatch requires initialized project marker.",
     "role": "module",
-    "contentHash": "6fe11e0f478bacdf32e5ce413716944d482c9ff3489f06c05a3b55a09fe26756",
+    "contentHash": "470d65f32ceee4ab3ff7e1ac589d28965dc3de8b27be55d8efaad66bc978da78",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:19:53.460Z"
+    "updatedAt": "2026-10-26T02:36:57.129Z"
+  },
+  {
+    "relativePath": "apps/server/src/harness_server/worker/pipeline.py",
+    "summary": "pipeline.py: Контракт пайплайна задачи для диспетчера (mvp-06, design 11).",
+    "role": "module",
+    "contentHash": "042ea9b152b4e22a5152244f4f0cce01fbaee49ce156404bebfbdf6fe6222395",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.670Z"
   },
   {
     "relativePath": "apps/server/tests/conftest.py",
-    "summary": "Общие фикстуры тестов: изоляция ENV, пример harness.yaml, Postgres (TEST_DATABASE_URL или контейнер testcontainers).",
+    "summary": "Test fixtures for local sandbox migration.",
     "role": "test",
-    "contentHash": "af2a61eab1179f7947756942100ec6ee4b8ffcbb99732df212f7d5521b3bce1a",
+    "contentHash": "1ae3f28096f5ac7de61b19d69786fd8c47808e5c41f4312ba56abbb4692b71f2",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:19:53.477Z"
+    "updatedAt": "2026-10-26T02:36:57.137Z"
+  },
+  {
+    "relativePath": "apps/server/tests/live_agent_env.py",
+    "summary": "Live-agent environment test helpers.",
+    "role": "test",
+    "contentHash": "ef6509abb0e516fa0cef0986529ecc27af475a8329da7aef08ae8b8726fd9f5a",
+    "author": "agent",
+    "updatedAt": "2026-10-26T02:36:57.145Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_agent_cli.py",
+    "summary": "Тесты CLI agent init: справка, неизвестный проект, коды завершения и запуск без DATABASE_URL.",
+    "role": "test",
+    "contentHash": "974c015c4ba11a442b360aea9b6fe19c0b022124693b24c5067846d190da4ea4",
+    "author": "agent",
+    "updatedAt": "2026-10-26T03:00:22.248Z"
   },
   {
     "relativePath": "apps/server/tests/test_agent_result.py",
@@ -637,55 +821,63 @@
     "role": "test",
     "contentHash": "c188292b86758328476f1b7521b722b7dfcdf795c835ef4823de3007f5054e5d",
     "author": "agent",
-    "updatedAt": "2026-10-19T18:49:12.407Z"
+    "updatedAt": "2026-10-24T15:53:41.673Z"
   },
   {
     "relativePath": "apps/server/tests/test_agent_runtime_live.py",
-    "summary": "Живой тест рантайма агента (mvp-06, 6.12) на настоящей песочнице; маркер live, по умолчанию не запускается.",
+    "summary": "Owner-only local agent runtime live checks.",
     "role": "test",
-    "contentHash": "10efd83b0331bbdf555a15a80d5a8029ed84aa1091474ae2b78f4069bc9cfe55",
+    "contentHash": "905e817ea4eef520e1ce506b1565faed4e78331504bc20f31c04cee90c4dc68d",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:19:53.505Z"
+    "updatedAt": "2026-10-26T02:36:57.161Z"
   },
   {
     "relativePath": "apps/server/tests/test_cli.py",
-    "summary": "Тесты CLI через CliRunner: песочница, vault-ключи, bootstrap. Добавлены test_default_bootstrap_script_is_repo_file и test_sandbox_bootstrap_default_script_does_not_depend_on_cwd (D-63).",
+    "summary": "Harness CLI regression tests.",
     "role": "test",
-    "contentHash": "63dfc8c8a437e053b84d487c9e0c35e1398fbfe4a24d9acb54cdaff582243562",
+    "contentHash": "954e741e117034a1ef7f4f37aa59934ef7ac66cf53d8341a056f80d2f4e76d3a",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:54:59.943Z"
+    "updatedAt": "2026-10-26T02:36:57.169Z"
   },
   {
     "relativePath": "apps/server/tests/test_compose.py",
-    "summary": "Тесты docker-compose.yml: сервисы migrate, server и worker, сборка, обязательные ENV, отсутствие публикации портов (D-59).",
+    "summary": "Compose service contract tests.",
     "role": "test",
-    "contentHash": "f06aaf637b4886f4b49d93210ebd298128966fcf088d75e5282aa67a06a6445d",
+    "contentHash": "fafc7c7a01e644d53cd35b1ebf998fec44ca5dfde40fa06828409c9a8397037b",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:53:10.242Z"
+    "updatedAt": "2026-10-26T02:36:57.178Z"
   },
   {
     "relativePath": "apps/server/tests/test_config.py",
-    "summary": "Тесты harness.yaml: сценарии platform-config (секреты не в YAML, уникальность id workspace, repo с provider, base_url, access_ref, отказ от gitlab:).",
+    "summary": "Local sandbox config validation tests.",
     "role": "test",
-    "contentHash": "66dc54d85dfc296ae0052497f561c34edd0670398383bbae38ffa4dc0a136d45",
+    "contentHash": "d2c297210a7f787458f156b0b934b6124b9fa07d09356aa1f08ac418ec216f8a",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:19:53.528Z"
+    "updatedAt": "2026-10-26T02:36:57.186Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_deployment_artifacts.py",
+    "summary": "Проверки состава и настроек артефактов развёртывания host worker.",
+    "role": "test",
+    "contentHash": "ada172202af6ff2c13c27013310134bb17353ed361b5d91790273c352a11c6e4",
+    "author": "agent",
+    "updatedAt": "2026-10-26T03:00:22.294Z"
   },
   {
     "relativePath": "apps/server/tests/test_dispatcher.py",
-    "summary": "Тесты диспетчера песочницы на FakeSandbox и настоящих коммитах Postgres (mvp-06, 4.1).",
+    "summary": "Dispatch initialization-marker tests.",
     "role": "test",
-    "contentHash": "23858134e96234869c293ce1852a95064cc2bd868987925eba8f6c5962510924",
+    "contentHash": "8d1c4a8dafcf4ec05a54ae6ecbed63a6aa2d29b963bdaac8079341267f7b491a",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:19:53.551Z"
+    "updatedAt": "2026-10-26T02:36:57.202Z"
   },
   {
     "relativePath": "apps/server/tests/test_dockerfile.py",
-    "summary": "Текстовые тесты образа: builder копирует deploy/sandbox, .dockerignore не исключает скрипт, Dockerfile без --no-editable (D-63). Читает файлы из корня репо, без Docker.",
+    "summary": "Docker image artifact tests.",
     "role": "test",
-    "contentHash": "c729f51fa04e67541c8b965d9e5cf6efe2421bfb661f0668918b0e8a242b72a8",
+    "contentHash": "bc285287b0993f351463363fad2f0926272a063fc927da8e439dfe936a0b84a0",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:54:59.967Z"
+    "updatedAt": "2026-10-26T02:36:57.210Z"
   },
   {
     "relativePath": "apps/server/tests/test_git_access.py",
@@ -693,7 +885,7 @@
     "role": "test",
     "contentHash": "ea80e43ca5add6ea28abfe6bb833964eafcd074522e60564679f00f8ba7cafbc",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:19:53.585Z"
+    "updatedAt": "2026-10-24T15:53:41.682Z"
   },
   {
     "relativePath": "apps/server/tests/test_health.py",
@@ -701,7 +893,7 @@
     "role": "test",
     "contentHash": "811ebf7af2bdb92d0c015215eceab46f6bc7f46a5eb8401037c35cc46c0921f0",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:59:48.886Z"
+    "updatedAt": "2026-10-24T15:53:41.684Z"
   },
   {
     "relativePath": "apps/server/tests/test_ids.py",
@@ -709,7 +901,7 @@
     "role": "test",
     "contentHash": "9e984d568f4e575550f7cba16501f544b518f94a50a79574114fa71392e89d09",
     "author": "agent",
-    "updatedAt": "2026-10-18T11:49:57.830Z"
+    "updatedAt": "2026-10-24T15:53:41.685Z"
   },
   {
     "relativePath": "apps/server/tests/test_intake_routing.py",
@@ -717,7 +909,7 @@
     "role": "test",
     "contentHash": "c81902bc911651bb29060ab11a93b194d46ce41aadd003f1017fac091a16b873",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.767Z"
+    "updatedAt": "2026-10-24T15:53:41.686Z"
   },
   {
     "relativePath": "apps/server/tests/test_intake_service.py",
@@ -725,7 +917,23 @@
     "role": "test",
     "contentHash": "5c4a4588afd4f37811eaa5636eee0a2cfd33ba07cf947b712c239875e1745a4c",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:29.451Z"
+    "updatedAt": "2026-10-24T15:53:41.688Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_local_provider.py",
+    "summary": "Тесты локального sandbox-провайдера: запуск subprocess, изоляция среды, таймауты и файловые операции.",
+    "role": "test",
+    "contentHash": "a81e349907ae64f10024ed732be2b2c71e36b43ac7d4276f9627f00f3095ce44",
+    "author": "agent",
+    "updatedAt": "2026-10-26T03:00:22.264Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_machine_service.py",
+    "summary": "Проверки prerequisite, локальной структуры, клонирования, памяти и инициализации проекта.",
+    "role": "test",
+    "contentHash": "4bf1e4e28a9215b5eaf943d265ba19bdbbc9e11ac52f8b92c71bdead126fab4e",
+    "author": "agent",
+    "updatedAt": "2026-10-26T03:00:21.957Z"
   },
   {
     "relativePath": "apps/server/tests/test_migrate.py",
@@ -733,7 +941,7 @@
     "role": "test",
     "contentHash": "37a5e5fe4adce839aefb2893884141e2b2174bf9a268cb83290b58c16dce3bba",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:59:48.896Z"
+    "updatedAt": "2026-10-24T15:53:41.690Z"
   },
   {
     "relativePath": "apps/server/tests/test_migrations.py",
@@ -741,7 +949,7 @@
     "role": "test",
     "contentHash": "4bfb89eaff6466645e3bda43bc51d795d911f1797dfdcefed5bf28f39a97e0fb",
     "author": "agent",
-    "updatedAt": "2026-10-19T07:53:10.152Z"
+    "updatedAt": "2026-10-24T15:53:41.691Z"
   },
   {
     "relativePath": "apps/server/tests/test_notify_service.py",
@@ -749,7 +957,15 @@
     "role": "test",
     "contentHash": "46c2740eb3502d6242354d7d4988687cf38257f4055105152d231ad651e1042c",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:29.460Z"
+    "updatedAt": "2026-10-24T15:53:41.692Z"
+  },
+  {
+    "relativePath": "apps/server/tests/test_novita_fake.py",
+    "summary": "test_novita_fake.py: Минимальные тесты FakeSandbox: журнал без значений env, файлы, ответы exec, удаление.",
+    "role": "test",
+    "contentHash": "aca2803ddac1c89c7b2e913fa165d96c99410fcf429a887f4cd3548b80ab9202",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.695Z"
   },
   {
     "relativePath": "apps/server/tests/test_polza_client.py",
@@ -757,7 +973,7 @@
     "role": "test",
     "contentHash": "f288d7c53384a6b52782fc3d8f4f78d2059242cdfb5f7f70f37c0c08e7459a9e",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.775Z"
+    "updatedAt": "2026-10-24T15:53:41.698Z"
   },
   {
     "relativePath": "apps/server/tests/test_polza_live.py",
@@ -765,7 +981,7 @@
     "role": "test",
     "contentHash": "98166f9b87ec36d12e9f6964b362488abe51c739fbb11614e5596205d2a03b3c",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:19:53.610Z"
+    "updatedAt": "2026-10-24T15:53:41.700Z"
   },
   {
     "relativePath": "apps/server/tests/test_recovery.py",
@@ -773,7 +989,7 @@
     "role": "test",
     "contentHash": "10c854beed494d410fc17173c200e4718d919de87481ac896eef4d109add57ae",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:29.470Z"
+    "updatedAt": "2026-10-24T15:53:41.701Z"
   },
   {
     "relativePath": "apps/server/tests/test_redaction.py",
@@ -781,7 +997,7 @@
     "role": "test",
     "contentHash": "47d229ec4d9af55f924c82bb2109456fcf730ea833e402ea6469f938b5229ddc",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:19:53.638Z"
+    "updatedAt": "2026-10-24T15:53:41.702Z"
   },
   {
     "relativePath": "apps/server/tests/test_routing_models.py",
@@ -789,7 +1005,7 @@
     "role": "test",
     "contentHash": "8031f75ac47a4137a089292ff51d5b48fb95b19c369194daeb27c893cb4f4dda",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.792Z"
+    "updatedAt": "2026-10-24T15:53:41.704Z"
   },
   {
     "relativePath": "apps/server/tests/test_routing_service.py",
@@ -797,31 +1013,31 @@
     "role": "test",
     "contentHash": "4cf086f5e1e9951ab501f4c646f9c79f945f3208b336284a609c1158d6d13fc8",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:19:53.669Z"
+    "updatedAt": "2026-10-24T15:53:41.705Z"
   },
   {
-    "relativePath": "apps/server/tests/test_sandbox_bootstrap.py",
-    "summary": "Тесты bootstrap: фазы setup и memory, клон каждого workspace со своим ключом, fetch существующего клона, ошибка home, скриптовые проверки --phase и секретных env (D-62).",
+    "relativePath": "apps/server/tests/test_sandbox_fake.py",
+    "summary": "Проверки поведения fake sandbox provider для сервисных тестов.",
     "role": "test",
-    "contentHash": "132b5556da9835630f445d0db734a8e18df6f4e2393f22be4c02d29ebad43311",
+    "contentHash": "d6cba554151e16cc801c4609ded666a0d3b16940cb0d3d6e47d21993fe572397",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:07:23.102Z"
+    "updatedAt": "2026-10-26T03:00:22.279Z"
   },
   {
     "relativePath": "apps/server/tests/test_sandbox_profile_live.py",
-    "summary": "Live-тест профиля песочницы: LIVE_REPO_ACCESS_REF/PROVIDER/PROJECT, ключ по workspace в bootstrap и activate, проверка доступности без ключа.",
+    "summary": "Owner-only sandbox profile live checks.",
     "role": "test",
-    "contentHash": "22c9e8dad161d519ea3c92773c2bf096e16dcc0ecab5996ea68b86a781ffaeff",
+    "contentHash": "8e36c536ce3b4add6e061fd37d685fb909e6251450c6efd54ea01f73b0257a14",
     "author": "agent",
-    "updatedAt": "2026-10-20T02:09:04.155Z"
+    "updatedAt": "2026-10-26T02:36:57.243Z"
   },
   {
     "relativePath": "apps/server/tests/test_sandbox_service.py",
-    "summary": "Тесты сервиса песочницы на FakeSandbox: bootstrap с фейком printf $HOME, activate с fetch по адресу из конфига и перекрытиями GIT_CONFIG_* (D-62).",
+    "summary": "Sandbox service tests after bootstrap removal.",
     "role": "test",
-    "contentHash": "0a6220d1ada572adff3d4217c2e31fa90b21ce7979c011c8582beca5766e26e6",
+    "contentHash": "b55bcfdf99a436f9d516ec0af392c8f3ed8b6f0ee020aa5baf675eef8ba2ba3d",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:07:23.073Z"
+    "updatedAt": "2026-10-26T02:36:57.252Z"
   },
   {
     "relativePath": "apps/server/tests/test_settings.py",
@@ -829,7 +1045,7 @@
     "role": "test",
     "contentHash": "acdfdae06627bad0bd0a446c7be8671264ab9ee3adcda8a8d7ec88eca1f52a52",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:53:10.285Z"
+    "updatedAt": "2026-10-24T15:53:41.710Z"
   },
   {
     "relativePath": "apps/server/tests/test_status_report.py",
@@ -837,7 +1053,7 @@
     "role": "test",
     "contentHash": "92a009562be877da0e924b2382e106f147e8aea6e6b38bb64d3aa2a42df5345f",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.809Z"
+    "updatedAt": "2026-10-24T15:53:41.712Z"
   },
   {
     "relativePath": "apps/server/tests/test_statuses.py",
@@ -845,7 +1061,7 @@
     "role": "test",
     "contentHash": "828d4eedd33e97f4633cc8ac09bb1dfaa732bef8b9947e1762398df70865550b",
     "author": "agent",
-    "updatedAt": "2026-10-18T11:49:57.811Z"
+    "updatedAt": "2026-10-24T15:53:41.713Z"
   },
   {
     "relativePath": "apps/server/tests/test_stt_client.py",
@@ -853,15 +1069,15 @@
     "role": "test",
     "contentHash": "81c4f19aca25ee952c2fd04baaa185b384d2356c562353319c94eefebb3c53d8",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:29.489Z"
+    "updatedAt": "2026-10-24T15:53:41.715Z"
   },
   {
     "relativePath": "apps/server/tests/test_task_queue.py",
     "summary": "Тесты claim_next_task: захват задачи с FOR UPDATE SKIP LOCKED, параллельные claim не получают одну задачу.",
     "role": "test",
-    "contentHash": "6a5e71905df475a91b755026015d6a924a52b06e8d08f423a9458d1dc448282c",
+    "contentHash": "5e34d5f71783b66b030ecd30694c76cb820f81ae29a7f32efb43dd8016eb71a3",
     "author": "agent",
-    "updatedAt": "2026-10-18T11:49:57.793Z"
+    "updatedAt": "2026-10-24T15:53:41.716Z"
   },
   {
     "relativePath": "apps/server/tests/test_task_service.py",
@@ -869,7 +1085,7 @@
     "role": "test",
     "contentHash": "b52c79a492656bb383918b67470797fdf7c2d374472a93bf5c6664f5583f06fb",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:29.433Z"
+    "updatedAt": "2026-10-24T15:53:41.717Z"
   },
   {
     "relativePath": "apps/server/tests/test_tasks_api.py",
@@ -877,7 +1093,7 @@
     "role": "test",
     "contentHash": "e46692a82a028538c3cc4cac6d4610fd54c31102eef1a74188f026a535cd37c2",
     "author": "agent",
-    "updatedAt": "2026-10-18T11:49:57.802Z"
+    "updatedAt": "2026-10-24T15:53:41.719Z"
   },
   {
     "relativePath": "apps/server/tests/test_telegram_client.py",
@@ -885,7 +1101,7 @@
     "role": "test",
     "contentHash": "48e7d1f6ad634d1d244fd07bf95fb468a85afee940b77f181eec95d93d017481",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:53:10.326Z"
+    "updatedAt": "2026-10-24T15:53:41.720Z"
   },
   {
     "relativePath": "apps/server/tests/test_telegram_live.py",
@@ -893,7 +1109,7 @@
     "role": "test",
     "contentHash": "36b5a95d8f642c7ce9a82821162d662c513ddb1dd0f8d258980a3055a47c5ce2",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:29.507Z"
+    "updatedAt": "2026-10-24T15:53:41.721Z"
   },
   {
     "relativePath": "apps/server/tests/test_telegram_parse.py",
@@ -901,7 +1117,7 @@
     "role": "test",
     "contentHash": "820284d54fe8a6f745b5c43cc634ce48bd2a1eee020a5a2f000bd1003029c5a0",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:29.516Z"
+    "updatedAt": "2026-10-24T15:53:41.723Z"
   },
   {
     "relativePath": "apps/server/tests/test_telegram_render.py",
@@ -909,7 +1125,7 @@
     "role": "test",
     "contentHash": "d2377ddcccecf2a0e555414d4a96e75583b42c397097758728ff80ed0997d64f",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:19:53.704Z"
+    "updatedAt": "2026-10-24T15:53:41.724Z"
   },
   {
     "relativePath": "apps/server/tests/test_telegram_webhook.py",
@@ -917,7 +1133,7 @@
     "role": "test",
     "contentHash": "8833c7a483b23852020eca28b56b714708f717e4669ae1bb6202f91fd800e926",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:29.533Z"
+    "updatedAt": "2026-10-24T15:53:41.725Z"
   },
   {
     "relativePath": "apps/server/tests/test_tokens.py",
@@ -925,7 +1141,7 @@
     "role": "test",
     "contentHash": "b100776200e855ed4b005fc64fae134be53202bcf9e75facc0f1df37687b364a",
     "author": "agent",
-    "updatedAt": "2026-10-19T07:53:10.168Z"
+    "updatedAt": "2026-10-24T15:53:41.727Z"
   },
   {
     "relativePath": "apps/server/tests/test_vault.py",
@@ -933,7 +1149,7 @@
     "role": "test",
     "contentHash": "a7aa0fd35a6261fcfdb8e05035405fb39def870e6d734c47581a635b090a0caf",
     "author": "agent",
-    "updatedAt": "2026-10-19T13:39:57.844Z"
+    "updatedAt": "2026-10-24T15:53:41.728Z"
   },
   {
     "relativePath": "apps/server/tests/test_webhook_service.py",
@@ -941,7 +1157,7 @@
     "role": "test",
     "contentHash": "e03bf1057897820ca04327063477b95d5e89c404daab98c57e6875d63d9d11e8",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:29.542Z"
+    "updatedAt": "2026-10-24T15:53:41.729Z"
   },
   {
     "relativePath": "apps/server/tests/test_wiring_routing.py",
@@ -949,15 +1165,15 @@
     "role": "test",
     "contentHash": "c1bf442f6e585115283b159639cafa80f0dd0f4e731e54dc66f6fdc2fe0c6e3c",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.817Z"
+    "updatedAt": "2026-10-24T15:53:41.731Z"
   },
   {
     "relativePath": "apps/server/tests/test_wiring_telegram.py",
-    "summary": "Тесты wiring Telegram: telegram_api_url и webhook-адрес подставляются в клиент, без URL используется официальный адрес, значение токена не попадает в ошибки (D-61).",
+    "summary": "Wiring integration tests.",
     "role": "test",
-    "contentHash": "b00aada4529034f83557c3f4031cbd89c70245d486ff9333530b000e3049b30f",
+    "contentHash": "32937c2471b8a585ea2a3e452cff31de27de44d46b3c847f2550727a447a77c5",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:53:10.267Z"
+    "updatedAt": "2026-10-26T02:36:57.261Z"
   },
   {
     "relativePath": "apps/server/tests/test_worker.py",
@@ -965,15 +1181,23 @@
     "role": "test",
     "contentHash": "13e1397e7117ee3043fcdb5765fc9623b9f3885f49fef2b098cbd1976e72d818",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:29.442Z"
+    "updatedAt": "2026-10-24T15:53:41.734Z"
   },
   {
     "relativePath": "config/harness.example.yaml",
-    "summary": "Пример несекретного harness.yaml: workspaces[].repo (provider, base_url, project, access_ref) вместо gitlab:, секреты только ссылками на vault.",
+    "summary": "Example harness configuration for local provider.",
     "role": "config",
-    "contentHash": "f0eb008503f24a8a68e7ecfcb3f9632fd4e10e7b16da2091b9008c08bbe97d3a",
+    "contentHash": "522c78463e67d944b188e184043251bafb44b05945244ecb45620238b032a5ed",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:19:53.738Z"
+    "updatedAt": "2026-10-26T02:36:57.284Z"
+  },
+  {
+    "relativePath": "config/harness.yaml",
+    "summary": "harness.yaml: Несекретные настройки harness. Скопировать в config/harness.yaml (файл не коммитится).",
+    "role": "config",
+    "contentHash": "5e92a5a75fcb17d547aebea672e8e14ccc615667f9bba40a9038e56f67de19e1",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.737Z"
   },
   {
     "relativePath": "db/README.md",
@@ -981,7 +1205,7 @@
     "role": "doc",
     "contentHash": "6bcf1e91c8beceb79484d96cb1b6dba38c5438118d2225df1e1ccde6002270f4",
     "author": "agent",
-    "updatedAt": "2026-10-19T07:53:10.245Z"
+    "updatedAt": "2026-10-24T15:53:41.738Z"
   },
   {
     "relativePath": "db/migrations/env.py",
@@ -989,7 +1213,7 @@
     "role": "config",
     "contentHash": "ace7f0daae26284a75239f458445850beeb275860356b1f4228a1fafd524d202",
     "author": "agent",
-    "updatedAt": "2026-10-18T11:49:57.740Z"
+    "updatedAt": "2026-10-24T15:53:41.739Z"
   },
   {
     "relativePath": "db/migrations/versions/20261018_0001_initial.py",
@@ -997,7 +1221,7 @@
     "role": "module",
     "contentHash": "c4c5ec70b3105b76426a2a8140eccce8ca86515243c32a52fd5228808cfeff81",
     "author": "agent",
-    "updatedAt": "2026-10-18T11:50:55.775Z"
+    "updatedAt": "2026-10-24T15:53:41.741Z"
   },
   {
     "relativePath": "db/migrations/versions/20261018_0002_telegram_update_payload.py",
@@ -1005,7 +1229,7 @@
     "role": "config",
     "contentHash": "3dd46b23d682298a7aaaa8b736daa237d29edc20a0119e8eb7028c47dd96ed8d",
     "author": "agent",
-    "updatedAt": "2026-10-18T13:43:02.751Z"
+    "updatedAt": "2026-10-24T15:53:41.744Z"
   },
   {
     "relativePath": "db/migrations/versions/20261018_0003_routing_decision.py",
@@ -1013,7 +1237,7 @@
     "role": "module",
     "contentHash": "d2d8019fb8f34b9ac8d740fa842e5ffe340c6a4772b939b3fdc815fbd633c880",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:47:45.463Z"
+    "updatedAt": "2026-10-24T15:53:41.746Z"
   },
   {
     "relativePath": "db/migrations/versions/20261019_0004_sandbox_agent_run.py",
@@ -1021,71 +1245,71 @@
     "role": "module",
     "contentHash": "64802df5f547f78208ef64e7a20644fe0ccc37e978c8c4d3606b4b51134c66bd",
     "author": "agent",
-    "updatedAt": "2026-10-19T07:53:10.024Z"
+    "updatedAt": "2026-10-24T15:53:41.747Z"
   },
   {
     "relativePath": "deploy/db/docker-compose.yml",
-    "summary": "Compose сервиса Postgres для окружения деплоя; учётные данные передаются через ENV, значения в файле не хранятся.",
+    "summary": "Postgres deployment restricted to loopback publication.",
     "role": "config",
-    "contentHash": "b86463a4325957b4b4f43c7728ed0a83b5242a833be9800deabc59d59ed6c1d6",
+    "contentHash": "93f5cc2a81ed795a32942edde9f36446f551e31218a339408175fe4f42d3ca07",
     "author": "agent",
-    "updatedAt": "2026-10-18T09:00:01.918Z"
+    "updatedAt": "2026-10-26T02:36:57.293Z"
   },
   {
-    "relativePath": "deploy/sandbox/bootstrap.sh",
-    "summary": "Скрипт bootstrap песочницы: фазы --phase setup и memory, клон и fetch по ключу workspace через заголовок, проверки HOME и секретных env (D-62).",
-    "role": "other",
-    "contentHash": "5b926de6a560ef7d525f1858dabd1cf48405f3c2de48dc2a8114c1132a719ecb",
+    "relativePath": "deploy/worker/README.md",
+    "summary": "Установка, конфигурация и управление worker на хостовой машине.",
+    "role": "doc",
+    "contentHash": "bbac5e04ce6f0b0510e86d2cba79dd90bc22d966758d5e3e34f842f4ef14d1ae",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:19:53.802Z"
+    "updatedAt": "2026-10-26T03:00:22.310Z"
   },
   {
     "relativePath": "docker-compose.yml",
-    "summary": "Стек harness для Dokploy: сервисы migrate, server и worker; Postgres в отдельном стеке deploy/db.",
+    "summary": "Dokploy migrate and server services; worker runs on host.",
     "role": "config",
-    "contentHash": "5af122e6796f6acae8f0d74224fd39b62e0c5b38bd171197e5879564f0f21403",
+    "contentHash": "046aaec224b169fdff1f8147b108941cc72384b704cdcc19903c99d51dacfb71",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:19:53.827Z"
+    "updatedAt": "2026-10-26T02:36:57.310Z"
   },
   {
     "relativePath": "docs/README.md",
-    "summary": "Оглавление каталога docs: ТЗ, решения D-NN, открытые вопросы, отчёт спайка Novita (docs/novita.md) и ссылки между ними.",
+    "summary": "Навигация по документации с материалами о локальной машине агента и worker.",
     "role": "doc",
-    "contentHash": "0f856ea1ae21e2ada4437a9c23fc463ffb60baf302c3a3e6904742092247e928",
+    "contentHash": "19ed1f8cc027bd28870c782b098fe111dba7eebe50c2ca6fd856de2289fb38a6",
     "author": "agent",
-    "updatedAt": "2026-10-18T08:27:10.142Z"
+    "updatedAt": "2026-10-26T03:00:22.062Z"
   },
   {
     "relativePath": "docs/decisions.md",
-    "summary": "ADR-лог: таблица решений D-NN. Добавлен D-63: скрипт bootstrap в образе, путь по умолчанию от корня приложения через parents[4], без ENV.",
+    "summary": "Решения об отказе от Novita и переходе к локальной машине агента и host worker.",
     "role": "doc",
-    "contentHash": "f02890809ef92bd08c66a5d2defca8b163769ac9f2b00258985ca1ca8ac92e78",
+    "contentHash": "849a001b7cc7cd8b70dfe192639a234cf14b5be90783f4496fffe3c06525b830",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:55:00.050Z"
+    "updatedAt": "2026-10-26T03:00:22.091Z"
   },
   {
     "relativePath": "docs/deployment.md",
-    "summary": "Инструкция деплоя Dokploy и GitLab CI. Шаг 3 «Первый запуск» описывает sandbox bootstrap из терминала Dokploy и путь /app/deploy/sandbox/bootstrap.sh (D-63).",
+    "summary": "Переход на локальную машину агента, подготовка проекта и запуск host worker.",
     "role": "doc",
-    "contentHash": "4820b19216d658b77a00ca8e09ec89238ff81a3742e597a5b604166b7a4d7cd9",
+    "contentHash": "e898f6e3f32bacf2ba55b9a0e309c84944d6172321bb79ed8d70e6e7c8e3f45b",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:54:59.989Z"
+    "updatedAt": "2026-10-26T03:00:22.004Z"
   },
   {
     "relativePath": "docs/development.md",
-    "summary": "Локальная разработка: uv sync, Postgres в Docker, migrate, harness dev, harness check, webhook-туннель; ссылка на работу без UI (docs/operating-without-ui.md).",
+    "summary": "Локальная разработка и запуск агента через agent init и worker как systemd user service.",
     "role": "doc",
-    "contentHash": "08aebc2a33895de0a9aeda0701b3cc99241d4509816bf5aebda91ab7fef9e10e",
+    "contentHash": "ca12670fa6201f1d2eef23e4bf9a9e91648ca9d13fca8e212097f00bf9b2834e",
     "author": "agent",
-    "updatedAt": "2026-10-19T09:00:18.966Z"
+    "updatedAt": "2026-10-26T03:00:22.018Z"
   },
   {
     "relativePath": "docs/glossary.md",
-    "summary": "Словарь терминов проекта: workspace, задача, песочница, репозиторий и провайдер git (GitHub или GitLab) с принятыми названиями.",
+    "summary": "Термины локальной машины агента, проекта и маркеров инициализации.",
     "role": "doc",
-    "contentHash": "4fe98952876064a4bcd417eb02e9979c3cb738439d6272f193af7062556d0b7f",
+    "contentHash": "199d3cc51279c15c5f68cdeb34c0388fe52ce6c60a413cd90ded5b43ae9ddec4",
     "author": "agent",
-    "updatedAt": "2026-10-20T04:19:53.891Z"
+    "updatedAt": "2026-10-26T03:00:22.077Z"
   },
   {
     "relativePath": "docs/mcp-agents-flow.md",
@@ -1093,31 +1317,23 @@
     "role": "doc",
     "contentHash": "e86fa94c1c1eb0588d76856ca2d924639ed08f850b1f25f74617f943fc1f9908",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:27.001Z"
-  },
-  {
-    "relativePath": "docs/novita.md",
-    "summary": "Результаты спайка Novita mvp-01: exec, файлы, пауза и возобновление, продление и таймаут, установка Claude Code; выводы для mvp-06 и ограничения паузы.",
-    "role": "doc",
-    "contentHash": "bca88d4e40b44d5fbf772bc8f8e68219bbe79917409f4ce14fe6aec7726dc952",
-    "author": "agent",
-    "updatedAt": "2026-10-19T03:48:17.062Z"
+    "updatedAt": "2026-10-24T15:53:41.760Z"
   },
   {
     "relativePath": "docs/open-questions.md",
-    "summary": "Открытые вопросы: вопрос 4 (клон при bootstrap, закрыт), вопрос 6 (шаблон Novita не делаем, D-44), риски без решения.",
+    "summary": "Открытые вопросы проекта после перехода с Novita на локальную машину агента.",
     "role": "doc",
-    "contentHash": "cc75d0d23ab5f6b89f533346839faf93370c31467c3c4b4af4f4fd3498de32fa",
+    "contentHash": "0f1b259e5689bf9316ba2b07eb9d55d0824458ba3b6560430ee17e9bcc09c20a",
     "author": "agent",
-    "updatedAt": "2026-10-19T12:54:19.007Z"
+    "updatedAt": "2026-10-26T03:00:22.048Z"
   },
   {
     "relativePath": "docs/operating-without-ui.md",
-    "summary": "Эксплуатация без UI: предупреждение worker о workspace без repo.access_ref, bootstrap клонирует по ключу репозитория из vault или анонимно.",
+    "summary": "Рабочий процесс без UI с подготовкой проектов на локальной машине агента.",
     "role": "doc",
-    "contentHash": "f7cb0aaeaeef2b1205c8195b95b7fc7b3b18c8bd9242ed23b8ee30b292b0f485",
+    "contentHash": "5f420b7deb6c2118309f4d3525dd2da73f0598924ad56b63e0e8128b4a09e627",
     "author": "agent",
-    "updatedAt": "2026-10-20T02:08:55.135Z"
+    "updatedAt": "2026-10-26T03:00:22.033Z"
   },
   {
     "relativePath": "docs/tz/tz-v5.md",
@@ -1125,7 +1341,7 @@
     "role": "doc",
     "contentHash": "984c1c776a1ddb24044342db9ea7050ec8aec3d27b67daabec227436d2f97a14",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:27.024Z"
+    "updatedAt": "2026-10-24T15:53:41.765Z"
   },
   {
     "relativePath": "openspec/changes/agent-heartbeat/.openspec.yaml",
@@ -1133,7 +1349,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.141Z"
+    "updatedAt": "2026-10-24T15:53:41.768Z"
   },
   {
     "relativePath": "openspec/changes/agent-heartbeat/proposal.md",
@@ -1141,7 +1357,7 @@
     "role": "doc",
     "contentHash": "c423dd0ff6988316e6aea5abcf751dc82c21fef38d803752c31464ea84ef7cbd",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.148Z"
+    "updatedAt": "2026-10-24T15:53:41.770Z"
   },
   {
     "relativePath": "openspec/changes/agent-heartbeat/specs/sandbox-runtime/spec.md",
@@ -1149,7 +1365,7 @@
     "role": "doc",
     "contentHash": "cee3dffaf8c6f54f9418d1810bcd68f406c67e30a7323cc01216e815a19ff0f5",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.153Z"
+    "updatedAt": "2026-10-24T15:53:41.771Z"
   },
   {
     "relativePath": "openspec/changes/agent-heartbeat/tasks.md",
@@ -1157,7 +1373,7 @@
     "role": "doc",
     "contentHash": "2985c2c6513b5d8e18ce53a439c379d542ed831db079bd75fbb545cb405c22cd",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.157Z"
+    "updatedAt": "2026-10-24T15:53:41.773Z"
   },
   {
     "relativePath": "openspec/changes/agent-sessions/.openspec.yaml",
@@ -1165,7 +1381,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.161Z"
+    "updatedAt": "2026-10-24T15:53:41.774Z"
   },
   {
     "relativePath": "openspec/changes/agent-sessions/proposal.md",
@@ -1173,7 +1389,7 @@
     "role": "doc",
     "contentHash": "8956202f5fc317d78fa43d363ff1b03a5f04a3c2cf5a69d4a8677b832db2966a",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.165Z"
+    "updatedAt": "2026-10-24T15:53:41.775Z"
   },
   {
     "relativePath": "openspec/changes/agent-sessions/specs/agent-sessions/spec.md",
@@ -1181,7 +1397,7 @@
     "role": "doc",
     "contentHash": "a3335605f6fcc86f759ba92e39fda77ec8231bd629bf927f63662d8cfbac371d",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.169Z"
+    "updatedAt": "2026-10-24T15:53:41.777Z"
   },
   {
     "relativePath": "openspec/changes/agent-sessions/tasks.md",
@@ -1189,7 +1405,63 @@
     "role": "doc",
     "contentHash": "c3907346ae5b334b29d0eacd0728d3b0a018c2e63158d54b3a85c6e8cedb89d7",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.172Z"
+    "updatedAt": "2026-10-24T15:53:41.778Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-18-mvp-01-novita-spike/.openspec.yaml",
+    "summary": ".openspec.yaml: yaml in openspec/changes/archive/2026-10-18-mvp-01-novita-spike",
+    "role": "config",
+    "contentHash": "fbeccb8e6385e25552f368fd6265fb9ae44bc41667c902cfb823162523f04f0b",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.780Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-18-mvp-01-novita-spike/proposal.md",
+    "summary": "proposal.md: Proposal: mvp-01-novita-spike",
+    "role": "doc",
+    "contentHash": "743d3d79d3170cd2f73051656e11aee1ada2d0ee69637f2420cc25643517e7f5",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.783Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-18-mvp-01-novita-spike/tasks.md",
+    "summary": "tasks.md: Tasks",
+    "role": "doc",
+    "contentHash": "522e52d480dea3b7a439926bbc1fcabf52eb2640cba8ad4e1d8898751c42e3e4",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.785Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-18-mvp-02-foundation/.openspec.yaml",
+    "summary": ".openspec.yaml: yaml in openspec/changes/archive/2026-10-18-mvp-02-foundation",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.786Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-18-mvp-02-foundation/design.md",
+    "summary": "design.md: Design: mvp-02-foundation",
+    "role": "doc",
+    "contentHash": "923b5836c51123beb85a214a36478dad2d15973dadba23e0715319ffb299330a",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.788Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-18-mvp-02-foundation/proposal.md",
+    "summary": "proposal.md: Proposal: mvp-02-foundation",
+    "role": "doc",
+    "contentHash": "1e58816fb03d52ce8c76ef923499cc2d678fe816a897d4487a36a70091970fda",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.789Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-18-mvp-02-foundation/specs/platform-config/spec.md",
+    "summary": "spec.md: ADDED Requirements",
+    "role": "doc",
+    "contentHash": "46b262db482965888ce2eef96a05d864bdd17a5484a81dcc177509e577a211c4",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.791Z"
   },
   {
     "relativePath": "openspec/changes/archive/2026-10-18-mvp-02-foundation/tasks.md",
@@ -1197,7 +1469,15 @@
     "role": "doc",
     "contentHash": "9461f7e10a6c7409b508b17dda7779848c0eb0d852e1293b6f56f45933449f1d",
     "author": "agent",
-    "updatedAt": "2026-10-18T09:36:15.272Z"
+    "updatedAt": "2026-10-24T15:53:41.792Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-18-mvp-03-task-store/.openspec.yaml",
+    "summary": ".openspec.yaml: yaml in openspec/changes/archive/2026-10-18-mvp-03-task-store",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.793Z"
   },
   {
     "relativePath": "openspec/changes/archive/2026-10-18-mvp-03-task-store/design.md",
@@ -1205,7 +1485,7 @@
     "role": "doc",
     "contentHash": "11010bdc75f8a6e47ebe61b2fa09255a33fd188b3cba03e074ac1e72f75d15d0",
     "author": "agent",
-    "updatedAt": "2026-10-18T14:16:06.277Z"
+    "updatedAt": "2026-10-24T15:53:41.795Z"
   },
   {
     "relativePath": "openspec/changes/archive/2026-10-18-mvp-03-task-store/proposal.md",
@@ -1213,7 +1493,7 @@
     "role": "doc",
     "contentHash": "f748592f76c76774e09f7a8f03417c866765d61c4ae4107cbbd98738087da098",
     "author": "agent",
-    "updatedAt": "2026-10-18T14:16:06.286Z"
+    "updatedAt": "2026-10-24T15:53:41.796Z"
   },
   {
     "relativePath": "openspec/changes/archive/2026-10-18-mvp-03-task-store/specs/platform-config/spec.md",
@@ -1221,7 +1501,7 @@
     "role": "doc",
     "contentHash": "03797181166768d64e7d8f3d99af57aa2632255ab32d51c0e61874356f6abf25",
     "author": "agent",
-    "updatedAt": "2026-10-18T14:16:06.305Z"
+    "updatedAt": "2026-10-24T15:53:41.797Z"
   },
   {
     "relativePath": "openspec/changes/archive/2026-10-18-mvp-03-task-store/specs/task-lifecycle/spec.md",
@@ -1229,7 +1509,7 @@
     "role": "doc",
     "contentHash": "10c442fd497b51bd4a5fc17f6315ba918cec89e68c212d57ea58e1c0b06d046a",
     "author": "agent",
-    "updatedAt": "2026-10-18T14:16:06.318Z"
+    "updatedAt": "2026-10-24T15:53:41.799Z"
   },
   {
     "relativePath": "openspec/changes/archive/2026-10-18-mvp-03-task-store/tasks.md",
@@ -1237,7 +1517,15 @@
     "role": "doc",
     "contentHash": "1f3c226c5a5a20fecf3352b10dd7e7dfb276fa663f60750cd367efd47702600d",
     "author": "agent",
-    "updatedAt": "2026-10-18T14:16:06.295Z"
+    "updatedAt": "2026-10-24T15:53:41.800Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-18-mvp-04-telegram-intake/.openspec.yaml",
+    "summary": ".openspec.yaml: yaml in openspec/changes/archive/2026-10-18-mvp-04-telegram-intake",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.801Z"
   },
   {
     "relativePath": "openspec/changes/archive/2026-10-18-mvp-04-telegram-intake/design.md",
@@ -1245,7 +1533,7 @@
     "role": "doc",
     "contentHash": "27ad2a573aa1131b6884ddba39420d2d07de2de984a7b5007412b86042193d39",
     "author": "agent",
-    "updatedAt": "2026-10-18T14:16:06.328Z"
+    "updatedAt": "2026-10-24T15:53:41.803Z"
   },
   {
     "relativePath": "openspec/changes/archive/2026-10-18-mvp-04-telegram-intake/proposal.md",
@@ -1253,7 +1541,7 @@
     "role": "doc",
     "contentHash": "9dc0a2d8fd2403ff3e6c7a33567963de4f47102d308c98e4f97b015bc68452bd",
     "author": "agent",
-    "updatedAt": "2026-10-18T14:16:06.338Z"
+    "updatedAt": "2026-10-24T15:53:41.804Z"
   },
   {
     "relativePath": "openspec/changes/archive/2026-10-18-mvp-04-telegram-intake/specs/speech-to-text/spec.md",
@@ -1261,7 +1549,7 @@
     "role": "doc",
     "contentHash": "480011d87ae6dad5e51ac2a1509846e494035ffae6326dfb105f9ad77c5c2b59",
     "author": "agent",
-    "updatedAt": "2026-10-18T14:16:06.356Z"
+    "updatedAt": "2026-10-24T15:53:41.805Z"
   },
   {
     "relativePath": "openspec/changes/archive/2026-10-18-mvp-04-telegram-intake/specs/telegram-bot/spec.md",
@@ -1269,7 +1557,7 @@
     "role": "doc",
     "contentHash": "5e35ef05a1d4c808e22e419e0c923b1ea343d3850ac625fd7d592e0f3aa690f3",
     "author": "agent",
-    "updatedAt": "2026-10-18T14:16:06.365Z"
+    "updatedAt": "2026-10-24T15:53:41.807Z"
   },
   {
     "relativePath": "openspec/changes/archive/2026-10-18-mvp-04-telegram-intake/tasks.md",
@@ -1277,7 +1565,15 @@
     "role": "doc",
     "contentHash": "6d65b511f6f51d52b633ceaebe924e7edc46bcde2ec5aa879f261e7b63c6d22f",
     "author": "agent",
-    "updatedAt": "2026-10-18T14:16:06.347Z"
+    "updatedAt": "2026-10-24T15:53:41.808Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-19-mvp-05-command-routing/.openspec.yaml",
+    "summary": ".openspec.yaml: yaml in openspec/changes/archive/2026-10-19-mvp-05-command-routing",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.810Z"
   },
   {
     "relativePath": "openspec/changes/archive/2026-10-19-mvp-05-command-routing/design.md",
@@ -1285,7 +1581,7 @@
     "role": "doc",
     "contentHash": "515f47e988bf93a2eba8d2ac9a071098fc3329da9d101077e88dfd038928b515",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:07:41.638Z"
+    "updatedAt": "2026-10-24T15:53:41.811Z"
   },
   {
     "relativePath": "openspec/changes/archive/2026-10-19-mvp-05-command-routing/proposal.md",
@@ -1293,7 +1589,23 @@
     "role": "doc",
     "contentHash": "96a17489a19ccde1d83cbcf55cfa132e8d7e84dfa8833e23ebe14ba4ef36678b",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:07:41.617Z"
+    "updatedAt": "2026-10-24T15:53:41.813Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-19-mvp-05-command-routing/specs/command-routing/spec.md",
+    "summary": "spec.md: ADDED Requirements",
+    "role": "doc",
+    "contentHash": "57166e7a04ad8422b8838ccba13f0f7f83b1b466af11564f6a214d63e37c69b7",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.814Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-19-mvp-05-command-routing/specs/telegram-bot/spec.md",
+    "summary": "spec.md: MODIFIED Requirements",
+    "role": "doc",
+    "contentHash": "2bcfc74cdb5ec358d42016cce8f6e55a4643849fd46ff10c1b53e58977acf3ac",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.815Z"
   },
   {
     "relativePath": "openspec/changes/archive/2026-10-19-mvp-05-command-routing/tasks.md",
@@ -1301,7 +1613,15 @@
     "role": "doc",
     "contentHash": "4c6ed88224169f960154a631f0a394ee1f6be8e8146fc080a735b5d949f63a4d",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:07:41.666Z"
+    "updatedAt": "2026-10-24T15:53:41.817Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-19-mvp-06-sandbox-runtime/.openspec.yaml",
+    "summary": ".openspec.yaml: yaml in openspec/changes/archive/2026-10-19-mvp-06-sandbox-runtime",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.818Z"
   },
   {
     "relativePath": "openspec/changes/archive/2026-10-19-mvp-06-sandbox-runtime/design.md",
@@ -1309,7 +1629,7 @@
     "role": "doc",
     "contentHash": "85519c5b1279b13bfa0855711997163f06b126cc79bb2347d5a761918c253223",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:07:41.709Z"
+    "updatedAt": "2026-10-24T15:53:41.820Z"
   },
   {
     "relativePath": "openspec/changes/archive/2026-10-19-mvp-06-sandbox-runtime/proposal.md",
@@ -1317,7 +1637,15 @@
     "role": "doc",
     "contentHash": "de88c03166943ab6aae810df670a6b0e1fd6a0322d7825b347bc7c1bc1c91d18",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:07:41.690Z"
+    "updatedAt": "2026-10-24T15:53:41.824Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-19-mvp-06-sandbox-runtime/specs/sandbox-runtime/spec.md",
+    "summary": "spec.md: ADDED Requirements",
+    "role": "doc",
+    "contentHash": "914f39aaf7a16d8ea7cd639d9e4d50aedcdd0ec8e8aa724c1cf65d61a51d30a3",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.829Z"
   },
   {
     "relativePath": "openspec/changes/archive/2026-10-19-mvp-06-sandbox-runtime/tasks.md",
@@ -1325,7 +1653,15 @@
     "role": "doc",
     "contentHash": "418db98f121b5e7bd848fc93b01384e3ee159330e9123a619433cebb75d82ba2",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:07:41.725Z"
+    "updatedAt": "2026-10-24T15:53:41.833Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-19-sandbox-profile/.openspec.yaml",
+    "summary": ".openspec.yaml: yaml in openspec/changes/archive/2026-10-19-sandbox-profile",
+    "role": "config",
+    "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.838Z"
   },
   {
     "relativePath": "openspec/changes/archive/2026-10-19-sandbox-profile/design.md",
@@ -1333,7 +1669,7 @@
     "role": "doc",
     "contentHash": "60b65f707ed92f50e7540a8c9a364b71e159ef2eec91d075d7249c9d4bbe869f",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:07:41.787Z"
+    "updatedAt": "2026-10-24T15:53:41.842Z"
   },
   {
     "relativePath": "openspec/changes/archive/2026-10-19-sandbox-profile/proposal.md",
@@ -1341,7 +1677,23 @@
     "role": "doc",
     "contentHash": "0c8cd31b6bdacf4ce53ad20176ad69da348df8b3dddeac8f106d3fe36a1abfeb",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:07:41.763Z"
+    "updatedAt": "2026-10-24T15:53:41.847Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-19-sandbox-profile/specs/sandbox-profile/spec.md",
+    "summary": "spec.md: ADDED Requirements",
+    "role": "doc",
+    "contentHash": "ece2c03e46c75dab33022de380f19b5bc3f3026d17bab59c4c4926aba017a79c",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.852Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-19-sandbox-profile/specs/sandbox-runtime/spec.md",
+    "summary": "spec.md: MODIFIED Requirements",
+    "role": "doc",
+    "contentHash": "cc67cac56874e1265d54b5f9e55f2ce060c000e15f3b3e7432dcee8ce5ebfcb3",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.856Z"
   },
   {
     "relativePath": "openspec/changes/archive/2026-10-19-sandbox-profile/tasks.md",
@@ -1349,7 +1701,95 @@
     "role": "doc",
     "contentHash": "e5286d88b7cc13f3865c9fe6d831d9d92d2d4e529802e90804d5a5fbe06c6f2b",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:07:48.332Z"
+    "updatedAt": "2026-10-24T15:53:41.857Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-20-bootstrap-in-image/design.md",
+    "summary": "Архив design bootstrap-in-image: DEFAULT_BOOTSTRAP_SCRIPT = parents[4] cli.py (editable-установка, /app), COPY deploy/sandbox в Dockerfile; отвергнуты ENV и importlib.resources.",
+    "role": "doc",
+    "contentHash": "c66c5af6e67a217501580e948210e18814f1764d0f41920a8b39143fa0891b88",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.859Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-20-bootstrap-in-image/proposal.md",
+    "summary": "Архив bootstrap-in-image (6f, D-63): на проде bootstrap не находил deploy/sandbox/bootstrap.sh; скрипт кладётся в образ, путь от корня приложения.",
+    "role": "doc",
+    "contentHash": "6e2f0f797d1d680520f24ceda4e23f525714100dd8d13bed77a348b06dd0c140",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.860Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-20-bootstrap-in-image/specs/sandbox-profile/spec.md",
+    "summary": "Архивная дельта sandbox-profile (bootstrap-in-image): скрипт bootstrap в образе сервера, путь от корня приложения, флаг --script, без новой ENV.",
+    "role": "doc",
+    "contentHash": "db19db82af30daed1e0af48ec1a51646f04b81c737e828f46f961b70dc72311b",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.862Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-20-bootstrap-in-image/tasks.md",
+    "summary": "Архив tasks bootstrap-in-image: все пункты отмечены; образ собран Dokploy (локально нет buildx), live — bootstrap в терминале worker 2026-10-20 exit 0.",
+    "role": "doc",
+    "contentHash": "2bcbf6e85a864c8cc52bffd364af22065ce9f66618237e9a893abea8ee286d83",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.863Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-20-git-providers/.openspec.yaml",
+    "summary": ".openspec.yaml: yaml in openspec/changes/archive/2026-10-20-git-providers",
+    "role": "config",
+    "contentHash": "b552ab6519df8f66b705724100f565c5cd842bc9389aeaa177da9cec3d02a685",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.864Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-20-git-providers/design.md",
+    "summary": "Архив design git-providers: RepoConfig, git_access, Basic oauth2/x-access-token на префикс; раздел Эскалация 1 (D-62) — command-scope перекрытия git, bootstrap в три фазы.",
+    "role": "doc",
+    "contentHash": "988084c7f96cbb12f7900cdf7cb4ee8afae4183444673888daee5de8f530ac31",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.866Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-20-git-providers/proposal.md",
+    "summary": "Архив git-providers (6e, D-60): workspaces[].repo GitHub|GitLab, вопросы владельца 1–7 и ответы (умолчания, R-1 принят); заархивировано 2026-10-20 после live bootstrap.",
+    "role": "doc",
+    "contentHash": "6d262426ed2087a4488922906df640890be05128e7ccf3abaff8bd0098925f50",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.867Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-20-git-providers/specs/platform-config/spec.md",
+    "summary": "Архивная дельта platform-config (git-providers): репозиторий workspace (provider, base_url https, project, access_ref), отказ старой формы gitlab:, сегменты base_url.",
+    "role": "doc",
+    "contentHash": "354262916cb398bcd5a79dd310092ac08b600faf87da9b05ae8bf4f3a25d2baa",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.868Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-20-git-providers/specs/sandbox-profile/spec.md",
+    "summary": "Архивная дельта sandbox-profile (git-providers, D-62): авторизация git по workspace, перекрытия конфига в команде с ключом, setup без ключей, клоны делает сервер.",
+    "role": "doc",
+    "contentHash": "48dfc29b0c73c4cc6efcb1de4112340d5f51a191f0317604cc6e6a59dcb92b36",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.870Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-20-git-providers/specs/sandbox-runtime/spec.md",
+    "summary": "Архивная дельта sandbox-runtime (git-providers): ключ записи репозитория перед задачей (error repo_access_ref), redaction токенов GitHub/GitLab, Basic, пароль в URL.",
+    "role": "doc",
+    "contentHash": "b6528fdc54195237517645fcdd916f357c51b5ef9893f6bb120f7b46d9359e7d",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.871Z"
+  },
+  {
+    "relativePath": "openspec/changes/archive/2026-10-20-git-providers/tasks.md",
+    "summary": "Архив tasks git-providers: разделы 0–8 отмечены; live 5.2 — прод bootstrap 2026-10-20 exit 0; 6.5 (.env.example) пропущен по решению владельца.",
+    "role": "doc",
+    "contentHash": "dac3ab2e613f7b327ec9d5e65e0f78b91046593c1b2c2142141c1f2925883d9b",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:41.872Z"
   },
   {
     "relativePath": "openspec/changes/bootstrap-in-image/design.md",
@@ -1389,7 +1829,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.176Z"
+    "updatedAt": "2026-10-24T15:53:41.874Z"
   },
   {
     "relativePath": "openspec/changes/budget-usage/proposal.md",
@@ -1397,7 +1837,7 @@
     "role": "doc",
     "contentHash": "cddd042c7e8ad0b9953a7dc44c48c1816ff200ba31d106bf7d9aad16ba24d33f",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.179Z"
+    "updatedAt": "2026-10-24T15:53:41.875Z"
   },
   {
     "relativePath": "openspec/changes/budget-usage/specs/budget/spec.md",
@@ -1405,7 +1845,7 @@
     "role": "doc",
     "contentHash": "0ed082cdb0e8762929c338118e4d7fa3c24fb7cac965e75ea9f6f171e5478c51",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.183Z"
+    "updatedAt": "2026-10-24T15:53:41.877Z"
   },
   {
     "relativePath": "openspec/changes/budget-usage/tasks.md",
@@ -1413,7 +1853,7 @@
     "role": "doc",
     "contentHash": "98d96dc77521f3ec3432c3274b589324238603c2849c4fa877d05983a3c4663d",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.186Z"
+    "updatedAt": "2026-10-24T15:53:41.878Z"
   },
   {
     "relativePath": "openspec/changes/check-tasks/.openspec.yaml",
@@ -1421,7 +1861,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.190Z"
+    "updatedAt": "2026-10-24T15:53:41.880Z"
   },
   {
     "relativePath": "openspec/changes/check-tasks/proposal.md",
@@ -1429,7 +1869,7 @@
     "role": "doc",
     "contentHash": "772f7b44eba0f2e6389bb7ff6735a45a6444329ad01aa6aba2d56b20f8676cc3",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.193Z"
+    "updatedAt": "2026-10-24T15:53:41.881Z"
   },
   {
     "relativePath": "openspec/changes/check-tasks/specs/task-lifecycle/spec.md",
@@ -1437,7 +1877,7 @@
     "role": "doc",
     "contentHash": "cd9e5b544db9e6e6abd92121fa328983df4d886ccc6d0352dc777fb6844f678b",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.197Z"
+    "updatedAt": "2026-10-24T15:53:41.882Z"
   },
   {
     "relativePath": "openspec/changes/check-tasks/tasks.md",
@@ -1445,7 +1885,7 @@
     "role": "doc",
     "contentHash": "42aaae1ee01a22c0a20d6da2b1aa6f39cf744ba4bcbb90a0955013c50dbe39d6",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.200Z"
+    "updatedAt": "2026-10-24T15:53:41.883Z"
   },
   {
     "relativePath": "openspec/changes/checkpoints/.openspec.yaml",
@@ -1453,7 +1893,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.204Z"
+    "updatedAt": "2026-10-24T15:53:41.885Z"
   },
   {
     "relativePath": "openspec/changes/checkpoints/proposal.md",
@@ -1461,7 +1901,7 @@
     "role": "doc",
     "contentHash": "99c16052b32c8dd4ce7fabfe0b07c3930681c4cf38337f89d510de2216dbb657",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.208Z"
+    "updatedAt": "2026-10-24T15:53:41.886Z"
   },
   {
     "relativePath": "openspec/changes/checkpoints/specs/agent-checkpoints/spec.md",
@@ -1469,7 +1909,7 @@
     "role": "doc",
     "contentHash": "92183fc7a29ec2422f27591e35a3b67c970384496eaa1dd7019a867832961e94",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.212Z"
+    "updatedAt": "2026-10-24T15:53:41.888Z"
   },
   {
     "relativePath": "openspec/changes/checkpoints/tasks.md",
@@ -1477,7 +1917,7 @@
     "role": "doc",
     "contentHash": "8f65a1a09c14fe8bea28104c8ffed81dfccd6060e7b132f3d8d17e4c56a56c93",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.215Z"
+    "updatedAt": "2026-10-24T15:53:41.889Z"
   },
   {
     "relativePath": "openspec/changes/cli-version-pin/.openspec.yaml",
@@ -1485,15 +1925,15 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.219Z"
+    "updatedAt": "2026-10-24T15:53:41.890Z"
   },
   {
     "relativePath": "openspec/changes/cli-version-pin/proposal.md",
-    "summary": "OpenSpec proposal cli-version-pin (волна 5): Закрепление версий CLI агентов. Зависит от sandbox-profile. ТЗ §16.1 C8",
+    "summary": "Superseded CLI version pin proposal status.",
     "role": "doc",
-    "contentHash": "974b729effe4d84bf2b555a36e9768aabb2d0cf62f1d9f64c7e89162e142367a",
+    "contentHash": "e68b1a88a23d593e4693d7ebdfb0f3d4794a84a48dcf9d0d63fd0d531c685a59",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.222Z"
+    "updatedAt": "2026-10-26T02:36:57.336Z"
   },
   {
     "relativePath": "openspec/changes/cli-version-pin/specs/sandbox-profile/spec.md",
@@ -1501,7 +1941,7 @@
     "role": "doc",
     "contentHash": "bed27e70a3afc9903b2f0cb34456bcc23148012dd5938d7e33afc98ed99a13ed",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.226Z"
+    "updatedAt": "2026-10-24T15:53:41.893Z"
   },
   {
     "relativePath": "openspec/changes/cli-version-pin/tasks.md",
@@ -1509,7 +1949,7 @@
     "role": "doc",
     "contentHash": "4111b17ffeddb098a3a1ef259a01811d2f5c93d97704867f20f172626c561851",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.229Z"
+    "updatedAt": "2026-10-24T15:53:41.894Z"
   },
   {
     "relativePath": "openspec/changes/codex-agent/.openspec.yaml",
@@ -1517,7 +1957,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.232Z"
+    "updatedAt": "2026-10-24T15:53:41.896Z"
   },
   {
     "relativePath": "openspec/changes/codex-agent/proposal.md",
@@ -1525,7 +1965,7 @@
     "role": "doc",
     "contentHash": "a489c541ce358e7c9868f6ce629759bf849d276916ac789363e690eaea231711",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.236Z"
+    "updatedAt": "2026-10-24T15:53:41.897Z"
   },
   {
     "relativePath": "openspec/changes/codex-agent/specs/sandbox-runtime/spec.md",
@@ -1533,7 +1973,7 @@
     "role": "doc",
     "contentHash": "86ec1c23dd12d166d3c6dddc519d977204703ef89f364b9dd76edb3eb6ec757b",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.239Z"
+    "updatedAt": "2026-10-24T15:53:41.899Z"
   },
   {
     "relativePath": "openspec/changes/codex-agent/tasks.md",
@@ -1541,7 +1981,7 @@
     "role": "doc",
     "contentHash": "41417bf32553d6dc4049024ec72f8638ed1c62e04adec1acadeed1e44af1f6ee",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.242Z"
+    "updatedAt": "2026-10-24T15:53:41.900Z"
   },
   {
     "relativePath": "openspec/changes/confirm-second-factor/.openspec.yaml",
@@ -1549,7 +1989,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.246Z"
+    "updatedAt": "2026-10-24T15:53:41.901Z"
   },
   {
     "relativePath": "openspec/changes/confirm-second-factor/proposal.md",
@@ -1557,7 +1997,7 @@
     "role": "doc",
     "contentHash": "fb2e657b33e199d61f84c29b4ee34480b6e58598266a0235877f51c34005f590",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.250Z"
+    "updatedAt": "2026-10-24T15:53:41.903Z"
   },
   {
     "relativePath": "openspec/changes/confirm-second-factor/specs/telegram-bot/spec.md",
@@ -1565,7 +2005,7 @@
     "role": "doc",
     "contentHash": "49af46b60e97d1a931e988a29d1e8f30f7014a8973e43e3e1aa66ff00e5a37f9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.253Z"
+    "updatedAt": "2026-10-24T15:53:41.904Z"
   },
   {
     "relativePath": "openspec/changes/confirm-second-factor/tasks.md",
@@ -1573,7 +2013,7 @@
     "role": "doc",
     "contentHash": "64504641c5c9ec2bc704043ee5a97c092c661010b40d516771a9163643870e87",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.256Z"
+    "updatedAt": "2026-10-24T15:53:41.905Z"
   },
   {
     "relativePath": "openspec/changes/console-auth/.openspec.yaml",
@@ -1581,15 +2021,15 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.260Z"
+    "updatedAt": "2026-10-24T15:53:41.907Z"
   },
   {
     "relativePath": "openspec/changes/console-auth/proposal.md",
     "summary": "OpenSpec proposal console-auth (волна 6): Консоль: каркас и вход администратора. Зависит от operator-tokens. ТЗ §8 (вход), §14",
     "role": "doc",
-    "contentHash": "4b15863dc6f10dbde30846d541917d3436c795d488e2233e69b631a6e3d9f199",
+    "contentHash": "e9c2a4ef1bf5aecaacbd34dc81d90fcbcb973ec77ac1498455ba05c465c5e1ca",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.263Z"
+    "updatedAt": "2026-10-24T15:53:41.908Z"
   },
   {
     "relativePath": "openspec/changes/console-auth/specs/operator-console/spec.md",
@@ -1597,7 +2037,7 @@
     "role": "doc",
     "contentHash": "bec2398ff6dbbd1857158e609318ee979c11abaf91f3b2da92ad42c5564bade8",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.266Z"
+    "updatedAt": "2026-10-24T15:53:41.909Z"
   },
   {
     "relativePath": "openspec/changes/console-auth/tasks.md",
@@ -1605,7 +2045,7 @@
     "role": "doc",
     "contentHash": "2a0827a595c9492f1a2878fe7fc15159347510af25abef8b7256d461feed7bc1",
     "author": "agent",
-    "updatedAt": "2026-10-18T11:32:21.147Z"
+    "updatedAt": "2026-10-24T15:53:41.911Z"
   },
   {
     "relativePath": "openspec/changes/console-observability/.openspec.yaml",
@@ -1613,15 +2053,15 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.273Z"
+    "updatedAt": "2026-10-24T15:53:41.912Z"
   },
   {
     "relativePath": "openspec/changes/console-observability/proposal.md",
     "summary": "OpenSpec proposal console-observability (волна 6): Консоль: канбан и наблюдаемость. Зависит от console-auth, mcp-operator-tools. ТЗ §8 (наблюдаемость)",
     "role": "doc",
-    "contentHash": "fc261ff0c3ad341edb6db5a3bfd75aab58f8d11f626732f6aa2dee4928945f10",
+    "contentHash": "5075bd66396828947cbe3d8ea426c09a1c724d320fff204c6c95b0842bb198bb",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.276Z"
+    "updatedAt": "2026-10-24T15:53:41.913Z"
   },
   {
     "relativePath": "openspec/changes/console-observability/specs/operator-console/spec.md",
@@ -1629,7 +2069,7 @@
     "role": "doc",
     "contentHash": "9c5b64576b0566f0dff6609349660bc3d1c31ae57ae47a477b7f1df36d4e8325",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.279Z"
+    "updatedAt": "2026-10-24T15:53:41.915Z"
   },
   {
     "relativePath": "openspec/changes/console-observability/tasks.md",
@@ -1637,7 +2077,7 @@
     "role": "doc",
     "contentHash": "283a02ff5cc46dbf29ee48cf6e5ebb09777019b1850ea0c92b4990474f2aa6a2",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.283Z"
+    "updatedAt": "2026-10-24T15:53:41.916Z"
   },
   {
     "relativePath": "openspec/changes/console-settings/.openspec.yaml",
@@ -1645,7 +2085,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.288Z"
+    "updatedAt": "2026-10-24T15:53:41.917Z"
   },
   {
     "relativePath": "openspec/changes/console-settings/proposal.md",
@@ -1653,7 +2093,7 @@
     "role": "doc",
     "contentHash": "9f6c505a022627019ddb6193df3eb5896e206669133bbebd2ae6b2531f4eef04",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.292Z"
+    "updatedAt": "2026-10-24T15:53:41.919Z"
   },
   {
     "relativePath": "openspec/changes/console-settings/specs/operator-console/spec.md",
@@ -1661,7 +2101,7 @@
     "role": "doc",
     "contentHash": "5e2a194ca97decaf71a85cb18d141b4fbd7e5b3745ac57fc22ebc9bfc8ee3f3d",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.296Z"
+    "updatedAt": "2026-10-24T15:53:41.920Z"
   },
   {
     "relativePath": "openspec/changes/console-settings/tasks.md",
@@ -1669,7 +2109,7 @@
     "role": "doc",
     "contentHash": "03c4765dd73eaa8cbc92a45f7646661a42bdd0ae2ca850a8794a69743f55980f",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.299Z"
+    "updatedAt": "2026-10-24T15:53:41.921Z"
   },
   {
     "relativePath": "openspec/changes/control-commands/.openspec.yaml",
@@ -1677,7 +2117,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.303Z"
+    "updatedAt": "2026-10-24T15:53:41.923Z"
   },
   {
     "relativePath": "openspec/changes/control-commands/proposal.md",
@@ -1685,7 +2125,7 @@
     "role": "doc",
     "contentHash": "4d9a3d570c938193d04f86e4af10b8eb7e841c01065d89efeb48f58b82b7fbcb",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.307Z"
+    "updatedAt": "2026-10-24T15:53:41.924Z"
   },
   {
     "relativePath": "openspec/changes/control-commands/specs/command-routing/spec.md",
@@ -1693,7 +2133,7 @@
     "role": "doc",
     "contentHash": "2f05aebcf89c0da98bdf0a4d4c542df430aa98254869f38fd98692bed9a9a4e2",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.310Z"
+    "updatedAt": "2026-10-24T15:53:41.925Z"
   },
   {
     "relativePath": "openspec/changes/control-commands/tasks.md",
@@ -1701,7 +2141,7 @@
     "role": "doc",
     "contentHash": "a120df5214c8bb7cd94086ffe484eed819fc9c09e0309f3002d6b1b1678a09e7",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.314Z"
+    "updatedAt": "2026-10-24T15:53:41.927Z"
   },
   {
     "relativePath": "openspec/changes/db-retention-backups/.openspec.yaml",
@@ -1709,7 +2149,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.317Z"
+    "updatedAt": "2026-10-24T15:53:41.929Z"
   },
   {
     "relativePath": "openspec/changes/db-retention-backups/proposal.md",
@@ -1717,7 +2157,7 @@
     "role": "doc",
     "contentHash": "1fe85fda7625d6b40c75ce9a4968a6d13a5b3be3a5a668ab75046c527d6be6ee",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.321Z"
+    "updatedAt": "2026-10-24T15:53:41.931Z"
   },
   {
     "relativePath": "openspec/changes/db-retention-backups/specs/operations/spec.md",
@@ -1725,7 +2165,7 @@
     "role": "doc",
     "contentHash": "dd7f0ca3803cf0aee10b28ca60c285b3aabd89a77ecdadf1ace87d42eeb4a15c",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.325Z"
+    "updatedAt": "2026-10-24T15:53:41.932Z"
   },
   {
     "relativePath": "openspec/changes/db-retention-backups/tasks.md",
@@ -1733,7 +2173,7 @@
     "role": "doc",
     "contentHash": "54a407ac4b4a8e3319b87ca0afaff1957e09444144766d861ad05e342189dfca",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.328Z"
+    "updatedAt": "2026-10-24T15:53:41.933Z"
   },
   {
     "relativePath": "openspec/changes/dry-run/.openspec.yaml",
@@ -1741,7 +2181,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.331Z"
+    "updatedAt": "2026-10-24T15:53:41.935Z"
   },
   {
     "relativePath": "openspec/changes/dry-run/proposal.md",
@@ -1749,7 +2189,7 @@
     "role": "doc",
     "contentHash": "cf7a9154671be2b87626ab56a8bd47300029b8dd40a14df491242ff91d8ddcb2",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.334Z"
+    "updatedAt": "2026-10-24T15:53:41.936Z"
   },
   {
     "relativePath": "openspec/changes/dry-run/specs/delivery-gates/spec.md",
@@ -1757,7 +2197,7 @@
     "role": "doc",
     "contentHash": "c10dce97c9a122b8bbf4ad288e437c77f60fb51ca518239776ca1037b30a1745",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.338Z"
+    "updatedAt": "2026-10-24T15:53:41.937Z"
   },
   {
     "relativePath": "openspec/changes/dry-run/tasks.md",
@@ -1765,7 +2205,7 @@
     "role": "doc",
     "contentHash": "469bd74d74cd45897871f89953cdfc18c1e2b2c837e45bac0eda0a550ae1f197",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.341Z"
+    "updatedAt": "2026-10-24T15:53:41.939Z"
   },
   {
     "relativePath": "openspec/changes/gates-tests-deploy/.openspec.yaml",
@@ -1773,7 +2213,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.345Z"
+    "updatedAt": "2026-10-24T15:53:41.940Z"
   },
   {
     "relativePath": "openspec/changes/gates-tests-deploy/design.md",
@@ -1781,7 +2221,7 @@
     "role": "doc",
     "contentHash": "38dd1455c39bc8d37b317c3528cffa36823fd08c5cc54726f19971dc78892efe",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:53:09.766Z"
+    "updatedAt": "2026-10-24T15:53:41.941Z"
   },
   {
     "relativePath": "openspec/changes/gates-tests-deploy/proposal.md",
@@ -1789,7 +2229,7 @@
     "role": "doc",
     "contentHash": "177c47d648c7cb18d3e62f8969c3cb1c08b2518d008a4bb47a89755557c1174b",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:53:09.750Z"
+    "updatedAt": "2026-10-24T15:53:41.943Z"
   },
   {
     "relativePath": "openspec/changes/gates-tests-deploy/specs/delivery-gates/spec.md",
@@ -1797,7 +2237,7 @@
     "role": "doc",
     "contentHash": "2ba9b2174aea8428e0f2d3c498ea83394d699e8497d3bfb40c481d5eaa90cd68",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:53:09.800Z"
+    "updatedAt": "2026-10-24T15:53:41.944Z"
   },
   {
     "relativePath": "openspec/changes/gates-tests-deploy/tasks.md",
@@ -1805,7 +2245,7 @@
     "role": "doc",
     "contentHash": "c5320b67cb2b1a1e1a4f4ccdee16646c0e185513a12338c488b3968514e4c3bc",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:53:09.782Z"
+    "updatedAt": "2026-10-24T15:53:41.945Z"
   },
   {
     "relativePath": "openspec/changes/git-providers/.openspec.yaml",
@@ -1869,7 +2309,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.358Z"
+    "updatedAt": "2026-10-24T15:53:41.947Z"
   },
   {
     "relativePath": "openspec/changes/harness-snap/proposal.md",
@@ -1877,7 +2317,7 @@
     "role": "doc",
     "contentHash": "6a04f9acd1c01cc9b0014d0cc55c2c9ae9ae5db36e3cc2c5b09c672ee3e3d98f",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.361Z"
+    "updatedAt": "2026-10-24T15:53:41.948Z"
   },
   {
     "relativePath": "openspec/changes/harness-snap/specs/agent-checkpoints/spec.md",
@@ -1885,7 +2325,7 @@
     "role": "doc",
     "contentHash": "5dba8b03104fb526dee71b4b6b67e7e2c80253f6a2ffe8e3692be216b4021337",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.364Z"
+    "updatedAt": "2026-10-24T15:53:41.949Z"
   },
   {
     "relativePath": "openspec/changes/harness-snap/tasks.md",
@@ -1893,7 +2333,7 @@
     "role": "doc",
     "contentHash": "f3b8181c46194ec00f295ce1673b481b9cce755e87e96b753b34a1d1731ebf29",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.368Z"
+    "updatedAt": "2026-10-24T15:53:41.951Z"
   },
   {
     "relativePath": "openspec/changes/health-alerts/.openspec.yaml",
@@ -1901,7 +2341,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.371Z"
+    "updatedAt": "2026-10-24T15:53:41.952Z"
   },
   {
     "relativePath": "openspec/changes/health-alerts/proposal.md",
@@ -1909,7 +2349,7 @@
     "role": "doc",
     "contentHash": "7ab30162b753a4478b5770e3c69bcf2445f6aa65d936d95ecaa5de58f18d1671",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.375Z"
+    "updatedAt": "2026-10-24T15:53:41.953Z"
   },
   {
     "relativePath": "openspec/changes/health-alerts/specs/operations/spec.md",
@@ -1917,7 +2357,7 @@
     "role": "doc",
     "contentHash": "3271706230091a6c983b13ad378dad5fafef94b00d13633d946dcc3908dd5bcc",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.378Z"
+    "updatedAt": "2026-10-24T15:53:41.955Z"
   },
   {
     "relativePath": "openspec/changes/health-alerts/tasks.md",
@@ -1925,7 +2365,7 @@
     "role": "doc",
     "contentHash": "0f599ade5aa2b87955f996e71276565c045b145fb50990ab06aa7131ab1974cb",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.381Z"
+    "updatedAt": "2026-10-24T15:53:41.958Z"
   },
   {
     "relativePath": "openspec/changes/idle-pause/.openspec.yaml",
@@ -1933,7 +2373,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.385Z"
+    "updatedAt": "2026-10-24T15:53:41.959Z"
   },
   {
     "relativePath": "openspec/changes/idle-pause/proposal.md",
@@ -1941,7 +2381,7 @@
     "role": "doc",
     "contentHash": "947723912436db11b7b6169eafb6747730171356f6b5396fc02cb86f45f50c82",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.388Z"
+    "updatedAt": "2026-10-24T15:53:41.961Z"
   },
   {
     "relativePath": "openspec/changes/idle-pause/specs/sandbox-runtime/spec.md",
@@ -1949,7 +2389,7 @@
     "role": "doc",
     "contentHash": "a4cb0fa159cbc0d6007dfb3f987b5aec3f51a716cbf11c07b26ecf4195642e2e",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.392Z"
+    "updatedAt": "2026-10-24T15:53:41.962Z"
   },
   {
     "relativePath": "openspec/changes/idle-pause/tasks.md",
@@ -1957,7 +2397,7 @@
     "role": "doc",
     "contentHash": "173bc0d1a0d10345d4976d2a06739f181e131c111cf480dcb87cd4f1c48b2602",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.395Z"
+    "updatedAt": "2026-10-24T15:53:41.963Z"
   },
   {
     "relativePath": "openspec/changes/integrations-mcp-config/.openspec.yaml",
@@ -1965,7 +2405,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.399Z"
+    "updatedAt": "2026-10-24T15:53:41.965Z"
   },
   {
     "relativePath": "openspec/changes/integrations-mcp-config/design.md",
@@ -1973,15 +2413,15 @@
     "role": "doc",
     "contentHash": "e1d157b53caa08922e5c46ccbb97d815f4b8fcf1dfa9a874433fccbd175cbd77",
     "author": "agent",
-    "updatedAt": "2026-10-19T09:38:16.199Z"
+    "updatedAt": "2026-10-24T15:53:41.966Z"
   },
   {
     "relativePath": "openspec/changes/integrations-mcp-config/proposal.md",
-    "summary": "Proposal integrations-mcp-config: таблица mcp_servers с vault:-ссылками, генерация ~/.harness/mcp.json на каждый run_agent, CLI harness-server mcp; до mvp-07.",
+    "summary": "MCP proposal retains dynamic generation after machine baseline.",
     "role": "doc",
-    "contentHash": "409462149069eae37d064342686b7a790451374ec4fb4f2101b1e12626ede73d",
+    "contentHash": "ee8c28eb61322aa5840d77dddbfb9c8bf2f5042e8bd83687434ce98252898b7f",
     "author": "agent",
-    "updatedAt": "2026-10-19T09:38:16.184Z"
+    "updatedAt": "2026-10-26T02:36:57.343Z"
   },
   {
     "relativePath": "openspec/changes/integrations-mcp-config/specs/integrations/spec.md",
@@ -1989,7 +2429,7 @@
     "role": "doc",
     "contentHash": "5d24e8bf4e1e25fb0e146f680bfc03f20edef6f5a3e9393fb30d7a05680dea48",
     "author": "agent",
-    "updatedAt": "2026-10-19T09:38:16.228Z"
+    "updatedAt": "2026-10-24T15:53:41.969Z"
   },
   {
     "relativePath": "openspec/changes/integrations-mcp-config/specs/sandbox-runtime/spec.md",
@@ -1997,7 +2437,7 @@
     "role": "doc",
     "contentHash": "97efcdf9b424bf4c11d0c0e2fd61420d8253bf07f1bedcfc16ee982fe47edfea",
     "author": "agent",
-    "updatedAt": "2026-10-19T09:38:16.242Z"
+    "updatedAt": "2026-10-24T15:53:41.970Z"
   },
   {
     "relativePath": "openspec/changes/integrations-mcp-config/tasks.md",
@@ -2005,7 +2445,63 @@
     "role": "doc",
     "contentHash": "8a5ae04ddb6021ae6c56b7b246f939d360e59ef9373e0f80936aa0215da9ee30",
     "author": "agent",
-    "updatedAt": "2026-10-19T09:38:16.213Z"
+    "updatedAt": "2026-10-24T15:53:41.971Z"
+  },
+  {
+    "relativePath": "openspec/changes/local-agent-machine/.openspec.yaml",
+    "summary": "Метаданные OpenSpec change local-agent-machine.",
+    "role": "config",
+    "contentHash": "e2ebaebee255ccc1e09b64ba38d9b09c360a7392fc110a48ca2525e1ea49fa46",
+    "author": "agent",
+    "updatedAt": "2026-10-26T03:00:36.158Z"
+  },
+  {
+    "relativePath": "openspec/changes/local-agent-machine/design.md",
+    "summary": "Проектные решения для локального провайдера, agent init, worker и удаления Novita.",
+    "role": "doc",
+    "contentHash": "dd575f45e537b5ad3361f14ec350a50a5a4bc748e2c7e5d749a4c0bd0a2a3f53",
+    "author": "agent",
+    "updatedAt": "2026-10-26T03:00:22.336Z"
+  },
+  {
+    "relativePath": "openspec/changes/local-agent-machine/proposal.md",
+    "summary": "Предложение по переходу от Novita к локальной машине агента.",
+    "role": "doc",
+    "contentHash": "43bd43714201657904f7c84c9ff99b9ca53da596bded6208309e5b39b11acf91",
+    "author": "agent",
+    "updatedAt": "2026-10-26T03:00:22.351Z"
+  },
+  {
+    "relativePath": "openspec/changes/local-agent-machine/specs/agent-machine/spec.md",
+    "summary": "Agent-machine OpenSpec delta.",
+    "role": "doc",
+    "contentHash": "0083594f8637d845b447c44ef8f0d58d52b32a0dbab0c6755eae40801cb5b613",
+    "author": "agent",
+    "updatedAt": "2026-10-26T02:36:57.376Z"
+  },
+  {
+    "relativePath": "openspec/changes/local-agent-machine/specs/sandbox-profile/spec.md",
+    "summary": "Delta-спецификация профиля локальной машины и установки memory-agent.",
+    "role": "doc",
+    "contentHash": "e07535d844f3e3e413d526f93857561db443ef8a697012a5ce39ec62914ee5a4",
+    "author": "agent",
+    "updatedAt": "2026-10-26T03:00:22.397Z"
+  },
+  {
+    "relativePath": "openspec/changes/local-agent-machine/specs/sandbox-runtime/spec.md",
+    "summary": "Delta-спецификация runtime песочницы и инициализации проекта.",
+    "role": "doc",
+    "contentHash": "98434095e9a00bc18feb8a17caf7b24769cfad7c3f52c96e47dac1743782022d",
+    "author": "agent",
+    "updatedAt": "2026-10-26T03:00:22.380Z"
+  },
+  {
+    "relativePath": "openspec/changes/local-agent-machine/tasks.md",
+    "summary": "Чеклист реализации и приёмки local-agent-machine с доказательствами проверок и синхронизацией памяти.",
+    "role": "doc",
+    "contentHash": "ce159c494b0af153b1fb73bb9e44dc013808768f233ffb035f0e5d4c3427eda8",
+    "author": "agent",
+    "updatedAt": "2026-10-26T03:00:22.366Z"
   },
   {
     "relativePath": "openspec/changes/mcp-operator-tools/.openspec.yaml",
@@ -2013,7 +2509,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.413Z"
+    "updatedAt": "2026-10-24T15:53:41.983Z"
   },
   {
     "relativePath": "openspec/changes/mcp-operator-tools/proposal.md",
@@ -2021,7 +2517,7 @@
     "role": "doc",
     "contentHash": "4df3f39ae48ef28533e526c5b9554ac362026b6f9f362bcdb83fc40ae65f73ea",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.416Z"
+    "updatedAt": "2026-10-24T15:53:41.984Z"
   },
   {
     "relativePath": "openspec/changes/mcp-operator-tools/specs/agents-flow-mcp/spec.md",
@@ -2029,7 +2525,7 @@
     "role": "doc",
     "contentHash": "deee1d6b3587e7877ad591396b6fb06656cbcb99120e92b427ea5695387c0e71",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.420Z"
+    "updatedAt": "2026-10-24T15:53:41.985Z"
   },
   {
     "relativePath": "openspec/changes/mcp-operator-tools/tasks.md",
@@ -2037,7 +2533,7 @@
     "role": "doc",
     "contentHash": "955f8ecd83f62fb8a48704f73c84df8ffa52712c426158214271179428a724b7",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.423Z"
+    "updatedAt": "2026-10-24T15:53:41.987Z"
   },
   {
     "relativePath": "openspec/changes/mvp-03-task-store/.openspec.yaml",
@@ -2229,15 +2725,15 @@
     "role": "doc",
     "contentHash": "ff673a920bfbe01edd9ac5816c7f80dfe095f47821a0db589985f8e31711ddcd",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:48:17.028Z"
+    "updatedAt": "2026-10-24T15:53:41.988Z"
   },
   {
     "relativePath": "openspec/changes/mvp-06b-vps-provider/proposal.md",
-    "summary": "Proposal mvp-06b-vps-provider: провайдер песочницы VPS по SSH (D-40), вынос SandboxProvider в adapters/sandbox; начинается после принятия mvp-06.",
+    "summary": "Superseded VPS provider proposal status.",
     "role": "doc",
-    "contentHash": "3501982373b8468c28c09991a14d3e205c7a4b62628f171271ca22c5c06961da",
+    "contentHash": "97516760dc8e5128df1b05ab1e94bcaa5ad66894dfd4d5afa62e79acbf78ef61",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:48:16.954Z"
+    "updatedAt": "2026-10-26T02:36:57.409Z"
   },
   {
     "relativePath": "openspec/changes/mvp-06b-vps-provider/specs/sandbox-runtime/spec.md",
@@ -2245,7 +2741,7 @@
     "role": "doc",
     "contentHash": "354b3ebe4ab6c682bdabced5924d50d9431d5b0c894b64b347e6dc62af83c937",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:48:16.991Z"
+    "updatedAt": "2026-10-24T15:53:41.991Z"
   },
   {
     "relativePath": "openspec/changes/mvp-06b-vps-provider/tasks.md",
@@ -2253,7 +2749,7 @@
     "role": "doc",
     "contentHash": "a879c507041192d0dc12f0cf3b1f5adb87ba93b99724fde0844a40305cd601ba",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:48:17.009Z"
+    "updatedAt": "2026-10-24T15:53:41.992Z"
   },
   {
     "relativePath": "openspec/changes/mvp-07-agents-flow-mcp/.openspec.yaml",
@@ -2261,7 +2757,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.519Z"
+    "updatedAt": "2026-10-24T15:53:41.993Z"
   },
   {
     "relativePath": "openspec/changes/mvp-07-agents-flow-mcp/design.md",
@@ -2269,7 +2765,7 @@
     "role": "doc",
     "contentHash": "3cc6f78e0c59c8c881a869d8eed1b6c4031efdb6c5473f2ca31365794a77978b",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.523Z"
+    "updatedAt": "2026-10-24T15:53:41.995Z"
   },
   {
     "relativePath": "openspec/changes/mvp-07-agents-flow-mcp/proposal.md",
@@ -2277,7 +2773,7 @@
     "role": "doc",
     "contentHash": "d08e11ac55259d5735d2c768542fea9ec49818ddb05aefdc909604eb97fd5efc",
     "author": "agent",
-    "updatedAt": "2026-10-19T18:49:12.675Z"
+    "updatedAt": "2026-10-24T15:53:41.996Z"
   },
   {
     "relativePath": "openspec/changes/mvp-07-agents-flow-mcp/specs/agents-flow-mcp/spec.md",
@@ -2285,7 +2781,7 @@
     "role": "doc",
     "contentHash": "70c985bc010e53b703c540c63bd79b3ca15db041dc0086530b03f8f24334a6c9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.529Z"
+    "updatedAt": "2026-10-24T15:53:41.998Z"
   },
   {
     "relativePath": "openspec/changes/mvp-07-agents-flow-mcp/tasks.md",
@@ -2293,7 +2789,7 @@
     "role": "doc",
     "contentHash": "dcb29d3f38c60a16f21c57402d82e051cfab31e4f6820811a168c75589b2f5aa",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.532Z"
+    "updatedAt": "2026-10-24T15:53:41.999Z"
   },
   {
     "relativePath": "openspec/changes/mvp-08-spec-planning/.openspec.yaml",
@@ -2301,7 +2797,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.536Z"
+    "updatedAt": "2026-10-24T15:53:42.000Z"
   },
   {
     "relativePath": "openspec/changes/mvp-08-spec-planning/design.md",
@@ -2309,7 +2805,7 @@
     "role": "doc",
     "contentHash": "97ae8ce2e148e2be7d3236de5255fbb7f98f0b45b947d5b5f0c38127c1b749c8",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.539Z"
+    "updatedAt": "2026-10-24T15:53:42.002Z"
   },
   {
     "relativePath": "openspec/changes/mvp-08-spec-planning/proposal.md",
@@ -2317,7 +2813,7 @@
     "role": "doc",
     "contentHash": "9bd258ed443105eae1175b41d4236325013b7925e279847c6a8cf264979289db",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.542Z"
+    "updatedAt": "2026-10-24T15:53:42.003Z"
   },
   {
     "relativePath": "openspec/changes/mvp-08-spec-planning/specs/spec-planning/spec.md",
@@ -2325,7 +2821,7 @@
     "role": "doc",
     "contentHash": "6347861af4dd68610daa231de99d0414b5484f2f5b1fa64c43c8ccbbd9f5c0f6",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.545Z"
+    "updatedAt": "2026-10-24T15:53:42.004Z"
   },
   {
     "relativePath": "openspec/changes/mvp-08-spec-planning/tasks.md",
@@ -2333,7 +2829,7 @@
     "role": "doc",
     "contentHash": "ed16d003e9db0e3fdaeb39773ac0343d1b21dcaccf6caaad804d6f55ced7df3e",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.549Z"
+    "updatedAt": "2026-10-24T15:53:42.006Z"
   },
   {
     "relativePath": "openspec/changes/mvp-09-delivery-mr/.openspec.yaml",
@@ -2341,7 +2837,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.552Z"
+    "updatedAt": "2026-10-24T15:53:42.007Z"
   },
   {
     "relativePath": "openspec/changes/mvp-09-delivery-mr/design.md",
@@ -2349,7 +2845,7 @@
     "role": "doc",
     "contentHash": "6387af416f130333cd0052ddc33e9ea3bbbbe67e089b7339c866c294b8c1af0e",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:58:07.994Z"
+    "updatedAt": "2026-10-24T15:53:42.008Z"
   },
   {
     "relativePath": "openspec/changes/mvp-09-delivery-mr/proposal.md",
@@ -2357,7 +2853,7 @@
     "role": "doc",
     "contentHash": "1a4a97b7997f80097a974e785c6df5855232bfffc8c805c2f63d5bc4e27545bb",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:58:08.023Z"
+    "updatedAt": "2026-10-24T15:53:42.010Z"
   },
   {
     "relativePath": "openspec/changes/mvp-09-delivery-mr/specs/delivery-gates/spec.md",
@@ -2365,7 +2861,7 @@
     "role": "doc",
     "contentHash": "bada4309a4849fe10d638d8c577a990a458ab910be51c51a1cdbffd793a5352a",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:58:08.057Z"
+    "updatedAt": "2026-10-24T15:53:42.011Z"
   },
   {
     "relativePath": "openspec/changes/mvp-09-delivery-mr/tasks.md",
@@ -2373,7 +2869,7 @@
     "role": "doc",
     "contentHash": "52030a9cd7044bf52baa56018479ce8b3da8e396f2437284db7c17334a28f05e",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:58:08.084Z"
+    "updatedAt": "2026-10-24T15:53:42.013Z"
   },
   {
     "relativePath": "openspec/changes/mvp-10-operator-console/design.md",
@@ -2381,7 +2877,7 @@
     "role": "doc",
     "contentHash": "59ab3aa44f50fc6230e80ce86e728e1e72847da4e28b492096fbc56ba35c6c19",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:01:10.822Z"
+    "updatedAt": "2026-10-24T15:53:42.015Z"
   },
   {
     "relativePath": "openspec/changes/mvp-10-operator-console/proposal.md",
@@ -2389,7 +2885,7 @@
     "role": "doc",
     "contentHash": "6a0c16481bc80598f0bdc6ad7b59501409bd0731c184f66f7a44f9ac8306c4b2",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:00:56.252Z"
+    "updatedAt": "2026-10-24T15:53:42.016Z"
   },
   {
     "relativePath": "openspec/changes/mvp-10-operator-console/specs/operator-console/spec.md",
@@ -2397,7 +2893,7 @@
     "role": "doc",
     "contentHash": "4121658af48d5f8d592c7fd910f962669da35b13b34790099cbcdd8d54e45a69",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:01:10.850Z"
+    "updatedAt": "2026-10-24T15:53:42.018Z"
   },
   {
     "relativePath": "openspec/changes/mvp-10-operator-console/tasks.md",
@@ -2405,7 +2901,55 @@
     "role": "doc",
     "contentHash": "79a6d1b4aadb6ef877a190adb165f63e98258fc359ad34c277fdad2d8f9fa44f",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:01:10.839Z"
+    "updatedAt": "2026-10-24T15:53:42.019Z"
+  },
+  {
+    "relativePath": "openspec/changes/opencode-only-client/.openspec.yaml",
+    "summary": "Метаданные OpenSpec change opencode-only-client.",
+    "role": "config",
+    "contentHash": "0ad492a63d87e00a8bc135b0a1a2b19270dbb9ffd997a69b89fd4ab72015a944",
+    "author": "agent",
+    "updatedAt": "2026-10-26T03:00:22.413Z"
+  },
+  {
+    "relativePath": "openspec/changes/opencode-only-client/design.md",
+    "summary": "Дизайн OpenCode-only клиента агента с учётом частичного замещения local-agent-machine.",
+    "role": "doc",
+    "contentHash": "36b6ca14c4fa80f09e7b39e596fa944c014abfa2340beef5b860d78f585b0dfa",
+    "author": "agent",
+    "updatedAt": "2026-10-26T03:00:22.430Z"
+  },
+  {
+    "relativePath": "openspec/changes/opencode-only-client/proposal.md",
+    "summary": "Статус предложения OpenCode-only после частичного замещения изменением local-agent-machine.",
+    "role": "doc",
+    "contentHash": "ba0c55319d50f00a9fd5ee2fe7b91d0906f6fda200fa15eb1fe583ceda9e7497",
+    "author": "agent",
+    "updatedAt": "2026-10-26T03:00:22.448Z"
+  },
+  {
+    "relativePath": "openspec/changes/opencode-only-client/specs/cleanup-claude-codex/spec.md",
+    "summary": "spec.md: ADDED Requirements",
+    "role": "doc",
+    "contentHash": "941d65fc0c4423b66c3d1036639593d53d113de77237c2f6abf8c51580bc1048",
+    "author": "agent",
+    "updatedAt": "2026-10-24T15:53:42.025Z"
+  },
+  {
+    "relativePath": "openspec/changes/opencode-only-client/specs/opencode-client/spec.md",
+    "summary": "Требования OpenSpec к единственному клиенту агента OpenCode.",
+    "role": "doc",
+    "contentHash": "5ab73d943412514cc228308d644ffc46190808ef08873860992820240f5ea192",
+    "author": "agent",
+    "updatedAt": "2026-10-26T03:00:22.482Z"
+  },
+  {
+    "relativePath": "openspec/changes/opencode-only-client/tasks.md",
+    "summary": "Задачи OpenCode-only client и связь с переходом на локальную машину агента.",
+    "role": "doc",
+    "contentHash": "e0a54d980a6bd07122fe1101b951dcbe86698fffb7c1bfaee667a14fbca2cc7a",
+    "author": "agent",
+    "updatedAt": "2026-10-26T03:00:22.465Z"
   },
   {
     "relativePath": "openspec/changes/operator-tokens/.openspec.yaml",
@@ -2413,7 +2957,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.568Z"
+    "updatedAt": "2026-10-24T15:53:42.029Z"
   },
   {
     "relativePath": "openspec/changes/operator-tokens/proposal.md",
@@ -2421,7 +2965,7 @@
     "role": "doc",
     "contentHash": "fa04809e68432d493c42c8b16857fad23e1c8c372eaeecabbeb96adddc9eeb96",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.572Z"
+    "updatedAt": "2026-10-24T15:53:42.031Z"
   },
   {
     "relativePath": "openspec/changes/operator-tokens/specs/agents-flow-mcp/spec.md",
@@ -2429,7 +2973,7 @@
     "role": "doc",
     "contentHash": "0fe2d562830a93f86cf2acd24ef5dc6d1aa8f570c9f1e23c06c6ec506d9fa111",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.576Z"
+    "updatedAt": "2026-10-24T15:53:42.032Z"
   },
   {
     "relativePath": "openspec/changes/operator-tokens/tasks.md",
@@ -2437,7 +2981,7 @@
     "role": "doc",
     "contentHash": "2023b70cb3f8635b00888423c30f7525d25001439abd882ba4ba7890b7076af0",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.579Z"
+    "updatedAt": "2026-10-24T15:53:42.034Z"
   },
   {
     "relativePath": "openspec/changes/processes/.openspec.yaml",
@@ -2445,7 +2989,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.583Z"
+    "updatedAt": "2026-10-24T15:53:42.041Z"
   },
   {
     "relativePath": "openspec/changes/processes/proposal.md",
@@ -2453,7 +2997,7 @@
     "role": "doc",
     "contentHash": "1d2e5e64a80f48c3cf3c8c3bd3a235797f617045047b21bb7035adeee1ddf46f",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.586Z"
+    "updatedAt": "2026-10-24T15:53:42.044Z"
   },
   {
     "relativePath": "openspec/changes/processes/specs/task-processes/spec.md",
@@ -2461,7 +3005,7 @@
     "role": "doc",
     "contentHash": "3ceea673900c134c77f9b4209ad4110700cb42b9dae03c83f52ba127e5fa861c",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.590Z"
+    "updatedAt": "2026-10-24T15:53:42.045Z"
   },
   {
     "relativePath": "openspec/changes/processes/tasks.md",
@@ -2469,7 +3013,7 @@
     "role": "doc",
     "contentHash": "32356529dcca6d6b929011098b310b344674de8fe27cd1925e7ee6a9c976baaf",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.593Z"
+    "updatedAt": "2026-10-24T15:53:42.047Z"
   },
   {
     "relativePath": "openspec/changes/repo-queue/.openspec.yaml",
@@ -2477,7 +3021,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.596Z"
+    "updatedAt": "2026-10-24T15:53:42.048Z"
   },
   {
     "relativePath": "openspec/changes/repo-queue/proposal.md",
@@ -2485,7 +3029,7 @@
     "role": "doc",
     "contentHash": "71be7852d89a90bc351d44dbaa1910f8fc1a7a481b23534538ba6ab6f453fc7a",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.599Z"
+    "updatedAt": "2026-10-24T15:53:42.049Z"
   },
   {
     "relativePath": "openspec/changes/repo-queue/specs/delivery-gates/spec.md",
@@ -2493,7 +3037,7 @@
     "role": "doc",
     "contentHash": "c9fc62bc8e4bc67cb29a5dc15db1a045c3f109a44f6ad4ed672ee4761b752f63",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.603Z"
+    "updatedAt": "2026-10-24T15:53:42.051Z"
   },
   {
     "relativePath": "openspec/changes/repo-queue/tasks.md",
@@ -2501,7 +3045,7 @@
     "role": "doc",
     "contentHash": "3086f23b69fe92509d68ee2e63f00ecb47cdf1286fde46ba326860c55e5c1e76",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.606Z"
+    "updatedAt": "2026-10-24T15:53:42.052Z"
   },
   {
     "relativePath": "openspec/changes/revert-task/.openspec.yaml",
@@ -2509,7 +3053,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.609Z"
+    "updatedAt": "2026-10-24T15:53:42.053Z"
   },
   {
     "relativePath": "openspec/changes/revert-task/proposal.md",
@@ -2517,7 +3061,7 @@
     "role": "doc",
     "contentHash": "0bc2a4579b4313731231c424f844c8b954821fb38cea61393930a41a571677da",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.612Z"
+    "updatedAt": "2026-10-24T15:53:42.055Z"
   },
   {
     "relativePath": "openspec/changes/revert-task/specs/delivery-gates/spec.md",
@@ -2525,7 +3069,7 @@
     "role": "doc",
     "contentHash": "21102c370c664057ffdc75e5c5390f23dc585e0651a6f96e4096e3ee261dc2bc",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.615Z"
+    "updatedAt": "2026-10-24T15:53:42.056Z"
   },
   {
     "relativePath": "openspec/changes/revert-task/tasks.md",
@@ -2533,7 +3077,7 @@
     "role": "doc",
     "contentHash": "127d9519dce31fb18071d0facef1103bbb85b32cb90616ea65c5e3736aea896d",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.619Z"
+    "updatedAt": "2026-10-24T15:53:42.058Z"
   },
   {
     "relativePath": "openspec/changes/routing-uncertainty/.openspec.yaml",
@@ -2541,7 +3085,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.622Z"
+    "updatedAt": "2026-10-24T15:53:42.059Z"
   },
   {
     "relativePath": "openspec/changes/routing-uncertainty/proposal.md",
@@ -2549,7 +3093,7 @@
     "role": "doc",
     "contentHash": "fb0a34310ddfc2b681c6623257490f9e7089fa73082516a2600b1fd1fccb9ff2",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.625Z"
+    "updatedAt": "2026-10-24T15:53:42.061Z"
   },
   {
     "relativePath": "openspec/changes/routing-uncertainty/specs/command-routing/spec.md",
@@ -2557,7 +3101,7 @@
     "role": "doc",
     "contentHash": "36339ebddac6d12f15494e6eb6d4deda789d4cf5013b835303d3ce538b2c45f9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.628Z"
+    "updatedAt": "2026-10-24T15:53:42.062Z"
   },
   {
     "relativePath": "openspec/changes/routing-uncertainty/tasks.md",
@@ -2565,7 +3109,7 @@
     "role": "doc",
     "contentHash": "e15d90379473f0f3e65096afe699631e0dd5063e47d9b9aeab653b9e562efb1f",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.632Z"
+    "updatedAt": "2026-10-24T15:53:42.063Z"
   },
   {
     "relativePath": "openspec/changes/sandbox-pool/.openspec.yaml",
@@ -2573,15 +3117,15 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.635Z"
+    "updatedAt": "2026-10-24T15:53:42.065Z"
   },
   {
     "relativePath": "openspec/changes/sandbox-pool/proposal.md",
-    "summary": "OpenSpec proposal sandbox-pool (волна 5): Пул песочниц. Зависит от mvp-06-sandbox-runtime, operator-tokens. ТЗ §9 (модель), §17 вопрос 2",
+    "summary": "Sandbox pool proposal retains future pool functionality.",
     "role": "doc",
-    "contentHash": "44ba82051f6859f3002d810b6af8aaa517406da248c13f10c509e14f844727c3",
+    "contentHash": "8a9bcb61d0a69efd509ad65e21942f94b04a52b9f5082ce9964edc2d1e901eaa",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.639Z"
+    "updatedAt": "2026-10-26T02:36:57.424Z"
   },
   {
     "relativePath": "openspec/changes/sandbox-pool/specs/sandbox-runtime/spec.md",
@@ -2589,7 +3133,7 @@
     "role": "doc",
     "contentHash": "9edbe7d109870cf9d936f390ee26eece8ad809955d2428eb467c80ee32fb753d",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.642Z"
+    "updatedAt": "2026-10-24T15:53:42.068Z"
   },
   {
     "relativePath": "openspec/changes/sandbox-pool/tasks.md",
@@ -2597,7 +3141,7 @@
     "role": "doc",
     "contentHash": "2fe5171c620558c77206b5951cc2c361700fec3151c4f88e20a029c6bb88ee10",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.646Z"
+    "updatedAt": "2026-10-24T15:53:42.069Z"
   },
   {
     "relativePath": "openspec/changes/sandbox-profile/.openspec.yaml",
@@ -2653,15 +3197,15 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.664Z"
+    "updatedAt": "2026-10-24T15:53:42.070Z"
   },
   {
     "relativePath": "openspec/changes/sandbox-timeout-extend/proposal.md",
-    "summary": "OpenSpec proposal sandbox-timeout-extend (волна 3): Продление сессии и повтор связи. Зависит от mvp-06-sandbox-runtime. ТЗ §7 (диспетчер), §9 (таймаут), §17 вопрос 7",
+    "summary": "Superseded timeout extension proposal status.",
     "role": "doc",
-    "contentHash": "632620c8d12cf34f0b0a4f46924678674f1d11fb6c8f9c4cfe88f17933b9c23f",
+    "contentHash": "6aa04ba2ebdfd346fedf2316062259538ba76f14af52810039d5ace4c7e9fb00",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.667Z"
+    "updatedAt": "2026-10-26T02:36:57.432Z"
   },
   {
     "relativePath": "openspec/changes/sandbox-timeout-extend/specs/sandbox-runtime/spec.md",
@@ -2669,7 +3213,7 @@
     "role": "doc",
     "contentHash": "4f700d40de383af8f17382359b1fa3e5a3073024c2c931f710b6658fc7624c8c",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.671Z"
+    "updatedAt": "2026-10-24T15:53:42.073Z"
   },
   {
     "relativePath": "openspec/changes/sandbox-timeout-extend/tasks.md",
@@ -2677,7 +3221,7 @@
     "role": "doc",
     "contentHash": "89d58e7bb136f97fc1b93cc2acf53c512e7ef33ce139eb1c65d14f72a3f6f6ca",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.674Z"
+    "updatedAt": "2026-10-24T15:53:42.074Z"
   },
   {
     "relativePath": "openspec/changes/skills-library/.openspec.yaml",
@@ -2685,7 +3229,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.677Z"
+    "updatedAt": "2026-10-24T15:53:42.076Z"
   },
   {
     "relativePath": "openspec/changes/skills-library/proposal.md",
@@ -2693,7 +3237,7 @@
     "role": "doc",
     "contentHash": "46634a50d862d2bfc94d529c5bce8fc6ef75f4e9f45f08f0b4c814636b988f25",
     "author": "agent",
-    "updatedAt": "2026-10-19T09:38:16.256Z"
+    "updatedAt": "2026-10-24T15:53:42.077Z"
   },
   {
     "relativePath": "openspec/changes/skills-library/specs/skills-library/spec.md",
@@ -2701,7 +3245,7 @@
     "role": "doc",
     "contentHash": "67566dc6f336473a9bfda2e17b4150ae952643c8df94057070820e36e7bb67b6",
     "author": "agent",
-    "updatedAt": "2026-10-19T09:38:16.286Z"
+    "updatedAt": "2026-10-24T15:53:42.079Z"
   },
   {
     "relativePath": "openspec/changes/skills-library/tasks.md",
@@ -2709,7 +3253,7 @@
     "role": "doc",
     "contentHash": "3ff77c00a02b2e56557522cd922dcf88a0d07eeb78d195f387f8511d29e2ca30",
     "author": "agent",
-    "updatedAt": "2026-10-19T09:38:16.271Z"
+    "updatedAt": "2026-10-24T15:53:42.080Z"
   },
   {
     "relativePath": "openspec/changes/spec-approval/.openspec.yaml",
@@ -2717,7 +3261,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.692Z"
+    "updatedAt": "2026-10-24T15:53:42.081Z"
   },
   {
     "relativePath": "openspec/changes/spec-approval/proposal.md",
@@ -2725,7 +3269,7 @@
     "role": "doc",
     "contentHash": "9de7136aa599845e035ba04503534e491da43a877c5e4f7b123c1511ab3e5e51",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.695Z"
+    "updatedAt": "2026-10-24T15:53:42.083Z"
   },
   {
     "relativePath": "openspec/changes/spec-approval/specs/spec-planning/spec.md",
@@ -2733,7 +3277,7 @@
     "role": "doc",
     "contentHash": "6a39ea5644c3e7652431d334ac62123728337142ae2dfd446c778d7e36e37aba",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.699Z"
+    "updatedAt": "2026-10-24T15:53:42.084Z"
   },
   {
     "relativePath": "openspec/changes/spec-approval/tasks.md",
@@ -2741,7 +3285,7 @@
     "role": "doc",
     "contentHash": "3fbe8eb84b5206e63a19f95bea1339d50d8301790fc5ae6bd901148ef8e57535",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.702Z"
+    "updatedAt": "2026-10-24T15:53:42.086Z"
   },
   {
     "relativePath": "openspec/changes/spec-drift/.openspec.yaml",
@@ -2749,7 +3293,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.706Z"
+    "updatedAt": "2026-10-24T15:53:42.089Z"
   },
   {
     "relativePath": "openspec/changes/spec-drift/proposal.md",
@@ -2757,7 +3301,7 @@
     "role": "doc",
     "contentHash": "ccbd07e8cafca229ed8fff751ad35f92bdfe612fb26335b74207084ace58a9c8",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.709Z"
+    "updatedAt": "2026-10-24T15:53:42.090Z"
   },
   {
     "relativePath": "openspec/changes/spec-drift/specs/spec-planning/spec.md",
@@ -2765,7 +3309,7 @@
     "role": "doc",
     "contentHash": "99f7dafe4ee63e29fda920eb646eb4097cf2e7fec2465b7124c60060f9d73011",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.712Z"
+    "updatedAt": "2026-10-24T15:53:42.092Z"
   },
   {
     "relativePath": "openspec/changes/spec-drift/tasks.md",
@@ -2773,7 +3317,7 @@
     "role": "doc",
     "contentHash": "2abab58c5c2eaa58a7f429ba3d44d63bfecfa03b78e5a1f50f6e2cd63c4773ad",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.716Z"
+    "updatedAt": "2026-10-24T15:53:42.093Z"
   },
   {
     "relativePath": "openspec/changes/staging-auto-merge/.openspec.yaml",
@@ -2781,7 +3325,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.720Z"
+    "updatedAt": "2026-10-24T15:53:42.095Z"
   },
   {
     "relativePath": "openspec/changes/staging-auto-merge/proposal.md",
@@ -2789,7 +3333,7 @@
     "role": "doc",
     "contentHash": "d328c80ceac622b5f330e8bf07b8ddae686eef3cc45814a236ef11207a3b902a",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.723Z"
+    "updatedAt": "2026-10-24T15:53:42.096Z"
   },
   {
     "relativePath": "openspec/changes/staging-auto-merge/specs/delivery-gates/spec.md",
@@ -2797,7 +3341,7 @@
     "role": "doc",
     "contentHash": "2d50381b24d0bf383d15a346c2e9e1ed1251d704e195ef0bb538cc5c9a6c8dfd",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.727Z"
+    "updatedAt": "2026-10-24T15:53:42.097Z"
   },
   {
     "relativePath": "openspec/changes/staging-auto-merge/tasks.md",
@@ -2805,7 +3349,7 @@
     "role": "doc",
     "contentHash": "141a719e4ce9e8010422eb665b1972415eca6f11cbb63820fb5f90c3904eca8f",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.730Z"
+    "updatedAt": "2026-10-24T15:53:42.099Z"
   },
   {
     "relativePath": "openspec/changes/stalled-reassign/.openspec.yaml",
@@ -2813,7 +3357,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.734Z"
+    "updatedAt": "2026-10-24T15:53:42.100Z"
   },
   {
     "relativePath": "openspec/changes/stalled-reassign/proposal.md",
@@ -2821,7 +3365,7 @@
     "role": "doc",
     "contentHash": "e60868de22d59d005e062388c59e7f497111e20117485fb395d3738b5d1dbebb",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.737Z"
+    "updatedAt": "2026-10-24T15:53:42.102Z"
   },
   {
     "relativePath": "openspec/changes/stalled-reassign/specs/sandbox-runtime/spec.md",
@@ -2829,7 +3373,7 @@
     "role": "doc",
     "contentHash": "cb83af01d0db983684f3013ead28f8754f252e170b6a482f902e1fc28de81594",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.741Z"
+    "updatedAt": "2026-10-24T15:53:42.103Z"
   },
   {
     "relativePath": "openspec/changes/stalled-reassign/tasks.md",
@@ -2837,7 +3381,7 @@
     "role": "doc",
     "contentHash": "74f3cd779ca177c8dfb3ae7db9c1ccc43ee5d56e8cbf6809f3db820519761eb1",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.744Z"
+    "updatedAt": "2026-10-24T15:53:42.104Z"
   },
   {
     "relativePath": "openspec/changes/status-commands/.openspec.yaml",
@@ -2845,7 +3389,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.747Z"
+    "updatedAt": "2026-10-24T15:53:42.106Z"
   },
   {
     "relativePath": "openspec/changes/status-commands/proposal.md",
@@ -2853,7 +3397,7 @@
     "role": "doc",
     "contentHash": "7a9cd942f8a42b179143e1587ca02402eae67408e89f68726d626075ed826b6f",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.751Z"
+    "updatedAt": "2026-10-24T15:53:42.107Z"
   },
   {
     "relativePath": "openspec/changes/status-commands/specs/command-routing/spec.md",
@@ -2861,7 +3405,7 @@
     "role": "doc",
     "contentHash": "e63c9422c8a8ea19099462f50565706367e77a9fb946aa0f600dcab4ee51f9f4",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.754Z"
+    "updatedAt": "2026-10-24T15:53:42.109Z"
   },
   {
     "relativePath": "openspec/changes/status-commands/tasks.md",
@@ -2869,7 +3413,7 @@
     "role": "doc",
     "contentHash": "34a74084e8bc52121b50f0d74f87c3d986a2d36bcc9e64397a38cbbe756b3cd5",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.758Z"
+    "updatedAt": "2026-10-24T15:53:42.110Z"
   },
   {
     "relativePath": "openspec/changes/task-limits/.openspec.yaml",
@@ -2877,7 +3421,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.761Z"
+    "updatedAt": "2026-10-24T15:53:42.111Z"
   },
   {
     "relativePath": "openspec/changes/task-limits/proposal.md",
@@ -2885,7 +3429,7 @@
     "role": "doc",
     "contentHash": "2a7e444fbb86e7413cab9490dcc495930c1e8b8a2032648c5f423f1682e5f12c",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.765Z"
+    "updatedAt": "2026-10-24T15:53:42.114Z"
   },
   {
     "relativePath": "openspec/changes/task-limits/specs/budget/spec.md",
@@ -2893,7 +3437,7 @@
     "role": "doc",
     "contentHash": "a3849a1f1fc962ad47a83d2f279e1a445167adeeede4c62e7c413b787624ba6c",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.768Z"
+    "updatedAt": "2026-10-24T15:53:42.116Z"
   },
   {
     "relativePath": "openspec/changes/task-limits/tasks.md",
@@ -2901,7 +3445,7 @@
     "role": "doc",
     "contentHash": "3f25c47fa4035691ed657d4630b1e1cf1e05d16eb63dd1e91d79893541e29557",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.771Z"
+    "updatedAt": "2026-10-24T15:53:42.117Z"
   },
   {
     "relativePath": "openspec/changes/task-pause-resume/.openspec.yaml",
@@ -2909,7 +3453,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.774Z"
+    "updatedAt": "2026-10-24T15:53:42.119Z"
   },
   {
     "relativePath": "openspec/changes/task-pause-resume/proposal.md",
@@ -2917,7 +3461,7 @@
     "role": "doc",
     "contentHash": "0905e5dea6aaf8fe4256627b81018a7c016d907c2ec444e5bbf7e847936dc891",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.777Z"
+    "updatedAt": "2026-10-24T15:53:42.120Z"
   },
   {
     "relativePath": "openspec/changes/task-pause-resume/specs/task-lifecycle/spec.md",
@@ -2925,7 +3469,7 @@
     "role": "doc",
     "contentHash": "5b4881ee69fd668c80e9057bd3f9de6b345eee834aefb17995949ee5b5c9b962",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.781Z"
+    "updatedAt": "2026-10-24T15:53:42.122Z"
   },
   {
     "relativePath": "openspec/changes/task-pause-resume/tasks.md",
@@ -2933,7 +3477,7 @@
     "role": "doc",
     "contentHash": "9fca8f1b1fa1f83d98e1b21f9886b30080bd363bade9a745671226185e4dadb1",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.784Z"
+    "updatedAt": "2026-10-24T15:53:42.123Z"
   },
   {
     "relativePath": "openspec/changes/task-rework/design.md",
@@ -2941,7 +3485,7 @@
     "role": "doc",
     "contentHash": "7c87f03b9964a5a52aa57414a32ba1440106033183e698d19e2e446548410da3",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:58:08.118Z"
+    "updatedAt": "2026-10-24T15:53:42.125Z"
   },
   {
     "relativePath": "openspec/changes/task-rework/proposal.md",
@@ -2949,7 +3493,7 @@
     "role": "doc",
     "contentHash": "c1f23a139d8bd9b364676bf8ce86a34600df243c426db11ca0976c19c49ef2dd",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:58:08.143Z"
+    "updatedAt": "2026-10-24T15:53:42.126Z"
   },
   {
     "relativePath": "openspec/changes/task-rework/specs/agents-flow-mcp/spec.md",
@@ -2957,7 +3501,7 @@
     "role": "doc",
     "contentHash": "d78c96c03d54fa4750927ab59438cc62a2a054f6299188e3502ffb0b91930852",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:53:09.686Z"
+    "updatedAt": "2026-10-24T15:53:42.127Z"
   },
   {
     "relativePath": "openspec/changes/task-rework/specs/command-routing/spec.md",
@@ -2965,7 +3509,7 @@
     "role": "doc",
     "contentHash": "b24b481562bd21565a8ab47347c640f97ed7e9a796a62a81959c6e955a6141f7",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:53:09.660Z"
+    "updatedAt": "2026-10-24T15:53:42.129Z"
   },
   {
     "relativePath": "openspec/changes/task-rework/specs/delivery-gates/spec.md",
@@ -2973,7 +3517,7 @@
     "role": "doc",
     "contentHash": "5dac18b98cab8e1f345c4f55fe6e38e0af8e3317e80b29cf102b63ede3e1b3fb",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:58:08.220Z"
+    "updatedAt": "2026-10-24T15:53:42.130Z"
   },
   {
     "relativePath": "openspec/changes/task-rework/specs/task-dialog/spec.md",
@@ -2981,7 +3525,7 @@
     "role": "doc",
     "contentHash": "f2d147ce3de4dd6f77f8ef448c559b01fd8ec9cce53633a568dcb0f7c7753c28",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:58:08.266Z"
+    "updatedAt": "2026-10-24T15:53:42.132Z"
   },
   {
     "relativePath": "openspec/changes/task-rework/specs/task-lifecycle/spec.md",
@@ -2989,7 +3533,7 @@
     "role": "doc",
     "contentHash": "796374069bf62c6eddbb73ade816a51f45716c9448558703b12098c4dbe5435b",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:53:09.615Z"
+    "updatedAt": "2026-10-24T15:53:42.133Z"
   },
   {
     "relativePath": "openspec/changes/task-rework/specs/telegram-bot/spec.md",
@@ -2997,7 +3541,7 @@
     "role": "doc",
     "contentHash": "8ef6badf522e7fee234aa7f1f6d9573de6dee84d215a8259bbb0f4c6152d0f41",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:53:09.733Z"
+    "updatedAt": "2026-10-24T15:53:42.134Z"
   },
   {
     "relativePath": "openspec/changes/task-rework/tasks.md",
@@ -3005,7 +3549,7 @@
     "role": "doc",
     "contentHash": "1a877b71aba166b8dc8ff5c5a5f3442793f69a8114200b3b655813ad27fec6b5",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:58:08.174Z"
+    "updatedAt": "2026-10-24T15:53:42.136Z"
   },
   {
     "relativePath": "openspec/changes/telegram-full-stages/.openspec.yaml",
@@ -3013,7 +3557,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.788Z"
+    "updatedAt": "2026-10-24T15:53:42.137Z"
   },
   {
     "relativePath": "openspec/changes/telegram-full-stages/proposal.md",
@@ -3021,7 +3565,7 @@
     "role": "doc",
     "contentHash": "d7e12d8cf6837ede26bc062400a59fe822268a73263c1c4918f2bf0df12a976e",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.791Z"
+    "updatedAt": "2026-10-24T15:53:42.138Z"
   },
   {
     "relativePath": "openspec/changes/telegram-full-stages/specs/telegram-bot/spec.md",
@@ -3029,7 +3573,7 @@
     "role": "doc",
     "contentHash": "af98597b29fd33f5a0c247cea0c6bfdca18c02735e42dca578975edfa1eb4a59",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.794Z"
+    "updatedAt": "2026-10-24T15:53:42.140Z"
   },
   {
     "relativePath": "openspec/changes/telegram-full-stages/tasks.md",
@@ -3037,7 +3581,7 @@
     "role": "doc",
     "contentHash": "8accf90f2852a83f7b492d9bb9e530addf22dca880f673ea98ec38b9dd7c857c",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.797Z"
+    "updatedAt": "2026-10-24T15:53:42.141Z"
   },
   {
     "relativePath": "openspec/changes/telegram-other-project/.openspec.yaml",
@@ -3045,7 +3589,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.801Z"
+    "updatedAt": "2026-10-24T15:53:42.142Z"
   },
   {
     "relativePath": "openspec/changes/telegram-other-project/proposal.md",
@@ -3053,7 +3597,7 @@
     "role": "doc",
     "contentHash": "d46b1d1387e66964cb0fc5c09ac5759ff8c9123b888f036001db934e1bebae3d",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.804Z"
+    "updatedAt": "2026-10-24T15:53:42.144Z"
   },
   {
     "relativePath": "openspec/changes/telegram-other-project/specs/telegram-bot/spec.md",
@@ -3061,7 +3605,7 @@
     "role": "doc",
     "contentHash": "ffb1254a020c8ab717b8a56a885f72a25dae9425836f45eeadf2ecc7ab9b106c",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.807Z"
+    "updatedAt": "2026-10-24T15:53:42.145Z"
   },
   {
     "relativePath": "openspec/changes/telegram-other-project/tasks.md",
@@ -3069,7 +3613,7 @@
     "role": "doc",
     "contentHash": "6e363bcf93d8b88ca4292450a67442b1e69975e26ae622767878b929fd194c05",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.811Z"
+    "updatedAt": "2026-10-24T15:53:42.147Z"
   },
   {
     "relativePath": "openspec/changes/voice-robustness/.openspec.yaml",
@@ -3077,7 +3621,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.814Z"
+    "updatedAt": "2026-10-24T15:53:42.148Z"
   },
   {
     "relativePath": "openspec/changes/voice-robustness/proposal.md",
@@ -3085,7 +3629,7 @@
     "role": "doc",
     "contentHash": "fe25758343959775197896bbb753676f32c3d268d4545f7024f6cf821950de1d",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.818Z"
+    "updatedAt": "2026-10-24T15:53:42.150Z"
   },
   {
     "relativePath": "openspec/changes/voice-robustness/specs/speech-to-text/spec.md",
@@ -3093,7 +3637,7 @@
     "role": "doc",
     "contentHash": "e04409d9f15dde49b43597f5d299529efb2a492f22e4f585f02b588eea5b8b51",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.821Z"
+    "updatedAt": "2026-10-24T15:53:42.151Z"
   },
   {
     "relativePath": "openspec/changes/voice-robustness/tasks.md",
@@ -3101,7 +3645,7 @@
     "role": "doc",
     "contentHash": "368d5f16cd3453f9fe5b0ec547e59b97f217e247d84ba6ec2dff97ec3636f2be",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.824Z"
+    "updatedAt": "2026-10-24T15:53:42.152Z"
   },
   {
     "relativePath": "openspec/changes/workspace-settings-snapshot/.openspec.yaml",
@@ -3109,7 +3653,7 @@
     "role": "config",
     "contentHash": "dc08c29816def5c12ac71497ed005c1c0d6d779aa76f03fa6cd1d3ed38d91ec9",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.828Z"
+    "updatedAt": "2026-10-24T15:53:42.154Z"
   },
   {
     "relativePath": "openspec/changes/workspace-settings-snapshot/proposal.md",
@@ -3117,7 +3661,7 @@
     "role": "doc",
     "contentHash": "ce87f686691b79f017eb1f68b0ae2ca327f3036b83bd2e671d325f751654b0b1",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.831Z"
+    "updatedAt": "2026-10-24T15:53:42.155Z"
   },
   {
     "relativePath": "openspec/changes/workspace-settings-snapshot/specs/task-lifecycle/spec.md",
@@ -3125,7 +3669,7 @@
     "role": "doc",
     "contentHash": "231ab144e91ab2f6ecc42886ef834b297b521efed696246377ae672bf05f07e2",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.834Z"
+    "updatedAt": "2026-10-24T15:53:42.157Z"
   },
   {
     "relativePath": "openspec/changes/workspace-settings-snapshot/tasks.md",
@@ -3133,7 +3677,7 @@
     "role": "doc",
     "contentHash": "524b0566d5103467dac40048021ce04271179d8deeab41f941ea7d9f4c33d4e7",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.838Z"
+    "updatedAt": "2026-10-24T15:53:42.158Z"
   },
   {
     "relativePath": "openspec/config.yaml",
@@ -3141,7 +3685,7 @@
     "role": "config",
     "contentHash": "8c7b4c2157dcbf6ec99822aeee54077f7ffbab444fc14fa26500bad0d350eeba",
     "author": "agent",
-    "updatedAt": "2026-10-18T07:40:37.841Z"
+    "updatedAt": "2026-10-24T15:53:42.161Z"
   },
   {
     "relativePath": "openspec/specs/command-routing/spec.md",
@@ -3149,31 +3693,31 @@
     "role": "doc",
     "contentHash": "10526a6aad906a74c81eea1b3d68f617e1353d9e06adce66122f3989c3accba0",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:07:41.488Z"
+    "updatedAt": "2026-10-24T15:53:42.163Z"
   },
   {
     "relativePath": "openspec/specs/platform-config/spec.md",
-    "summary": "Основная спека platform-config: конфиг и ENV-ссылки на секреты; дельта синхронизирована при архивации mvp-03-task-store (2026-10-18).",
+    "summary": "Main spec конфигурации платформы harness.yaml: workspaces[].repo с провайдером github/gitlab и access_ref; старый gitlab-блок удалён (D-60).",
     "role": "doc",
-    "contentHash": "39268bd0f0869bef4b0bc41f4a623bb3cd262579449445f79c8c29c2af3c8119",
+    "contentHash": "c51818db4403fe771d77705486062ae717035745448fb4ff67580c2ab5ef7f16",
     "author": "agent",
-    "updatedAt": "2026-10-18T14:16:06.236Z"
+    "updatedAt": "2026-10-24T15:53:42.164Z"
   },
   {
     "relativePath": "openspec/specs/sandbox-profile/spec.md",
-    "summary": "Основная спека sandbox-profile (синхронизирована из archive): bootstrap без участия владельца, ключи из vault только в env, память проекта memory-agent в песочнице.",
+    "summary": "Main spec профиля песочницы: bootstrap с ключами из vault по workspace, git-заголовок на префикс репо, bootstrap в образе (D-50…D-53, D-60, D-63).",
     "role": "doc",
-    "contentHash": "6ed49aa955c940b71b1665865d55547a69de456d37b4c5231583df8e5e311149",
+    "contentHash": "9fcae0bea13c1b81d33a52a0979e8598caeedcccc37f8ccf0d68392af31bba46",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:07:41.537Z"
+    "updatedAt": "2026-10-24T15:53:42.165Z"
   },
   {
     "relativePath": "openspec/specs/sandbox-runtime/spec.md",
-    "summary": "Основная спека sandbox-runtime (синхронизирована из mvp-06): адаптер Novita, bootstrap, запуск агента, очистка, пауза; секреты из vault в env команд и redaction.",
+    "summary": "Main spec рантайма песочницы: bootstrap и activate с repo-адресом из конфига, fetch по префиксу репозитория (D-60, D-62).",
     "role": "doc",
-    "contentHash": "1eba2c5b74f6c7059a2e71da68f95014fd54bc9408a5eb9208a76e8dddcf6f38",
+    "contentHash": "307cf24ea3374b75963da968ede6309fd0255f44ac86841523db208d369d2a92",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:07:41.511Z"
+    "updatedAt": "2026-10-24T15:53:42.167Z"
   },
   {
     "relativePath": "openspec/specs/speech-to-text/spec.md",
@@ -3181,7 +3725,7 @@
     "role": "doc",
     "contentHash": "4ccf111f28a53fa5c3400e9e027ccfcaaa18bc669dfa9da204328e2ea79572cc",
     "author": "agent",
-    "updatedAt": "2026-10-18T14:16:06.268Z"
+    "updatedAt": "2026-10-24T15:53:42.168Z"
   },
   {
     "relativePath": "openspec/specs/task-lifecycle/spec.md",
@@ -3189,7 +3733,7 @@
     "role": "doc",
     "contentHash": "eb8c5260852f3fb4c2dd8ef6f94542cceea24cd54bb0a1ec579ca0bc877c2333",
     "author": "agent",
-    "updatedAt": "2026-10-18T14:16:06.249Z"
+    "updatedAt": "2026-10-24T15:53:42.170Z"
   },
   {
     "relativePath": "openspec/specs/telegram-bot/spec.md",
@@ -3197,15 +3741,15 @@
     "role": "doc",
     "contentHash": "9dd259216f447e9f232d0de13056db4e349c6de5c160bc01a5e5ff863d247f0d",
     "author": "agent",
-    "updatedAt": "2026-10-19T19:07:41.580Z"
+    "updatedAt": "2026-10-24T15:53:42.171Z"
   },
   {
     "relativePath": "pyproject.toml",
-    "summary": "Корень uv workspace: members apps/server и shared, Python 3.12; общие настройки инструментов проверки проекта.",
+    "summary": "Repository tool configuration and dependencies.",
     "role": "config",
-    "contentHash": "0be939fcde0b98c08f6eefc5ea5321d802516ab06b5f3f588257ad17f44488e3",
+    "contentHash": "82b7d566ed0a43a1d2da1cdab0410aebe5e19f65038fe740a5f7bba56202c0d4",
     "author": "agent",
-    "updatedAt": "2026-10-18T09:00:01.904Z"
+    "updatedAt": "2026-10-26T02:36:57.448Z"
   },
   {
     "relativePath": "shared/README.md",
@@ -3213,7 +3757,7 @@
     "role": "doc",
     "contentHash": "2edf2cf268fab27d4be6d9e270a2b759073fb658d4599d70a04da3a704b98acb",
     "author": "agent",
-    "updatedAt": "2026-10-19T02:30:15.561Z"
+    "updatedAt": "2026-10-24T15:53:42.174Z"
   },
   {
     "relativePath": "shared/pyproject.toml",
@@ -3221,7 +3765,7 @@
     "role": "config",
     "contentHash": "d7461d695f170b84a587e1dfece7af92c9c959b3dc02cafcc5ce49d326f263e9",
     "author": "agent",
-    "updatedAt": "2026-10-18T09:00:01.864Z"
+    "updatedAt": "2026-10-24T15:53:42.175Z"
   },
   {
     "relativePath": "shared/src/harness_shared/__init__.py",
@@ -3229,7 +3773,7 @@
     "role": "module",
     "contentHash": "93c22990f563c54a5514d590ad8cfed4f39159c84cf171d650c4cedb28353f6f",
     "author": "agent",
-    "updatedAt": "2026-10-18T09:00:01.885Z"
+    "updatedAt": "2026-10-24T15:53:42.177Z"
   },
   {
     "relativePath": "shared/src/harness_shared/health.py",
@@ -3237,7 +3781,7 @@
     "role": "module",
     "contentHash": "1febf78b4a10221a747117bed7e3eda8ffd938123289440f793d423ccf809eb6",
     "author": "agent",
-    "updatedAt": "2026-10-18T09:00:01.875Z"
+    "updatedAt": "2026-10-24T15:53:42.178Z"
   },
   {
     "relativePath": "shared/src/harness_shared/routing.py",
@@ -3245,7 +3789,7 @@
     "role": "module",
     "contentHash": "1922ba0a6862d8c990d783191f17c2d5e7f5e947ed8e7156b524d16e15263372",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:47:45.325Z"
+    "updatedAt": "2026-10-24T15:53:42.180Z"
   },
   {
     "relativePath": "shared/src/harness_shared/sandboxes.py",
@@ -3253,7 +3797,7 @@
     "role": "module",
     "contentHash": "0ffe52c0e495605e5c4ea978344936683804b47366722886d9a4ae3ff446840d",
     "author": "agent",
-    "updatedAt": "2026-10-19T03:50:34.291Z"
+    "updatedAt": "2026-10-24T15:53:42.181Z"
   },
   {
     "relativePath": "shared/src/harness_shared/tasks.py",
@@ -3261,14 +3805,6 @@
     "role": "module",
     "contentHash": "5829b963f0d0663eca50a95458db64ca32aefc4805a7c5206e256520a052d6f1",
     "author": "agent",
-    "updatedAt": "2026-10-18T11:49:57.757Z"
-  },
-  {
-    "relativePath": "tools/spikes/novita_check.py",
-    "summary": "Спайк Novita: novita_check проверяет exec, files, pause/resume, set_timeout, expire, claude stream-json, HTTPS, cleanup по metadata purpose=mvp-01-spike; redact; флаги --only, --self-test.",
-    "role": "module",
-    "contentHash": "89bdc8446f9c4007480bcbcc90443039c92c5173a1a2f0e930698bb5e2b7a96c",
-    "author": "agent",
-    "updatedAt": "2026-10-18T08:27:10.104Z"
+    "updatedAt": "2026-10-24T15:53:42.183Z"
   }
 ]

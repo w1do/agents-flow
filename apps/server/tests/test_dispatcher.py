@@ -7,13 +7,15 @@
 import asyncio
 import base64
 import json
+import shlex
+import sys
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import pytest
-from harness_server.adapters.novita import ExecResult, FakeSandbox
+from harness_server.adapters.sandbox import ExecResult, FakeSandbox
 from harness_server.adapters.vault import FakeVault, McpSecretVault, VaultError
 from harness_server.config import HarnessConfig, SandboxMemoryConfig, load_config
 from harness_server.db.models import Task, TaskToken
@@ -74,6 +76,7 @@ def _limit_line() -> str:
 
 
 AGENT_PID = 4242
+PROBE_PREFIX = shlex.quote(sys.executable) + " -c"
 
 
 class _AgentFake(FakeSandbox):
@@ -85,6 +88,7 @@ class _AgentFake(FakeSandbox):
     """
 
     group_alive: bool = False
+    kill_makes_dead: bool = True
 
     async def exec(
         self,
@@ -96,8 +100,15 @@ class _AgentFake(FakeSandbox):
         timeout_s: float = 60,
     ) -> ExecResult:
         result = await super().exec(sandbox_id, cmd, envs=envs, cwd=cwd, timeout_s=timeout_s)
-        if cmd == f"kill -0 -- -{AGENT_PID}" and not self.group_alive:
-            return ExecResult(exit_code=1, stdout="", stderr="")
+        if (
+            cmd.startswith("kill -TERM -- -") or cmd.startswith("kill -KILL -- -")
+        ) and self.kill_makes_dead:
+            self.group_alive = False
+            return result
+        if cmd == f"kill -0 -- -{AGENT_PID}":
+            return ExecResult(exit_code=0 if self.group_alive else 1, stdout="", stderr="")
+        if cmd.startswith(PROBE_PREFIX):
+            return ExecResult(exit_code=0 if self.group_alive else 3, stdout="", stderr="")
         return result
 
 
@@ -389,6 +400,32 @@ async def test_recovery_with_dead_agent_marks_task_error(
     assert any(e.text and "агент завершился без статуса" in e.text for e in events)
 
 
+async def test_recovery_cleans_recorded_agent_when_marker_disappeared(
+    committed_session_factory: Factory,
+) -> None:
+    """A failed re-init must not release an already launched agent without cleanup."""
+    task = await _prepare(committed_session_factory)
+    fake = _fake()
+    pipeline = _Pipeline(fake, agent_finishes=False)
+    await _reserve_for_pipeline(committed_session_factory, pipeline)
+    await _set_agent_run(committed_session_factory, started_at=datetime.now(UTC), pid=AGENT_PID)
+    await _seed_agent(fake, task)
+    fake.respond('test -f "$HOME/.harness/projects/demo.ready"', exit_code=1)
+
+    await dispatch_once(_ctx(committed_session_factory, fake), {TaskKind.IMPLEMENT: pipeline})
+
+    assert _launches(fake) == []
+    assert any(e.cmd and "worktree remove --force" in e.cmd for e in fake.journal)
+    assert await _sandbox_row(committed_session_factory) == (SandboxStatus.PAUSED, None)
+    async with committed_session_factory() as session:
+        stored = (
+            (await session.execute(select(TaskToken).where(TaskToken.task_id == task.id)))
+            .scalars()
+            .all()
+        )
+    assert all(token.revoked_at is not None for token in stored)
+
+
 async def test_agent_output_secret_stays_out_of_events(
     committed_session_factory: Factory,
 ) -> None:
@@ -445,6 +482,197 @@ async def test_activation_failure_before_worktree_returns_sandbox_to_paused(
     assert await _sandbox_row(committed_session_factory) == (SandboxStatus.PAUSED, None)
     assert fake.paused
     assert len(fake.journal) == journal_before_resume
+
+
+async def test_fresh_missing_marker_reports_init_without_fetch_or_cleanup(
+    committed_session_factory: Factory,
+) -> None:
+    task = await _prepare(committed_session_factory)
+    fake = _fake()
+    fake.respond('test -f "$HOME/.harness/projects/demo.ready"', exit_code=1)
+    fake.respond('test -d "$HOME/.harness/worktrees/', exit_code=1)
+    await dispatch_once(
+        _ctx(committed_session_factory, fake),
+        {TaskKind.IMPLEMENT: _Pipeline(fake, agent_finishes=True)},
+    )
+    async with committed_session_factory() as session:
+        events = await list_task_events(session, task.id)
+    assert any(
+        e.text and "project_not_initialized: выполните agent init demo" in e.text for e in events
+    )
+    assert not any(
+        e.cmd and (" fetch" in e.cmd or "worktree remove" in e.cmd) for e in fake.journal
+    )
+    assert await _sandbox_row(committed_session_factory) == (SandboxStatus.PAUSED, None)
+
+
+async def test_ready_marker_quotes_home_with_spaces_and_allows_activation(
+    committed_session_factory: Factory,
+) -> None:
+    task = await _prepare(committed_session_factory)
+    fake = _fake()
+    fake.respond('test -f "$HOME/.harness/projects/demo.ready"', exit_code=0)
+
+    await dispatch_once(
+        _ctx(committed_session_factory, fake),
+        {TaskKind.IMPLEMENT: _Pipeline(fake, agent_finishes=True)},
+    )
+
+    assert any(
+        entry.cmd == 'test -f "$HOME/.harness/projects/demo.ready"' for entry in fake.journal
+    )
+    async with committed_session_factory() as session:
+        events = await list_task_events(session, task.id)
+    assert not any(event.text and "project_not_initialized" in event.text for event in events)
+
+
+async def test_recovered_never_started_missing_marker_releases_without_cleanup(
+    committed_session_factory: Factory,
+) -> None:
+    task = await _prepare(committed_session_factory)
+    fake = _fake()
+    pipeline = _Pipeline(fake, agent_finishes=False)
+    await _reserve_for_pipeline(committed_session_factory, pipeline)
+    fake.respond('test -f "$HOME/.harness/projects/demo.ready"', exit_code=1)
+    fake.respond('test -d "$HOME/.harness/worktrees/', exit_code=1)
+    await dispatch_once(_ctx(committed_session_factory, fake), {TaskKind.IMPLEMENT: pipeline})
+    async with committed_session_factory() as session:
+        events = await list_task_events(session, task.id)
+    assert any(
+        e.text and "project_not_initialized: выполните agent init demo" in e.text for e in events
+    )
+    assert not any(e.cmd and "worktree remove" in e.cmd for e in fake.journal)
+    assert not any(e.cmd and " fetch" in e.cmd for e in fake.journal)
+    assert await _sandbox_row(committed_session_factory) == (SandboxStatus.PAUSED, None)
+
+
+async def test_missing_marker_partial_token_artifact_revokes_and_cleans_before_release(
+    committed_session_factory: Factory,
+) -> None:
+    task = await _prepare(committed_session_factory)
+    fake = _fake()
+    pipeline = _Pipeline(fake, agent_finishes=False)
+    await _reserve_for_pipeline(committed_session_factory, pipeline)
+    async with committed_session_factory() as session:
+        await sandboxes.issue_task_token(
+            session, task.id, secret_key=SECRET_KEY, agent_run_timeout_min=60
+        )
+    await fake.write_file(PROVIDER_ID, f"{sandboxes.task_dir(HOME, task.id)}/run.json", "{}")
+    fake.respond('test -f "$HOME/.harness/projects/demo.ready"', exit_code=1)
+    fake.respond('test -d "$HOME/.harness/worktrees/', exit_code=0)
+    await dispatch_once(_ctx(committed_session_factory, fake), {TaskKind.IMPLEMENT: pipeline})
+    assert any(e.cmd and "worktree remove --force" in e.cmd for e in fake.journal)
+    assert not any(e.cmd and " fetch" in e.cmd for e in fake.journal)
+    async with committed_session_factory() as session:
+        tokens = (
+            (await session.execute(select(TaskToken).where(TaskToken.task_id == task.id)))
+            .scalars()
+            .all()
+        )
+    assert tokens and all(token.revoked_at is not None for token in tokens)
+    assert await _sandbox_row(committed_session_factory) == (SandboxStatus.PAUSED, None)
+
+
+async def test_missing_marker_live_pid_kills_and_revokes_before_release(
+    committed_session_factory: Factory,
+) -> None:
+    task = await _prepare(committed_session_factory)
+    fake = _fake()
+    fake.group_alive = True
+    pipeline = _Pipeline(fake, agent_finishes=False)
+    await _reserve_for_pipeline(committed_session_factory, pipeline)
+    async with committed_session_factory() as session:
+        await sandboxes.issue_task_token(
+            session, task.id, secret_key=SECRET_KEY, agent_run_timeout_min=60
+        )
+    await _set_agent_run(committed_session_factory, started_at=datetime.now(UTC), pid=AGENT_PID)
+    fake.respond('test -f "$HOME/.harness/projects/demo.ready"', exit_code=1)
+    fake.respond('test -d "$HOME/.harness/worktrees/', exit_code=0)
+    await dispatch_once(_ctx(committed_session_factory, fake), {TaskKind.IMPLEMENT: pipeline})
+    commands = [entry.cmd or "" for entry in fake.journal]
+    assert any(f"kill -TERM -- -{AGENT_PID}" in command for command in commands)
+    assert any("worktree remove --force" in command for command in commands)
+    assert not any(" fetch" in command for command in commands)
+    assert await _sandbox_row(committed_session_factory) == (SandboxStatus.PAUSED, None)
+
+
+async def test_missing_marker_crash_window_pid_file_kills_before_release(
+    committed_session_factory: Factory,
+) -> None:
+    task = await _prepare(committed_session_factory)
+    fake = _fake()
+    fake.group_alive = True
+    pipeline = _Pipeline(fake, agent_finishes=False)
+    await _reserve_for_pipeline(committed_session_factory, pipeline)
+    async with committed_session_factory() as session:
+        await sandboxes.issue_task_token(
+            session, task.id, secret_key=SECRET_KEY, agent_run_timeout_min=60
+        )
+    await _set_agent_run(committed_session_factory, started_at=datetime.now(UTC), pid=None)
+    pid_path = f"{sandboxes.task_dir(HOME, task.id)}/pid"
+    await fake.write_file(PROVIDER_ID, pid_path, str(AGENT_PID))
+    fake.respond('test -f "$HOME/.harness/projects/demo.ready"', exit_code=1)
+    fake.respond('test -d "$HOME/.harness/worktrees/', exit_code=0)
+
+    await dispatch_once(_ctx(committed_session_factory, fake), {TaskKind.IMPLEMENT: pipeline})
+
+    entries = fake.journal
+    recovered = next(
+        i
+        for i, entry in enumerate(entries)
+        if entry.method == "read_file" and entry.cmd == pid_path
+    )
+    killed = next(
+        i for i, entry in enumerate(entries) if entry.cmd and "kill -TERM -- -4242" in entry.cmd
+    )
+    removed = next(
+        i for i, entry in enumerate(entries) if entry.cmd and entry.cmd.startswith("rm -rf")
+    )
+    assert recovered < killed < removed
+    async with committed_session_factory() as session:
+        tokens = (
+            await session.execute(select(TaskToken).where(TaskToken.task_id == task.id))
+        ).scalars()
+    assert all(token.revoked_at is not None for token in tokens)
+    assert await _sandbox_row(committed_session_factory) == (SandboxStatus.PAUSED, None)
+
+
+async def test_missing_marker_crash_window_kill_failure_keeps_reservation_error(
+    committed_session_factory: Factory,
+) -> None:
+    task = await _prepare(committed_session_factory)
+    fake = _fake()
+    fake.group_alive = True
+    fake.kill_makes_dead = False
+    pipeline = _Pipeline(fake, agent_finishes=False)
+    await _reserve_for_pipeline(committed_session_factory, pipeline)
+    await _set_agent_run(committed_session_factory, started_at=datetime.now(UTC), pid=None)
+    await fake.write_file(PROVIDER_ID, f"{sandboxes.task_dir(HOME, task.id)}/pid", str(AGENT_PID))
+    fake.respond('test -f "$HOME/.harness/projects/demo.ready"', exit_code=1)
+    fake.respond('test -d "$HOME/.harness/worktrees/', exit_code=0)
+
+    await dispatch_once(_ctx(committed_session_factory, fake), {TaskKind.IMPLEMENT: pipeline})
+
+    assert not [entry for entry in fake.journal if entry.cmd and entry.cmd.startswith("rm -rf")]
+    assert await _sandbox_row(committed_session_factory) == (SandboxStatus.ERROR, task.id)
+
+
+async def test_missing_marker_partial_cleanup_failure_keeps_reservation_error(
+    committed_session_factory: Factory,
+) -> None:
+    task = await _prepare(committed_session_factory)
+    fake = _fake()
+    pipeline = _Pipeline(fake, agent_finishes=False)
+    await _reserve_for_pipeline(committed_session_factory, pipeline)
+    async with committed_session_factory() as session:
+        await sandboxes.issue_task_token(
+            session, task.id, secret_key=SECRET_KEY, agent_run_timeout_min=60
+        )
+    fake.respond('test -f "$HOME/.harness/projects/demo.ready"', exit_code=1)
+    fake.respond('test -d "$HOME/.harness/worktrees/', exit_code=0)
+    fake.respond("git -C /home/sbx/work/demo worktree remove", exit_code=1)
+    await dispatch_once(_ctx(committed_session_factory, fake), {TaskKind.IMPLEMENT: pipeline})
+    assert await _sandbox_row(committed_session_factory) == (SandboxStatus.ERROR, task.id)
 
 
 class _CancelledPipeline(_Pipeline):
@@ -526,7 +754,7 @@ def _vault_config(*, memory: bool) -> HarnessConfig:
     workspace = CONFIG.workspaces[0].model_copy(update={"repo": repo})
     sandbox_update: dict[str, Any] = {}
     if memory:
-        sandbox_update["memory"] = SandboxMemoryConfig(ref=MEMORY_REF, embedding_ref=EMBEDDING_REF)
+        sandbox_update["memory"] = SandboxMemoryConfig(embedding_ref=EMBEDDING_REF)
     sandbox = CONFIG.sandbox.model_copy(update=sandbox_update)
     return CONFIG.model_copy(update={"workspaces": [workspace], "sandbox": sandbox})
 

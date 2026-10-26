@@ -9,12 +9,12 @@
 import json
 import logging
 import shlex
-import uuid
+import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
-from typing import Final, Protocol
+from typing import Final, NoReturn, Protocol
 from uuid import UUID
 
 from harness_shared.sandboxes import AgentRole, SandboxStatus
@@ -23,7 +23,7 @@ from pydantic import SecretStr
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from harness_server.adapters.novita import ExecResult, SandboxError, SandboxProvider
+from harness_server.adapters.sandbox import ExecResult, SandboxError, SandboxProvider
 from harness_server.config import GitAuthorConfig, HarnessConfig, RepoConfig, WorkspaceConfig
 from harness_server.db.models import Sandbox, Task, TaskToken
 from harness_server.domain.errors import UnknownWorkspace, UnsupportedKind
@@ -46,17 +46,29 @@ logger = logging.getLogger(__name__)
 
 # Запас сверх лимита агента: токен не должен истечь раньше, чем агент отработает весь лимит (D-37).
 TOKEN_EXPIRY_MARGIN: Final = timedelta(minutes=10)
-# Скрипт кладётся в /tmp с уникальным именем на каждый запуск (D-52, ревью): envd пишет от root,
-# а fs.protected_regular=2 не даёт открыть на запись существующий файл другого uid в sticky /tmp.
-BOOTSTRAP_SCRIPT_PREFIX: Final = "/tmp/harness-bootstrap-"
-# Клон и npm-установка медленные, но не должны висеть бесконечно: 15 минут.
-BOOTSTRAP_TIMEOUT_SEC: Final = 900
-# С памятью первый memory init индексирует проекты: без запаса по времени он оборвётся (D-47).
-BOOTSTRAP_MEMORY_TIMEOUT_SEC: Final = 1800
-# Фазы bootstrap.sh (D-62): setup — установки без ключей, memory — индексация клонов.
-BOOTSTRAP_PHASE_SETUP: Final = "setup"
-BOOTSTRAP_PHASE_MEMORY: Final = "memory"
+# Git and memory operations may be slow, but must not hang indefinitely.
 # Роль агента по типу задачи (design 7): план — planner, реализация — implementer.
+GIT_TIMEOUT_SEC: Final = 300
+SHORT_TIMEOUT_SEC: Final = 60
+KILL_GRACE_SEC: Final = 10
+# _kill_group already waits for SIGTERM grace and sends SIGKILL.  Two immediate probes bound the
+# final reap check without letting cleanup delete evidence while a group remains observable.
+KILL_REAP_PROBES: Final = 2
+_GROUP_PROBE_CODE: Final = (
+    "import os, sys\n"
+    "try:\n"
+    "    os.killpg(int(sys.argv[1]), 0)\n"
+    "except ProcessLookupError:\n"
+    "    raise SystemExit(3)\n"
+    "except PermissionError:\n"
+    "    raise SystemExit(4)\n"
+    "except OSError:\n"
+    "    raise SystemExit(5)\n"
+)
+STREAM_TAIL_LINES: Final = 200
+STDERR_TAIL_BYTES: Final = 4 * LOG_TEXT_LIMIT
+CLAUDE_CODE_AGENT_TYPE: Final = "claude-code"
+
 _ROLE_BY_KIND: Final = {
     TaskKind.PLAN: AgentRole.PLANNER,
     TaskKind.IMPLEMENT: AgentRole.IMPLEMENTER,
@@ -115,6 +127,15 @@ async def revoke_task_tokens(
     logger.info("task tokens revoked task=%s", task_id)
 
 
+async def has_live_task_token(session: AsyncSession, task_id: UUID) -> bool:
+    """Whether a crash left a usable task token that requires full cleanup."""
+    return (
+        await session.execute(
+            select(TaskToken.id).where(TaskToken.task_id == task_id, TaskToken.revoked_at.is_(None))
+        )
+    ).scalar_one_or_none() is not None
+
+
 def git_author_env(author: GitAuthorConfig) -> dict[str, str]:
     """env агента для коммитов: автор и коммиттер из sandbox.git_author (env запуска, не файл)."""
     return {
@@ -123,190 +144,6 @@ def git_author_env(author: GitAuthorConfig) -> dict[str, str]:
         "GIT_COMMITTER_NAME": author.name,
         "GIT_COMMITTER_EMAIL": author.email,
     }
-
-
-async def _remove_bootstrap_script(provider: SandboxProvider, sandbox_id: str, path: str) -> None:
-    """Удаляет временный скрипт bootstrap. Сбой rm не меняет исход, текст не логируется."""
-    try:
-        await provider.exec(sandbox_id, f"rm -f {shlex.quote(path)}", timeout_s=SHORT_TIMEOUT_SEC)
-    except Exception as exc:
-        logger.warning("bootstrap script cleanup failed type=%s", type(exc).__name__)
-
-
-def _merge_results(results: Sequence[ExecResult]) -> ExecResult:
-    """Итог шагов bootstrap: код первого неуспешного шага (или 0), вывод шагов по порядку."""
-    exit_code = next((item.exit_code for item in results if item.exit_code != 0), 0)
-    stdout = "\n".join(item.stdout.rstrip("\n") for item in results if item.stdout.strip())
-    stderr = "\n".join(item.stderr.rstrip("\n") for item in results if item.stderr.strip())
-    return ExecResult(exit_code=exit_code, stdout=stdout, stderr=stderr)
-
-
-async def _sync_clone(
-    provider: SandboxProvider,
-    sandbox_id: str,
-    *,
-    workspace_id: str,
-    repo_dir: str,
-    repo: RepoConfig,
-    token: SecretStr | None,
-) -> ExecResult:
-    """Клон или fetch одного workspace командами с ключом только этого workspace (D-62).
-
-    Каталога нет — clone; есть клон — set-url origin без ключа, затем fetch по адресу из конфига;
-    каталог без .git — код 1. Ключ передаётся только в env команды clone или fetch.
-    """
-    state = await provider.exec(
-        sandbox_id,
-        f"if [ -d {shlex.quote(repo_dir + '/.git')} ]; then echo repo; "
-        f"elif [ -e {shlex.quote(repo_dir)} ]; then echo other; else echo absent; fi",
-        timeout_s=SHORT_TIMEOUT_SEC,
-    )
-    if state.exit_code != 0:
-        return ExecResult(
-            exit_code=1, stdout="", stderr=f"workspace {workspace_id}: каталог клона не проверен"
-        )
-    kind = state.stdout.strip()
-    if kind == "other":
-        return ExecResult(
-            exit_code=1, stdout="", stderr=f"{repo_dir} существует и не является git-репозиторием"
-        )
-    if token is not None:
-        envs = git_access.git_auth_env(repo, token.get_secret_value())
-    else:
-        envs = git_access.anonymous_git_env()
-    if kind == "repo":
-        progress = ExecResult(exit_code=0, stdout=f"обновляю {workspace_id}", stderr="")
-        remote = await provider.exec(
-            sandbox_id,
-            git_access.set_origin_command(repo, repo_dir),
-            envs=git_access.anonymous_git_env(),
-            timeout_s=SHORT_TIMEOUT_SEC,
-        )
-        if remote.exit_code != 0:
-            return _merge_results([progress, remote])
-        fetched = await provider.exec(
-            sandbox_id,
-            git_access.fetch_command(repo, repo_dir),
-            envs=envs,
-            timeout_s=GIT_TIMEOUT_SEC,
-        )
-        return _merge_results([progress, remote, fetched])
-    # Каталога нет: clone. Если каталог всё же появился, git clone откажет и не перезапишет его.
-    progress = ExecResult(exit_code=0, stdout=f"клонирую {workspace_id}", stderr="")
-    cloned = await provider.exec(
-        sandbox_id,
-        git_access.clone_command(repo, repo_dir),
-        envs=envs,
-        timeout_s=GIT_TIMEOUT_SEC,
-    )
-    return _merge_results([progress, cloned])
-
-
-async def bootstrap(
-    provider: SandboxProvider,
-    sandbox_id: str,
-    config: HarnessConfig,
-    *,
-    script: str,
-    repo_tokens: Mapping[str, SecretStr],
-    memory_ref: str | None = None,
-    memory_repo: str | None = None,
-    embedding_key: SecretStr | None = None,
-) -> ExecResult:
-    """Готовит песочницу в три шага (design 16, 3; D-62) и возвращает их общий результат.
-
-    1. bootstrap.sh --phase setup без ключей в env: установки, каталоги, mcp.json, memory-agent.
-    2. Для каждого workspace — clone или set-url и fetch отдельными git-командами; ключ из
-       repo_tokens (по id workspace) уходит только в env git-команд своего workspace, без ключа
-       клон анонимный (D-60).
-    3. При памяти — bootstrap.sh --phase memory с EMBEDDING_API_KEY: индексация клонов (D-47).
-
-    Шаг с ненулевым кодом останавливает следующие. Ключ неизвестного workspace и memory_ref без
-    memory_repo (и наоборот) — ValueError до любого вызова провайдера (D-51). Не удалось узнать
-    домашний каталог — SandboxStepError("home"). Вывод вызывающий пропускает через redaction.
-    """
-    if (memory_ref is None) != (memory_repo is None):
-        raise ValueError("memory_ref и memory_repo задаются вместе")
-    known_ids = {ws.id for ws in config.workspaces}
-    if set(repo_tokens) - known_ids:
-        raise ValueError("repo_tokens: ключ для неизвестного workspace")
-    args = [
-        "--claude-version",
-        config.sandbox.claude_code_version,
-        "--openspec-version",
-        config.sandbox.openspec_version,
-    ]
-    if memory_ref is not None and memory_repo is not None:
-        args += ["--memory-ref", memory_ref, "--memory-repo", memory_repo]
-    args += [f"{ws.id}={git_access.clone_url(ws.repo)}" for ws in config.workspaces]
-    script_path = f"{BOOTSTRAP_SCRIPT_PREFIX}{uuid.uuid4().hex}.sh"
-
-    def script_command(phase: str) -> str:
-        return shlex.join(["bash", script_path, "--phase", phase, *args])
-
-    # HARNESS_SANDBOX_BOOTSTRAP — защита скрипта от запуска вне песочницы (ревью, D-52).
-    script_envs = {"GIT_TERMINAL_PROMPT": "0", "HARNESS_SANDBOX_BOOTSTRAP": "1"}
-    # Установка Docker и memory-agent дольше обычной: таймаут памяти (D-47).
-    setup_timeout_s = BOOTSTRAP_TIMEOUT_SEC if memory_ref is None else BOOTSTRAP_MEMORY_TIMEOUT_SEC
-    results: list[ExecResult] = []
-
-    await provider.connect(sandbox_id)
-    try:
-        await provider.write_file(sandbox_id, script_path, script)
-        # Установки без ключей в env: postinst apt и lifecycle npm не видят ни одного ключа (D-62).
-        results.append(
-            await provider.exec(
-                sandbox_id,
-                script_command(BOOTSTRAP_PHASE_SETUP),
-                envs=dict(script_envs),
-                timeout_s=setup_timeout_s,
-            )
-        )
-        if results[-1].exit_code == 0:
-            home = await home_dir(provider, sandbox_id)
-            for ws in config.workspaces:
-                results.append(
-                    await _sync_clone(
-                        provider,
-                        sandbox_id,
-                        workspace_id=ws.id,
-                        repo_dir=f"{home}/work/{ws.id}",
-                        repo=ws.repo,
-                        token=repo_tokens.get(ws.id),
-                    )
-                )
-                if results[-1].exit_code != 0:
-                    break
-        if memory_ref is not None and all(item.exit_code == 0 for item in results):
-            memory_envs = dict(script_envs)
-            if embedding_key is not None:
-                memory_envs["EMBEDDING_API_KEY"] = embedding_key.get_secret_value()
-            results.append(
-                await provider.exec(
-                    sandbox_id,
-                    script_command(BOOTSTRAP_PHASE_MEMORY),
-                    envs=memory_envs,
-                    timeout_s=BOOTSTRAP_MEMORY_TIMEOUT_SEC,
-                )
-            )
-    finally:
-        # Скрипт не остаётся в песочнице и при сбое записи или запуска (ревью, D-52).
-        await _remove_bootstrap_script(provider, sandbox_id, script_path)
-    result = _merge_results(results)
-    logger.info("sandbox bootstrap finished sandbox=%s exit_code=%s", sandbox_id, result.exit_code)
-    return result
-
-
-# Таймаут exec для git и файловых команд: клон и fetch медленные, но не бесконечные.
-GIT_TIMEOUT_SEC: Final = 300
-SHORT_TIMEOUT_SEC: Final = 60
-# Агент выполняется в фоне; после SIGTERM группе даётся 10 секунд до SIGKILL (design 3).
-KILL_GRACE_SEC: Final = 10
-# Сколько последних событий потока читается для итога хода (design 3).
-STREAM_TAIL_LINES: Final = 200
-# Хвост stderr читается байтами: символ UTF-8 занимает до 4 байт, поэтому запас по лимиту текста.
-STDERR_TAIL_BYTES: Final = 4 * LOG_TEXT_LIMIT
-CLAUDE_CODE_AGENT_TYPE: Final = "claude-code"
 
 
 class SandboxStepError(Exception):
@@ -575,8 +412,6 @@ async def activate(
     if task.workspace_id is None:
         raise SandboxStepError("no_workspace")
     await provider.connect(provider_id)
-    # Новосоздаваемая песочница Novita живёт по таймауту (D-19): продлеваем на лимит агента + запас.
-    await provider.extend_timeout(provider_id, (timeout_min + 10) * 60)
 
     home = await home_dir(provider, provider_id)
     repo_dir = f"{home}/work/{task.workspace_id}"
@@ -652,15 +487,13 @@ async def _sync_memory(
     """Инкрементальное обновление индекса памяти клона (design 4, D-47).
 
     Индекс отражает origin/<default_branch>, а не изменения агента: клон переводится на тип
-    default_branch. Маркер <id>.ready ставит bootstrap; без него память не настроена и шаг
+    default_branch. Маркер <id>.ready ставит agent init; без него память не настроена и шаг
     пропускается. Ненулевой код или ошибка провайдера — предупреждение, задача продолжается.
     """
     workspace = shlex.quote(repo)
     marker = shlex.quote(f"{home}/.harness/memory/{task.workspace_id}.ready")
-    ensure_docker = shlex.quote(f"{home}/.harness/bin/ensure-docker.sh")
     cmd = (
         f"if [ -f {marker} ] && command -v memory >/dev/null; then "
-        f"bash {ensure_docker} && "
         f"git -C {workspace} checkout --quiet --detach --force "
         f"{shlex.quote(f'origin/{default_branch}')} && "
         "memory service up && "
@@ -827,16 +660,49 @@ async def _is_alive(provider: SandboxProvider, provider_id: str, pid: int) -> bo
     return result.exit_code == 0
 
 
-async def _kill_group(provider: SandboxProvider, provider_id: str, pid: int) -> None:
-    """SIGTERM группе процессов агента, через KILL_GRACE_SEC — SIGKILL (design 3, 13)."""
+async def _kill_group(provider: SandboxProvider, provider_id: str, pid: int) -> ExecResult | None:
+    """SIGTERM группе процессов агента, через KILL_GRACE_SEC — SIGKILL (design 3, 13).
+
+    The command reports an actual signal failure; a group that exited after SIGTERM is success,
+    not a spurious SIGKILL error.
+    """
     if pid <= 1:
-        return
-    await provider.exec(
+        return None
+    return await provider.exec(
         provider_id,
-        f"kill -TERM -- -{pid} 2>/dev/null; sleep {KILL_GRACE_SEC}; "
-        f"kill -KILL -- -{pid} 2>/dev/null; true",
+        f"kill -TERM -- -{pid} 2>/dev/null || exit 1; sleep {KILL_GRACE_SEC}; "
+        f"if kill -0 -- -{pid} 2>/dev/null; then kill -KILL -- -{pid} 2>/dev/null || exit 1; fi",
         timeout_s=KILL_GRACE_SEC + SHORT_TIMEOUT_SEC,
     )
+
+
+async def _probe_group(provider: SandboxProvider, provider_id: str, pid: int) -> bool | None:
+    """Return whether an agent group is alive; ``None`` means its state is not observable.
+
+    The host-local provider runs the worker's absolute interpreter in a separate session.  Its
+    stdlib ``os.killpg`` errno mapping makes only ESRCH (exit 3) evidence of group absence; EPERM
+    and every other error remain unsafe.  A future remote provider needs its own probe.
+    """
+    if pid <= 1:
+        return False
+    result = await provider.exec(
+        provider_id,
+        shlex.join([sys.executable, "-c", _GROUP_PROBE_CODE, str(pid)]),
+        timeout_s=SHORT_TIMEOUT_SEC,
+    )
+    if result.exit_code == 0:
+        return True
+    if result.exit_code == 3:
+        return False
+    return None
+
+
+async def _cleanup_failed(session: AsyncSession, provider_id: str) -> NoReturn:
+    """Keep the reservation and evidence for an operator after an unsafe cleanup stop."""
+    row = await _locked_sandbox(session, provider_id)
+    row.status = SandboxStatus.ERROR
+    await session.commit()
+    raise CleanupFailed("command")
 
 
 async def wait_agent(
@@ -937,13 +803,43 @@ async def cleanup_task(
     Причина в лог проходит redaction.
     """
     await revoke_task_tokens(session, task.id)
-    # Агент мог запуститься до сбоя (например, БД упала после launch): его группа должна умереть
-    # до удаления каталога и worktree. Живость проверяется до kill: у мёртвой группы _kill_group
-    # ждал бы KILL_GRACE_SEC впустую.
+    # Агент мог запуститься до сбоя между записью started_at и agent_pid.  Only that recorded
+    # launch permits the pid-file recovery path; without it a file is untrusted agent input.
     row = await sandbox_status(session, provider_id)
-    pid = row.agent_pid if row is not None else None
-    if pid is not None and await _is_alive(provider, provider_id, pid):
-        await _kill_group(provider, provider_id, pid)
+    started_at = row.agent_started_at if row is not None else None
+    pid = parse_pid(str(row.agent_pid)) if row is not None and row.agent_pid is not None else None
+    if row is not None and row.agent_pid is None and started_at is not None:
+        try:
+            home = await home_dir(provider, provider_id)
+            pid_text = await provider.read_file(provider_id, f"{task_dir(home, task.id)}/pid")
+        except (OSError, UnicodeError, SandboxError):
+            await _cleanup_failed(session, provider_id)
+        pid = parse_pid(pid_text) if pid_text is not None else None
+        # A started record with no usable pid is a crash window, not proof of death.  Preserve the
+        # directory because it may still contain the only evidence of a live process.
+        if pid is None:
+            await _cleanup_failed(session, provider_id)
+        await record_agent_pid(session, provider_id, pid)
+    if pid is not None:
+        try:
+            alive = await _probe_group(provider, provider_id, pid)
+        except SandboxError:
+            await _cleanup_failed(session, provider_id)
+        if alive is None:
+            await _cleanup_failed(session, provider_id)
+        if alive:
+            try:
+                killed = await _kill_group(provider, provider_id, pid)
+                if killed is not None and killed.exit_code != 0:
+                    await _cleanup_failed(session, provider_id)
+                for _ in range(KILL_REAP_PROBES):
+                    alive = await _probe_group(provider, provider_id, pid)
+                    if alive is not True:
+                        break
+            except SandboxError:
+                await _cleanup_failed(session, provider_id)
+            if alive is not False:
+                await _cleanup_failed(session, provider_id)
     home = await home_dir(provider, provider_id)
     commands: list[str] = []
     if task.workspace_id is not None:
@@ -1005,7 +901,6 @@ async def release_sandbox(
 async def assert_not_busy(session: AsyncSession, provider_id: str) -> None:
     """Отказ SandboxBusy, если за песочницей закреплена задача. Нет строки — не занята.
 
-    Для bootstrap: скрипт меняет окружение, которым пользуется активная задача (пункт I).
     Блокировки нет: проверка защищает от типичной ошибки оператора, не от гонки.
     """
     row = await sandbox_status(session, provider_id)

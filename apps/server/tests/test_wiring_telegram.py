@@ -3,8 +3,9 @@
 import httpx
 import pytest
 import respx
+from certifi import where
 from harness_server.settings import load_settings
-from harness_server.wiring import build_adapters
+from harness_server.wiring import build_adapters, build_http_client
 
 pytestmark = pytest.mark.asyncio
 
@@ -46,3 +47,13 @@ async def test_build_adapters_defaults_to_bot_api(valid_env: dict[str, str]) -> 
         await adapters.telegram.get_file("F1")
 
     assert route.called
+
+
+async def test_shared_http_client_honors_operator_proxy_and_ca_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("HTTPS_PROXY", "http://proxy.example.test:8080")
+    monkeypatch.setenv("SSL_CERT_FILE", where())
+
+    async with build_http_client() as client:
+        assert client._trust_env is True

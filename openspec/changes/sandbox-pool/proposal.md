@@ -10,7 +10,8 @@
 
 - Несколько песочниц в `sandboxes`, выбор свободной нужного типа агента с `SKIP LOCKED`
 - `create_sandbox(agent_type)`, `list_sandboxes`, `pause_sandbox(es)`, `resume_sandbox(es)`, `delete_sandbox(confirm)`
-- Создание через Novita API + bootstrap
+- Выбор и API пула остаются будущим объёмом. Создание через Novita API, bootstrap и создание
+  локального провайдера отменены `local-agent-machine`; пул сейчас не реализуется.
 
 ## Capabilities
 

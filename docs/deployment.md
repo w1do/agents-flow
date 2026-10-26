@@ -1,16 +1,55 @@
 # Деплой (Dokploy + GitLab CI)
 
+## Переход на локальную машину агента
+
+Это руководство описывает ручную процедуру; ничего здесь автоматически не устанавливается и не выполняется. Выполняет оператор. Изменение `local-agent-machine` ещё не принято целиком: runtime-пункты 3–5 заблокированы до успешного повторного теста `4.5`; не проводить производственный rollout до снятия этого блокера и приёмки.
+
+1. **Подготовить хост.** Установить и проверить `git`, Node.js не ниже 22.13, `npm`, клиент Claude (`claude`) и `openspec`. Если включена память проекта, дополнительно нужны `memory` и Docker Compose. Оператор отвечает за установку/версии; агент сам инструменты не устанавливает.
+2. **Обновить конфигурацию проекта.** В операторской копии `harness.yaml` применить актуальную форму из `config/harness.example.yaml`: локальный `sandbox.provider_id`, удалить устаревшие поля версий CLI и поля `sandbox.memory.repo`/`ref`, сохранив актуальный `embedding_ref`, если память настроена. Проверить конфигурацию до выката; боевой файл не коммитить.
+3. **Инициализировать проект.** Для каждого проекта выполнить `agent init <project>` от непривилегированного пользователя, после установки prerequisites и доступов. Проверить результат и маркеры инициализации перед назначением задач.
+4. **Worker на хосте.** Установить и настроить user unit по [`deploy/worker/README.md`](../deploy/worker/README.md), проверить его конфигурацию и запуск по инструкции оператора. Worker работает на хосте, не в Compose. Остановка unit сама по себе не останавливает уже запущенные процессы агентов: сначала прекратить новые назначения, затем дождаться завершения или явно отменить активные задания и убедиться, что процессы завершились.
+5. **Compose и Dokploy.** Использовать актуальный Compose без сервиса worker. Удалить устаревшие переменные `NOVITA_*` из Environment Dokploy после проверки их отсутствия в актуальной конфигурации; не помещать секреты в файлы или команды.
+6. **Удалить старую запись sandbox из БД (вручную, только оператором).** Сначала сделать проверенный бэкап БД. Прекратить новые назначения, дренировать очередь и дождаться завершения/отмены активных заданий; перед остановкой worker удостовериться, что агентские процессы завершились. Убедиться по фактической production-схеме и ограничениям, что таблица/поля и условия ниже применимы. Ожидаемые поля `sandboxes`: `id` UUID, `provider_id` unique, `status`, nullable `current_task_id`, `agent_pid`, `agent_started_at`; допустимые статусы включают `paused`, `active`, `error`. Не полагаться на это описание вместо проверки живой схемы.
+
+   Оператор обязан подставить точные старые UUID и `provider_id`, а также текущий `sandbox.provider_id` из конфигурации. Не предполагать значение `local`. Выполнять в доверенной SQL-консоли/сессии с безопасной аутентификацией; не передавать пароль или секретный URL подключения в argv. Использовать типизированные/кавыченные параметры клиента либо явно заменить безопасные плейсхолдеры точными значениями.
+
+   ```sql
+   BEGIN;
+   SELECT id, provider_id, status, current_task_id, agent_pid, agent_started_at
+   FROM sandboxes
+   WHERE id = :'OLD_SANDBOX_UUID'::uuid
+     AND provider_id = :'OLD_PROVIDER_ID'
+   FOR UPDATE;
+   ```
+
+   Продолжать только если SELECT вернул ровно выбранную оператором запись и все три поля активности равны `NULL`. Затем выполнить условное удаление:
+
+   ```sql
+   DELETE FROM sandboxes
+   WHERE id = :'OLD_SANDBOX_UUID'::uuid
+     AND provider_id = :'OLD_PROVIDER_ID'
+     AND provider_id <> :'CURRENT_CONFIGURED_PROVIDER_ID'
+     AND status = 'paused'
+     AND current_task_id IS NULL
+     AND agent_pid IS NULL
+     AND agent_started_at IS NULL
+   RETURNING id, provider_id;
+   ```
+
+   Удаление допустимо только если `RETURNING` показал ровно одну ожидаемую запись. Ноль строк, несколько/неожиданная строка, активность, несовпадение схемы или любая ошибка — немедленно `ROLLBACK`, выяснить причину; не обходить ограничения. Не использовать `CASCADE`, отключение FK, широкие DELETE или принудительное обнуление активности. Только после проверки оператором ровно одной ожидаемой удалённой записи выполнить отдельной командой `COMMIT`; иначе `ROLLBACK`. Не объединять COMMIT безусловно с copy/paste-блоком.
+
+Эти шаги и SQL не исполнялись в рамках подготовки документации. Установка, конфигурация, миграция данных, удаление ENV и живая проверка остаются ответственностью владельца.
+
 ## Стеки
 
 | Стек | Файл | Сервисы | Заметки |
 |---|---|---|---|
-| БД | `deploy/db/docker-compose.yml` | `postgres` | Отдельный Compose-сервис Dokploy, volume, без `ports` |
-| Харнесс | `docker-compose.yml` | `migrate` → `server`, `worker`; `console` после MVP | Один образ для migrate/server/worker |
+| БД | `deploy/db/docker-compose.yml` | `postgres` | Отдельный Compose-сервис, volume; порт только на `127.0.0.1:5432` хоста |
+| Харнесс | `docker-compose.yml` | `migrate` → `server`; `console` после MVP | Образ migrate/server; worker запускается на хосте systemd user unit |
 
 - Все сервисы в внешней сети `dokploy-network`; наружу только `expose`.
-- Домен и HTTPS — в Dokploy на `server` (и `console` позже). Песочницам Novita нужен публичный HTTPS `/mcp` (A2).
-- `migrate` — одноразовый (`alembic upgrade head`); `server` и `worker` стартуют через
-  `depends_on: { migrate: { condition: service_completed_successfully } }`.
+- Домен и HTTPS — в Dokploy на `server` (и `console` позже). Агенту на машине агента нужен публичный HTTPS `/mcp` (адрес `HARNESS_PUBLIC_URL` + `/mcp`, A2, D-38).
+- `migrate` — одноразовый (`alembic upgrade head`); `server` стартует после успешного `migrate`. Worker не входит в Compose.
 - Секреты приложения — только в Environment Dokploy. `config/harness.yaml` — File Mount Dokploy.
 
 ## Первый деплой в Dokploy (без реестра)
@@ -18,11 +57,10 @@
 Реестра GitLab пока нет: CI не запускался, remote репозитория — GitHub (D-59). Dokploy собирает образ сам
 из `Dockerfile` по `docker-compose.yml`, поэтому `HARNESS_IMAGE` не задаётся. Раздел «CI» ниже — цель после переноса в GitLab.
 
-1. **Postgres.** Нативный сервис Dokploy `postgres:16` в той же сети `dokploy-network`, порты наружу не публикуются.
-   `DATABASE_URL` стека харнесса указывает на внутренний хост этого сервиса (имя сервиса в Dokploy), пользователь,
+1. **Postgres.** Разверните `deploy/db/docker-compose.yml`: volume сохраняет данные, порт опубликован только на loopback `127.0.0.1:5432`, сервис подключён к `dokploy-network`. `DATABASE_URL` контейнера server указывает на DB в общей Docker-сети; host worker использует `127.0.0.1:5432`. Пользователь,
    пароль и база — из его настроек. Пароль в документацию и репозиторий не пишется.
 2. **Стек харнесса.** Dokploy → Compose → Source: GitHub `w1do/agents-flow`, ветка `main`, Compose Path `docker-compose.yml`.
-   Dokploy выполняет `build` из `Dockerfile`; образ получает локальный тег `agents-flow:local`, один на migrate, server и worker.
+   Dokploy выполняет `build` из `Dockerfile`; образ получает локальный тег `agents-flow:local`, общий для migrate и server.
 3. **Домен.** Домен `flow.w1do.ru` привязать к сервису `server`, порт `8000`, HTTPS: Let's Encrypt.
    `HARNESS_PUBLIC_URL=https://flow.w1do.ru`.
 4. **File Mount.** Файл `harness.yaml` с боевыми значениями (ссылки `vault:…`, workspace, sandbox) — путь монтирования
@@ -30,7 +68,7 @@
 5. **ENV.** Environment стека в Dokploy: обязательные и опциональные переменные из ARCHITECTURE.md §9, которые нужны
    текущим этапам. Значения секретов — только в Dokploy. `docker-compose.yml` передаёт все переменные из `Settings`;
    тест `apps/server/tests/test_compose.py` следит за этим.
-6. **Запуск.** Сначала выполняется `migrate` (`alembic upgrade head`), затем стартуют `server` и `worker`.
+6. **Запуск.** Сначала выполняется `migrate` (`alembic upgrade head`), затем стартует `server`. Worker отдельно устанавливается оператором как systemd user service; см. [`deploy/worker/README.md`](../deploy/worker/README.md). Это описание артефакта, не подтверждение установки или живой приёмки.
 7. **Webhook Telegram.** В терминале контейнера `server` (Dokploy → сервис server → Terminal):
    `harness-server telegram set-webhook`. Команда регистрирует `https://flow.w1do.ru/telegram/webhook` с секретом
    `TELEGRAM_WEBHOOK_SECRET`. Повторять при смене домена или секрета.
@@ -45,8 +83,8 @@
 выключен: слияние PR прод не меняет, выкат — только кнопкой Deploy или API (`POST /api/compose.deploy` с
 `composeId` стека, заголовок `x-api-key` — ключ из vault `Deploy/Dokploy/prod`; File Mount правится через
 `POST /api/mounts.update`). Поэтому изменение, ломающее `harness.yaml`, выкатывается так: слить PR → поправить
-File Mount → Deploy (так выкачен D-60). После деплоя: `https://flow.w1do.ru/health` и, если менялась песочница,
-`harness-server sandbox bootstrap` в терминале контейнера `server` или `worker`. Ключ Dokploy в документацию и
+File Mount → Deploy (так выкачен D-60). После деплоя: `https://flow.w1do.ru/health` и, если менялась машина агента, `agent init <project>` на хосте (D-64).
+Ключ Dokploy в документацию и
 репозиторий не пишется.
 
 ## CI (`.gitlab-ci.yml`)
@@ -80,22 +118,21 @@ Job `deploy:dokploy` не добавляет `curl -v` и `--trace`: при ош
    `TELEGRAM_WEBHOOK_SECRET`. Запускается в контейнере `server` после деплоя и при каждой смене `HARNESS_PUBLIC_URL`
    или секрета. `HARNESS_PUBLIC_URL` должен быть https без учётных данных, иначе команда завершится с кодом 1 и
    понятным сообщением. Вывод команды токен и секрет не содержат.
-3. Создать песочницу в Novita вручную, записать id в `harness.yaml` (`sandbox.provider_id`), затем выполнить
-   `harness-server sandbox bootstrap`: команда загружает `deploy/sandbox/bootstrap.sh` и запускает его с версиями
-   из конфига и парами `<workspace_id>=<clone_url>`. Bootstrap идёт в три шага: `--phase setup` без ключей, затем
-   клоны и fetch делает сервер отдельной git-командой на каждый workspace с ключом только этого workspace, затем
-   `--phase memory` с индексацией памяти (только с `EMBEDDING_API_KEY`). Workspace без ключа клонируется анонимно (D-62).
-   Скрипт идемпотентен: повторный запуск безопасен. Команда запускается в терминале Dokploy контейнера `server` или `worker` (из любого каталога): `harness-server sandbox bootstrap`; скрипт лежит в образе — `/app/deploy/sandbox/bootstrap.sh`, другой путь — `--script <путь>` (D-63).
-4. `harness-server sandbox pause` — песочница уходит в простой до первой задачи.
+3. Подготовить машину агента по разделу «Переход на локальную машину агента» (шаги 1–3) и выполнить
+   `agent init <project>` от непривилегированного пользователя для каждого проекта. `sandbox.provider_id` в
+   `harness.yaml` задаёт id, который проверяет `LocalSandboxProvider` (D-64). Процедура повторного запуска
+   `agent init` не принята (TODO: задача 4.5 `local-agent-machine`).
+4. Worker запускать на хосте как systemd user unit по инструкции [`deploy/worker/README.md`](../deploy/worker/README.md);
+   остановка unit не завершает процессы агента автоматически.
 
-### Песочница в `error` с закреплённой задачей
+### Задача осталась закреплена за машиной
 
-`sandbox resume` отвечает «занята», если за песочницей закреплена задача. Владелец проверяет состояние
-(`harness-server sandbox status`, событие задачи через `GET /tasks/{id}` с `HARNESS_ADMIN_TOKEN`), убеждается,
-что агент в песочнице не работает, и затем вручную в БД сбрасывает `current_task_id` и статус песочницы.
-Это разовое действие владельца, не команда CLI; SQL с конкретными значениями в документацию не добавляется.
+Если задача осталась закреплена, сначала проверьте её через `GET /tasks/{id}` и убедитесь на хосте, что процесс
+агента завершился. Не очищайте `current_task_id` вручную, пока не установлены причина сбоя и состояние процесса;
+процедура восстановления для такого сбоя не подтверждена: TODO описать после приёмки runtime-пунктов 3–5
+`local-agent-machine`.
 
-## Песочница: профиль и память (sandbox-profile)
+## Настройки профиля и память агента (sandbox-profile)
 
 - Ключи владельца лежат в vault. Серверу нужны ENV `VAULT_MCP_URL` (только `https://`) и `VAULT_MCP_TOKEN` (секрет).
   В `harness.yaml` — ссылки `workspaces[].repo.access_ref` (ключ записи репозитория workspace) и
@@ -106,37 +143,35 @@ Job `deploy:dokploy` не добавляет `curl -v` и `--trace`: при ош
   `repo.access_ref: "vault:Repository/Gitlab/админский"` (GitLab-workspace), `repo.access_ref: "vault:Repository/Github/админский"`
   (`w1do/chistotyumen`) и `sandbox.memory.embedding_ref: "vault:Сервисы/Polza/EmbeddingsMemory"`.
   В `config/harness.example.yaml` эти ссылки не заносятся.
-- Первый bootstrap с памятью (после заполнения `sandbox.memory`): `harness-server sandbox bootstrap`. Команда
-  ставит Node 22, Docker, memory-agent из GitHub на коммите `sandbox.memory.ref` и индексирует клоны. Повторный запуск не
-  переустанавливает совпадающие версии и не клонирует заново.
-- Блок памяти в `harness.yaml` (закреплённый коммит memory-agent, D-51):
+- Память (после заполнения `sandbox.memory.embedding_ref`): `agent init <project>` на машине агента выполняет
+  `memory init` с ключом embeddings только в env команды (задача 4.4 `local-agent-machine`). Инструменты `memory` и
+  Docker Compose ставит оператор, `agent init` их проверяет (задача 4.1).
+- Блок памяти в `harness.yaml` (поля `repo` и `ref` сняты, D-64):
   ```yaml
   sandbox:
     memory:
-      ref: 09e5e63ac721db75020fcfa69e33930750975139
       embedding_ref: vault:Сервисы/Polza/EmbeddingsMemory
   ```
-  `repo` не задан — `w1do/memory-agent`. Пакет `project-memory` из реестра npm не ставится: он чужой.
-- memory-agent собирается от пользователя песочницы по lockfile коммита; команда `memory` — симлинк `/usr/local/bin/memory`.
-- Обновление memory-agent: новый полный sha в `ref` и повторный `harness-server sandbox bootstrap`. Тег и ветка
-  в `ref` не принимаются; маркер `~/.harness/memory/installed-ref` сверяет установленный коммит.
+  Пакет `project-memory` из реестра npm не ставится: он чужой (D-51).
+- Как оператор ставит memory-agent на машину агента и как обновляет его версию, в документе не описано: TODO,
+  процедура не подтверждена по коду. Проверка наличия команды `memory` — задача 4.1 `local-agent-machine`.
 - Рекомендация: ключ embeddings для песочницы — отдельный ключ Polza с лимитом расходов, не основной ключ.
   Ключ доступен процессам песочницы на время команды (см. design, Risks).
-- После паузы Novita демон Docker поднимает `~/.harness/bin/ensure-docker.sh`; активация вызывает его сама.
-- Ошибка vault при bootstrap: код 1, причина `vault`, строка песочницы не меняется. Ошибка vault при активации:
+- Скрипт `ensure-docker.sh` больше не вызывается (задача 5.2): демон Docker на машине агента поддерживает оператор (D-64).
+- Ошибка vault при `agent init`: код 1, причина `vault` (задача 4.5, ещё не принята). Ошибка vault при активации:
   задача в `error` с причиной `vault`. Сбой `memory sync` при активации задачу не роняет (см. лог worker).
 
-## Песочница: токены, изоляция и allowlist (mvp-06)
+## Машина агента: токены и границы безопасности (D-64)
 
-- Токен подписки `CLAUDE_CODE_OAUTH_TOKEN` живёт только в ENV Dokploy, ключи репозиториев — в vault. Агент получает их
-  в env одной команды запуска, в файлы песочницы они не пишутся (проверяется тестами и live-тестом).
+- Токен подписки `CLAUDE_CODE_OAUTH_TOKEN` задаётся в окружении worker; ключи репозиториев — в vault. Секреты
+  передаются только явно указанным командам и не входят в очищенное окружение подпроцессов (D-64).
 - Ротация `CLAUDE_CODE_OAUTH_TOKEN` не реже 90 дней и сразу при подозрении на утечку (`claude setup-token`
   заново, затем обновить ENV и перезапустить worker).
 - Рекомендуется отдельный аккаунт или подписка под харнесс: токен доступен процессу агента, а исходящий HTTPS открыт.
-- Исходящий allowlist Novita (`network.allow_out`, IP/CIDR) рекомендуется ограничить адресами GitLab, Telegram,
-  Anthropic и Novita. Код не применяет его в MVP: песочница создаётся вручную (D-38).
-- Claude Code в песочнице запускается с `--setting-sources user` и `--strict-mcp-config`: hooks и MCP-серверы
-  репозитория задачи не выполняются (D-36). Bootstrap не кладёт hooks и plugins в профиль песочницы.
+- Код не ограничивает исходящий трафик машины агента. Ограничение сети — на стороне оператора; сетевые правила
+  конкретного хоста не подтверждены: TODO (D-64, D-38).
+- Claude Code запускается с `--setting-sources user` и `--strict-mcp-config`: hooks и MCP-серверы
+  репозитория задачи не выполняются (D-36). Hooks и plugins в профиль пользователя не кладутся (D-48).
 
 ## Переход на D-60 (провайдер репозитория, git-providers)
 
@@ -169,8 +204,7 @@ Job `deploy:dokploy` не добавляет `curl -v` и `--trace`: при ош
    — позже, отдельным шагом в vault (D-60). Ключ GitHub не пишется в файлы и документацию, только ссылка.
 2. Удалить `GITLAB_TOKEN` и `GITLAB_URL` из ENV Dokploy: они не читаются, но остаются в настройках.
 3. Выкатить образ. Если правка п. 1 не сделана, сервер не стартует и называет поле, которое надо перенести.
-4. Подготовленная песочница: повторный `harness-server sandbox bootstrap` делает `set-url origin` и fetch с
-   новым заголовком. Клоны публичных репозиториев не меняются.
+4. Процедура миграции существующих клонов не описана: TODO подтвердить по `agent init` и рабочей копии хоста до выката.
 
 Откат: вернуть прежний образ и `harness.yaml` с секцией `gitlab:` (сохранить копию до правки).
 

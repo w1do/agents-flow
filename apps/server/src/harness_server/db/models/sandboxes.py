@@ -12,7 +12,7 @@ from harness_server.db.ids import uuid7
 
 
 class Sandbox(TimestampMixin, Base):
-    """Песочница, созданная вручную; provider_id выдаёт провайдер (Novita).
+    """Логическая постоянная машина агента с provider_id из конфигурации.
 
     agent_started_at и agent_pid — серверный учёт запуска агента, файлам песочницы не доверяем
     (D-41).

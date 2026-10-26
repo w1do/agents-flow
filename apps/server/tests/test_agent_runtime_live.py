@@ -1,9 +1,10 @@
 """Живая проверка рантайма агента (mvp-06, пункт 6.12): сервисный путь на настоящей песочнице.
 
-Запуск (владелец, вручную): LIVE_NOVITA_API_KEY=… LIVE_NOVITA_SANDBOX_ID=… \
-LIVE_CLAUDE_CODE_OAUTH_TOKEN=… uv run pytest -m live apps/server/tests/test_agent_runtime_live.py
-Нужны Postgres (TEST_DATABASE_URL или testcontainers) и песочница, подготовленная bootstrap.sh
-(claude в PATH). Без переменных тесты пропускаются. Значения ключей не печатаются.
+Запуск (владелец, вручную): LOCAL_AGENT_LIVE=1 \
+LOCAL_AGENT_LIVE_CLAUDE_CODE_OAUTH_TOKEN=… LOCAL_AGENT_LIVE_WORKSPACE=… \
+uv run pytest -m live apps/server/tests/test_agent_runtime_live.py
+Нужны Postgres (TEST_DATABASE_URL или testcontainers), локальная машина агента и предварительный
+`agent init <workspace>`. Без переменных тесты пропускаются. Значения ключей не печатаются.
 
 Тест сам создаёт в песочнице локальный репозиторий workspace (~/work/<id>) с bare origin в /tmp:
 activate выполняет git fetch origin и worktree add, GitLab для этого не нужен. Всё созданное
@@ -15,16 +16,13 @@ import os
 import secrets
 import shlex
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from harness_server.adapters.novita import (
-    ExecResult,
-    NovitaSandboxProvider,
-    SandboxProvider,
-)
+from harness_server.adapters.local import LocalSandboxProvider
+from harness_server.adapters.sandbox import ExecResult, SandboxProvider
 from harness_server.config import HarnessConfig, RepoConfig, load_config
 from harness_server.db.models import Task, TaskToken
 from harness_server.services import sandboxes
@@ -32,6 +30,7 @@ from harness_server.services.agent_result import AgentRun, AgentState
 from harness_server.services.sandboxes import AgentStartState
 from harness_server.services.tasks import create_task
 from harness_shared.tasks import TaskKind, TaskSource, TaskStatus
+from live_agent_env import LiveAgentEnvironment, run_agent_init
 from pydantic import SecretStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -40,8 +39,6 @@ pytestmark = [pytest.mark.live, pytest.mark.asyncio(loop_scope="session")]
 
 Factory = async_sessionmaker[AsyncSession]
 REPO_ROOT = Path(__file__).resolve().parents[3]
-# Из примера берутся только лимиты и структура; provider_id подменяется id настоящей песочницы.
-BASE_CONFIG: HarnessConfig = load_config(REPO_ROOT / "config" / "harness.example.yaml")
 
 # default_branch тестового workspace: base_ref для activate (design 10).
 DEFAULT_BRANCH = "main"
@@ -57,8 +54,6 @@ LONG_PROMPT = (
 )
 # Недостижимый адрес: агент не должен достучаться до боевого сервера из тестовой песочницы.
 UNREACHABLE_MCP_URL = "http://127.0.0.1:9/mcp"
-# Значение для GITLAB_TOKEN в activate: origin локальный, токен не используется.
-UNUSED_GITLAB_TOKEN = "local-origin-unused"
 SHORT_TIMEOUT_SEC = 60
 GIT_TIMEOUT_SEC = 300
 POLL_SEC = 5
@@ -75,47 +70,53 @@ class _ImplementStage:
     to_status: TaskStatus | None = TaskStatus.ACTIVE
 
 
-def _live_settings() -> tuple[str, str, str, str | None]:
-    """Читает переменные live-теста; без обязательных — пропуск, не падение."""
-    api_key = os.environ.get("LIVE_NOVITA_API_KEY")
-    sandbox_id = os.environ.get("LIVE_NOVITA_SANDBOX_ID")
-    oauth_token = os.environ.get("LIVE_CLAUDE_CODE_OAUTH_TOKEN")
-    if not api_key or not sandbox_id or not oauth_token:
+def _live_settings() -> str:
+    if os.environ.get("LOCAL_AGENT_LIVE") != "1":
+        pytest.skip("set LOCAL_AGENT_LIVE=1 for owner local runtime acceptance")
+    token = os.environ.get("LOCAL_AGENT_LIVE_CLAUDE_CODE_OAUTH_TOKEN")
+    workspace = os.environ.get("LOCAL_AGENT_LIVE_WORKSPACE")
+    if os.getuid() == 0 or not token or not workspace:
         pytest.skip(
-            "нужны LIVE_NOVITA_API_KEY, LIVE_NOVITA_SANDBOX_ID, LIVE_CLAUDE_CODE_OAUTH_TOKEN"
+            "requires a non-root user, workspace and LOCAL_AGENT_LIVE_CLAUDE_CODE_OAUTH_TOKEN"
         )
-    return api_key, sandbox_id, oauth_token, os.environ.get("LIVE_NOVITA_DOMAIN")
-
-
-@pytest.fixture
-def provider() -> SandboxProvider:
-    api_key, _, _, domain = _live_settings()
-    return NovitaSandboxProvider(api_key=api_key, domain=domain)
-
-
-@pytest.fixture
-def sandbox_id() -> str:
-    _, sandbox, _, _ = _live_settings()
-    return sandbox
-
-
-@pytest.fixture
-def oauth_token() -> str:
-    _, _, token, _ = _live_settings()
     return token
 
 
 @pytest.fixture
-def live_config(sandbox_id: str) -> HarnessConfig:
-    """Конфиг с provider_id настоящей песочницы: строка в БД должна ссылаться на неё."""
-    sandbox = BASE_CONFIG.sandbox.model_copy(update={"provider_id": sandbox_id})
-    return BASE_CONFIG.model_copy(update={"sandbox": sandbox})
+def provider() -> SandboxProvider:
+    _live_settings()
+    return LocalSandboxProvider("local")
+
+
+@pytest.fixture
+def sandbox_id() -> str:
+    return "local"
+
+
+@pytest.fixture
+def oauth_token() -> str:
+    return _live_settings()
+
+
+@pytest.fixture
+def live_config(live_agent_environment: LiveAgentEnvironment) -> HarnessConfig:
+    base = load_config(live_agent_environment.config_path)
+    return base.model_copy(
+        update={"sandbox": base.sandbox.model_copy(update={"provider_id": "local"})}
+    )
 
 
 @pytest.fixture
 async def factory(committed_session_factory: Factory) -> AsyncIterator[Factory]:
-    """Имя фабрики для тестов: настоящие коммиты; очистка таблиц — в committed_session_factory."""
     yield committed_session_factory
+
+
+@pytest.fixture(autouse=True)
+def initialized_agent_workspace(live_agent_environment: LiveAgentEnvironment) -> None:
+    """Exercise the required operator setup contract before isolated runtime work."""
+    _live_settings()
+    workspace = os.environ["LOCAL_AGENT_LIVE_WORKSPACE"]
+    run_agent_init(REPO_ROOT, live_agent_environment, workspace)
 
 
 async def _must(provider: SandboxProvider, sandbox_id: str, cmd: str, what: str) -> ExecResult:
@@ -139,11 +140,11 @@ async def _home(provider: SandboxProvider, sandbox_id: str) -> str:
 
 async def _create_repo(
     provider: SandboxProvider, sandbox_id: str, home: str, workspace: str
-) -> tuple[str, str]:
+) -> tuple[str, str, str]:
     """Локальный репозиторий workspace: ~/work/<id> с одним коммитом на main и bare origin в /tmp.
 
-    Возвращает (корень тестового каталога, путь репозитория). Чужой каталог не трогается: путь
-    содержит случайный id, и его существование проверяется до создания.
+    Возвращает (корень тестового каталога, путь репозитория, bare origin). Чужой каталог не
+    трогается: путь содержит случайный id, и его существование проверяется до создания.
     """
     root = f"/tmp/harness-live-{uuid.uuid4().hex}"
     origin = f"{root}/origin.git"
@@ -178,12 +179,11 @@ async def _create_repo(
         f"{git} remote add origin {shlex.quote(origin)} && {git} push -q origin {DEFAULT_BRANCH}",
         "push origin",
     )
-    return root, repo
+    return root, repo, origin
 
 
 async def _ensure_mcp_config(provider: SandboxProvider, sandbox_id: str, home: str) -> bool:
-    """run.sh передаёт --mcp-config ~/.harness/mcp.json, его создаёт bootstrap. Если файла нет,
-    тест создаёт пустой и возвращает True: тогда тест же его и удаляет."""
+    """Создаёт пустой mcp.json, если `agent init` его ещё не подготовил."""
     path = f"{home}/.harness/mcp.json"
     if await _exists(provider, sandbox_id, path):
         return False
@@ -246,16 +246,23 @@ async def _reserve_task(factory: Factory, workspace: str, text: str) -> Task:
     return task
 
 
-async def _activate(provider: SandboxProvider, sandbox_id: str, task: Task) -> None:
+async def _activate(
+    provider: SandboxProvider,
+    sandbox_id: str,
+    task: Task,
+    origin: str,
+    owned_local_origin_git_access: Callable[[str], None],
+) -> None:
+    owned_local_origin_git_access(origin)
     await sandboxes.activate(
         provider,
         sandbox_id,
         task,
         base_ref=DEFAULT_BRANCH,
         timeout_min=AGENT_TIMEOUT_MIN,
-        # Локальный origin не совпадает с адресом репозитория: заголовок не уйдёт (D-52, D-60).
+        # Fixture maps every helper to this test-owned bare origin; production stays HTTPS-only.
         repo=RepoConfig(provider="gitlab", project="group/demo"),
-        repo_token=SecretStr(UNUSED_GITLAB_TOKEN),
+        repo_token=None,
     )
 
 
@@ -362,19 +369,20 @@ async def test_live_success_path_activate_run_wait_cleanup(
     oauth_token: str,
     live_config: HarnessConfig,
     factory: Factory,
+    owned_local_origin_git_access: Callable[[str], None],
 ) -> None:
     workspace = f"live-{uuid.uuid4().hex[:8]}"
     home = await _home(provider, sandbox_id)
     await _ensure(factory, live_config)
     task = await _reserve_task(factory, workspace, SHORT_PROMPT)
-    root, repo = await _create_repo(provider, sandbox_id, home, workspace)
+    root, repo, origin = await _create_repo(provider, sandbox_id, home, workspace)
     mcp_created = await _ensure_mcp_config(provider, sandbox_id, home)
     directory = sandboxes.task_dir(home, task.id)
     worktree = sandboxes.worktree_dir(home, task.id)
     secret_key = secrets.token_urlsafe(32)
     pid: int | None = None
     try:
-        await _activate(provider, sandbox_id, task)
+        await _activate(provider, sandbox_id, task, origin, owned_local_origin_git_access)
         start = await _run(
             factory,
             provider,
@@ -449,19 +457,20 @@ async def test_live_killed_agent_is_died_without_relaunch(
     oauth_token: str,
     live_config: HarnessConfig,
     factory: Factory,
+    owned_local_origin_git_access: Callable[[str], None],
 ) -> None:
     workspace = f"live-{uuid.uuid4().hex[:8]}"
     home = await _home(provider, sandbox_id)
     await _ensure(factory, live_config)
     task = await _reserve_task(factory, workspace, LONG_PROMPT)
-    root, repo = await _create_repo(provider, sandbox_id, home, workspace)
+    root, repo, origin = await _create_repo(provider, sandbox_id, home, workspace)
     mcp_created = await _ensure_mcp_config(provider, sandbox_id, home)
     directory = sandboxes.task_dir(home, task.id)
     worktree = sandboxes.worktree_dir(home, task.id)
     secret_key = secrets.token_urlsafe(32)
     pid: int | None = None
     try:
-        await _activate(provider, sandbox_id, task)
+        await _activate(provider, sandbox_id, task, origin, owned_local_origin_git_access)
         start = await _run(
             factory,
             provider,

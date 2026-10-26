@@ -1,0 +1,18 @@
+[Unit]
+Description=agents-flow host worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/agents-flow/worker.env
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env harness-server worker
+Restart=on-failure
+RestartSec=5
+# run.sh starts agents with setsid; do not kill their separate process groups on worker restart.
+KillMode=process
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target
