@@ -49,6 +49,20 @@ async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
         yield session
 
 
+async def require_worker_token(
+    request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+) -> None:
+    """Отдельный канал worker; все отказы одинаковы, значения не логируются."""
+    expected: SecretStr | None = request.app.state.settings.worker_api_token
+    if expected is None or credentials is None or credentials.scheme.lower() != "bearer":
+        raise _unauthorized()
+    given = hashlib.sha256(credentials.credentials.encode()).digest()
+    wanted = hashlib.sha256(expected.get_secret_value().encode()).digest()
+    if not hmac.compare_digest(given, wanted):
+        raise _unauthorized()
+
+
 async def require_webhook_secret(
     request: Request,
     x_telegram_bot_api_secret_token: Annotated[str | None, Header()] = None,

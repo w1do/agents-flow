@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, ValidationError, field_validator
+from pydantic import Field, SecretStr, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Telegram принимает secret_token только из этих символов и длиной до 256.
@@ -95,6 +95,8 @@ class Settings(BaseSettings):
 
     harness_public_url: str | None = None
     harness_admin_token: SecretStr | None = None
+    worker_api_token: SecretStr | None = None
+    worker_heartbeat_timeout_sec: float = Field(default=120.0, ge=30)
     polza_ai_url: str | None = None
     polza_ai_key: SecretStr | None = None
     polza_ai_model: str | None = None
@@ -135,6 +137,21 @@ class Settings(BaseSettings):
     @classmethod
     def _check_admin_token_length(cls, value: SecretStr | None) -> SecretStr | None:
         return _check_admin_token(value)
+
+    @field_validator("worker_api_token")
+    @classmethod
+    def _check_worker_token(cls, value: SecretStr | None) -> SecretStr | None:
+        return _check_admin_token(value)
+
+    @model_validator(mode="after")
+    def _separate_worker_token(self) -> "Settings":
+        if (
+            self.worker_api_token is not None
+            and self.harness_admin_token is not None
+            and self.worker_api_token == self.harness_admin_token
+        ):
+            raise ValueError("WORKER_API_TOKEN должен отличаться от HARNESS_ADMIN_TOKEN")
+        return self
 
     @field_validator("telegram_webhook_secret")
     @classmethod

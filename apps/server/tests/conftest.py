@@ -56,6 +56,11 @@ ALL_ENV_NAMES = (
     "ADMIN_EMAIL",
     "ADMIN_PASSWORD",
     "WORKER_POLL_INTERVAL_SEC",
+    "WORKER_API_TOKEN",
+    "WORKER_HEARTBEAT_TIMEOUT_SEC",
+    "AGENT_POLL_INTERVAL_SEC",
+    "VAULT_MCP_URL",
+    "VAULT_MCP_TOKEN",
     "VOICE_MAX_BYTES",
     # Unit clients use recorded transports; inherited proxies must not trigger network setup.
     "ALL_PROXY",

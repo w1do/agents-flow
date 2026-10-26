@@ -159,7 +159,7 @@ def test_serve_without_bot_token_exits_nonzero(
     assert "TELEGRAM_BOT_TOKEN" in result.output
 
 
-def test_worker_without_bot_token_exits_nonzero(
+def test_worker_requires_worker_api_token(
     valid_env: dict[str, str], monkeypatch: MonkeyPatch
 ) -> None:
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN")
@@ -167,7 +167,7 @@ def test_worker_without_bot_token_exits_nonzero(
     result = runner.invoke(app, ["worker"])
 
     assert result.exit_code != 0
-    assert "TELEGRAM_BOT_TOKEN" in result.output
+    assert "WORKER_API_TOKEN" in result.output
 
 
 def test_error_output_contains_no_other_secret_values(
@@ -196,6 +196,9 @@ def test_commands_fail_fast_on_missing_config_file(
     valid_env: dict[str, str], monkeypatch: MonkeyPatch, command: str
 ) -> None:
     monkeypatch.setenv("HARNESS_CONFIG", "/nonexistent/harness.yaml")
+    if command == "worker":
+        monkeypatch.setenv("HARNESS_PUBLIC_URL", "https://worker.test")
+        monkeypatch.setenv("WORKER_API_TOKEN", "test-worker-token-0123456789abcdef01")
 
     result = runner.invoke(app, [command])
 

@@ -9,43 +9,70 @@ import base64
 import json
 import shlex
 import sys
+from collections.abc import AsyncIterator
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
 import pytest_asyncio
 from catalog import DEMO, seed_workspaces
 from harness_server.adapters.sandbox import ExecResult, FakeSandbox
 from harness_server.adapters.vault import FakeVault, McpSecretVault, VaultError
+from harness_server.adapters.worker_api import FakeWorkerAPI, HttpWorkerAPI
+from harness_server.app import create_app
 from harness_server.config import HarnessConfig, SandboxMemoryConfig, load_config
 from harness_server.db.models import Task, TaskToken
-from harness_server.db.session import create_engine, create_session_factory
 from harness_server.services import git_access, sandboxes
 from harness_server.services.projects import update_project
 from harness_server.services.tasks import create_task, get_task, list_task_events
-from harness_server.settings import Settings, load_settings
+from harness_server.settings import load_settings
 from harness_server.vault_ref import VaultRef
 from harness_server.worker import _build_dispatch
+from harness_server.worker.client import WorkerClient
 from harness_server.worker.dispatcher import DispatchContext, build_dispatch_context, dispatch_once
 from harness_server.worker.pipeline import AgentRunner, Outcome
+from harness_server.worker.settings import WorkerSettings, load_worker_settings
 from harness_shared.projects import ProjectRepo, ProjectUpdate
 from harness_shared.sandboxes import AgentRole, SandboxStatus
-from harness_shared.tasks import TaskKind, TaskSource, TaskStatus
+from harness_shared.tasks import TaskKind, TaskOut, TaskSource, TaskStatus
 from pydantic import SecretStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from worker_api_support import WORKER
 
 pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 Factory = async_sessionmaker[AsyncSession]
 
 
+_clients: dict[Factory, WorkerClient] = {}
+
+
 @pytest_asyncio.fixture(autouse=True, loop_scope="session")
-async def _demo_project(committed_session_factory: Factory) -> None:
-    """Проект demo заводится в каталог до каждого теста: диспетчер берёт access_ref из БД (D-65)."""
+async def _demo_project(
+    committed_session_factory: Factory, valid_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> AsyncIterator[None]:
+    """Диспетчер вызывает реальный HTTP API над теми же транзакциями Postgres."""
     await seed_workspaces(committed_session_factory, DEMO)
+    monkeypatch.setenv("WORKER_API_TOKEN", WORKER)
+    settings = load_settings()
+    app = create_app(settings, CONFIG)
+    app.state.settings = settings
+    app.state.config = CONFIG
+    app.state.session_factory = committed_session_factory
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="https://test"
+    ) as http:
+        _clients[committed_session_factory] = WorkerClient(
+            HttpWorkerAPI(http, "https://test", WORKER)
+        )
+        try:
+            yield
+        finally:
+            del _clients[committed_session_factory]
 
 
 async def _drop_access_ref(factory: Factory) -> None:
@@ -150,10 +177,10 @@ class _Pipeline:
         self._agent_finishes = agent_finishes
         self._stream_line = stream_line
 
-    def base_ref(self, task: Task, config: HarnessConfig) -> str:
+    def base_ref(self, task: TaskOut, config: HarnessConfig) -> str:
         return "main"
 
-    async def run(self, runner: AgentRunner, task: Task) -> Outcome:
+    async def run(self, runner: AgentRunner, task: TaskOut) -> Outcome:
         await runner.run_agent("сделай задачу")
         if self._agent_finishes:
             directory = sandboxes.task_dir(HOME, task.id)
@@ -182,10 +209,9 @@ def _ctx(
     return DispatchContext(
         provider=fake,
         config=_vault_config(memory=False),
-        session_factory=factory,
+        client=_clients[factory],
         vault=FakeVault({VaultRef("demo", "gitlab", "main"): GITLAB}),
         oauth_token=SecretStr(OAUTH),
-        secret_key=SecretStr(SECRET_KEY),
         agents_flow_url="https://harness.example/mcp",
         timeout_min=60,
         poll_interval_sec=0.0,
@@ -701,7 +727,7 @@ async def test_missing_marker_partial_cleanup_failure_keeps_reservation_error(
 class _CancelledPipeline(_Pipeline):
     """Пайплайн, у которого отменяют worker сразу после запуска агента."""
 
-    async def run(self, runner: AgentRunner, task: Task) -> Outcome:
+    async def run(self, runner: AgentRunner, task: TaskOut) -> Outcome:
         await runner.run_agent("сделай задачу")
         raise asyncio.CancelledError
 
@@ -881,12 +907,15 @@ async def test_memory_embedding_key_goes_to_sync_env_and_is_redacted(
 # --- sandbox-profile: сборка контекста диспетчера (tasks 2.3, пункт 5 ревью) ---
 
 
-def _dispatch_settings(valid_env: dict[str, str], monkeypatch: pytest.MonkeyPatch) -> Settings:
+def _dispatch_settings(
+    valid_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> WorkerSettings:
     """Settings для build_dispatch_context: ENV агента заданы; GITLAB_TOKEN из ENV не читается
     (D-60)."""
     monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", OAUTH)
     monkeypatch.setenv("HARNESS_PUBLIC_URL", "https://harness.example.com")
-    return load_settings()
+    monkeypatch.setenv("WORKER_API_TOKEN", WORKER)
+    return load_worker_settings()
 
 
 async def test_build_context_takes_vault_for_repo_keys(
@@ -895,31 +924,25 @@ async def test_build_context_takes_vault_for_repo_keys(
     monkeypatch.setenv("VAULT_MCP_URL", "https://vault.example/mcp")
     monkeypatch.setenv("VAULT_MCP_TOKEN", "vault-token-test-0123456789abcdef")
     settings = _dispatch_settings(valid_env, monkeypatch)
-    factory = create_session_factory(create_engine(UNREACHABLE_DATABASE_URL))
+    client = WorkerClient(FakeWorkerAPI([]))
 
     ctx = build_dispatch_context(
-        settings, _vault_config(memory=False), factory, FakeSandbox(sandbox_id=PROVIDER_ID)
+        settings, _vault_config(memory=False), client, FakeSandbox(sandbox_id=PROVIDER_ID)
     )
 
     assert ctx is not None
     assert isinstance(ctx.vault, McpSecretVault)
 
 
-async def test_dispatch_startup_warns_about_workspace_without_key(
+async def test_dispatch_startup_requires_no_database_or_catalog_request(
     valid_env: dict[str, str],
     monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
-    committed_session_factory: Factory,
 ) -> None:
-    await _drop_access_ref(committed_session_factory)
     settings = _dispatch_settings(valid_env, monkeypatch)
-
-    step = await _build_dispatch(settings, CONFIG, committed_session_factory)
-
-    # Диспетчер создаётся: задачи без ключа уходят в error, остальные работают. Список — из БД.
+    api = FakeWorkerAPI([])
+    step = await _build_dispatch(settings, CONFIG, WorkerClient(api))
     assert step is not None
-    assert "repo.access_ref" in caplog.text
-    assert "demo" in caplog.text
+    assert api.calls == []
 
 
 async def test_build_context_ignores_gitlab_env(
@@ -927,9 +950,9 @@ async def test_build_context_ignores_gitlab_env(
 ) -> None:
     monkeypatch.setenv("GITLAB_TOKEN", GITLAB)
     settings = _dispatch_settings(valid_env, monkeypatch)
-    factory = create_session_factory(create_engine(UNREACHABLE_DATABASE_URL))
+    client = WorkerClient(FakeWorkerAPI([]))
 
-    ctx = build_dispatch_context(settings, CONFIG, factory, FakeSandbox(sandbox_id=PROVIDER_ID))
+    ctx = build_dispatch_context(settings, CONFIG, client, FakeSandbox(sandbox_id=PROVIDER_ID))
 
     assert ctx is not None
     assert ctx.vault is None

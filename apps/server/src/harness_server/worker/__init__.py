@@ -1,11 +1,4 @@
-"""Worker: цикл диспетчера песочницы (mvp-06) и апдейты Telegram.
-
-При старте дообрабатывает апдейты Telegram и досылает карточки, брошенные до рестарта (D-27).
-Ошибка восстановления логируется и не мешает запуску цикла. Если песочница настроена
-(local provider),
-на каждом шаге цикла запускается диспетчер: без реестра пайплайнов он ничего не делает.
-Публичный API пакета (run_worker, start_worker, serve_worker) сохранён после переноса из worker.py.
-"""
+"""Worker машины агента: HTTP-очередь и локальный провайдер, без серверных ENV и БД."""
 
 import asyncio
 import contextlib
@@ -13,23 +6,15 @@ import logging
 import signal
 from collections.abc import Awaitable, Callable
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+import httpx
 
+from harness_server.adapters.local import LocalSandboxProvider
+from harness_server.adapters.worker_api import HttpWorkerAPI
 from harness_server.config import HarnessConfig
-from harness_server.db.session import create_engine, create_session_factory
-from harness_server.services.intake import recover_pending
 from harness_server.services.machine import require_non_root
-from harness_server.services.projects import list_workspaces
-from harness_server.services.sandboxes import ensure_sandbox
-from harness_server.settings import Settings
-from harness_server.wiring import (
-    BotAdapters,
-    build_adapters,
-    build_bot_context,
-    build_http_client,
-    build_sandbox_provider,
-)
+from harness_server.worker.client import WorkerClient
 from harness_server.worker.dispatcher import build_dispatch_context, dispatch_once
+from harness_server.worker.settings import WorkerSettings
 
 logger = logging.getLogger(__name__)
 
@@ -57,56 +42,38 @@ async def run_worker(
 
 
 async def start_worker(
-    settings: Settings,
+    settings: WorkerSettings,
     config: HarnessConfig,
     stop: asyncio.Event,
     *,
-    adapters: BotAdapters | None = None,
+    http: httpx.AsyncClient | None = None,
 ) -> None:
-    """Восстанавливает брошенные апдейты, затем крутит цикл до stop. Ресурсы закрываются при выходе.
-
-    adapters — фейки в тестах; без него строятся реальные адаптеры из настроек.
-    """
+    """Ресурсы HTTP закрываются при выходе; серверные операции выполняются только через API."""
     require_non_root()
-    engine = create_engine(settings.database_url.get_secret_value())
-    factory = create_session_factory(engine)
-    http = build_http_client()
+    client_http = http or httpx.AsyncClient(timeout=15, trust_env=False)
     try:
-        bot = build_bot_context(
-            settings,
-            factory,
-            adapters if adapters is not None else build_adapters(settings, http),
+        client = WorkerClient(
+            HttpWorkerAPI(
+                client_http,
+                settings.harness_public_url,
+                settings.worker_api_token.get_secret_value(),
+            )
         )
-        try:
-            await recover_pending(bot)
-        except Exception as exc:
-            # В тексте исключения может быть строка подключения: в лог уходит только класс.
-            logger.warning("telegram recovery failed: %s", type(exc).__name__)
-        dispatch = await _build_dispatch(settings, config, factory)
+        dispatch = await _build_dispatch(settings, config, client)
         await run_worker(settings.worker_poll_interval_sec, stop, dispatch)
     finally:
-        await http.aclose()
-        await engine.dispose()
+        if http is None:
+            await client_http.aclose()
 
 
 async def _build_dispatch(
-    settings: Settings, config: HarnessConfig, factory: async_sessionmaker[AsyncSession]
+    settings: WorkerSettings, config: HarnessConfig, client: WorkerClient
 ) -> Callable[[], Awaitable[bool]] | None:
-    """Диспетчер песочницы, если песочница настроена; иначе None и worker работает как прежде."""
-    provider = build_sandbox_provider(settings, config.sandbox.provider_id)
-    ctx = build_dispatch_context(settings, config, factory, provider)
+    """Сборка локального диспетчера не подключается к серверу или БД."""
+    provider = LocalSandboxProvider(config.sandbox.provider_id)
+    ctx = build_dispatch_context(settings, config, client, provider)
     if ctx is None:
         return None
-    async with factory() as session:
-        await ensure_sandbox(session, config)
-        workspaces = await list_workspaces(session)
-    # Ключи репозиториев — в vault по repo.access_ref; без ключа задачи уходят в error (D-60).
-    without_key = [ws.id for ws in workspaces if ws.repo.access_ref is None]
-    if without_key:
-        logger.warning(
-            "проект без repo.access_ref, задачи по нему уходят в error: %s",
-            ", ".join(without_key),
-        )
 
     async def step() -> bool:
         return await dispatch_once(ctx)
@@ -114,12 +81,8 @@ async def _build_dispatch(
     return step
 
 
-async def serve_worker(settings: Settings, config: HarnessConfig) -> None:
-    """Запускает worker и переводит SIGTERM/SIGINT в остановку цикла.
-
-    Docker останавливает контейнер сигналом SIGTERM; без обработчика процесс убивался бы на
-    полуслове и не дожидался бы завершения текущего шага.
-    """
+async def serve_worker(settings: WorkerSettings, config: HarnessConfig) -> None:
+    """SIGTERM/SIGINT останавливают цикл после текущего шага."""
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
