@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 216 33% 97%;
+    --foreground: 222 47% 11%;
+    --primary: 225 70% 46%;
+    --muted: 215 25% 94%;
+    --muted-foreground: 215 16% 42%;
+    --border: 214 24% 88%;
+    --destructive: 0 72% 42%;
+  }
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply m-0 bg-background font-sans text-foreground antialiased;
+  }
+  h1 {
+    @apply text-3xl font-semibold tracking-tight;
+  }
+  label {
+    @apply block text-sm font-medium;
+  }
+  legend {
+    @apply mb-5 text-lg font-semibold;
+  }
+  th {
+    @apply bg-slate-50 px-5 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground;
+  }
+  td {
+    @apply border-t px-5 py-5 align-middle text-sm;
+  }
+  table {
+    @apply w-full border-collapse;
+  }
+}
+@layer components {
+  .panel {
+    @apply rounded-lg border bg-white shadow-sm;
+  }
+  .page-heading {
+    @apply mb-8 flex flex-wrap items-center justify-between gap-5;
+  }
+  .page-heading h1 {
+    @apply mb-3;
+  }
+  .eyebrow {
+    @apply mb-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground;
+  }
+  .badge {
+    @apply inline-flex rounded-full px-3 py-1 font-mono text-xs;
+  }
+  .control {
+    @apply flex min-h-10 w-full rounded-md border bg-white px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50;
+  }
+  .control[aria-invalid="true"] {
+    @apply border-destructive ring-1 ring-destructive;
+  }
+  .control[readonly] {
+    @apply bg-muted text-muted-foreground;
+  }
+  .form-grid {
+    @apply grid min-w-0 gap-5 sm:grid-cols-2;
+  }
+  .form-grid[aria-invalid="true"] {
+    @apply rounded-md border border-destructive p-4;
+  }
+  .hint {
+    @apply text-xs leading-5 text-muted-foreground;
+  }
+  .field-error {
+    @apply text-sm text-destructive;
+  }
+  .error-box {
+    @apply rounded-md border border-red-200 bg-red-50 p-4 text-sm text-destructive;
+  }
+}
