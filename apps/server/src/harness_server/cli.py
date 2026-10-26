@@ -77,7 +77,7 @@ def serve(host: str = "127.0.0.1", port: int = 8000) -> None:
 
 @app.command()
 def worker() -> None:
-    """Запускает worker: цикл опроса очереди, корректная остановка по SIGTERM."""
+    """Запускает worker с ENV машины агента и HARNESS_CONFIG, без настроек сервера."""
     try:
         settings = load_worker_settings()
         config = load_config(settings.harness_config)
@@ -91,8 +91,7 @@ def worker() -> None:
 @app.command()
 def migrate(alembic_config: Path = Path("alembic.ini")) -> None:
     """Применяет миграции Alembic до head. Нужна переменная DATABASE_URL."""
-    # env.py читает DATABASE_URL напрямую из окружения, поэтому проверяем её здесь,
-    # чтобы не получить трассировку Alembic вместо понятного сообщения.
+    # env.py читает DATABASE_URL напрямую; миграциям не нужны ENV HTTP-сервера и worker.
     if not os.environ.get("DATABASE_URL"):
         typer.echo("Ошибка конфигурации: DATABASE_URL: не задан", err=True)
         raise typer.Exit(code=1)
