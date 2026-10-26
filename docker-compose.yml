@@ -43,9 +43,7 @@ x-harness-common: &harness-common
     # Vault с ключами владельца (D-45): без этих ENV ссылки vault:… не разрешаются.
     VAULT_MCP_URL: ${VAULT_MCP_URL:-}
     VAULT_MCP_TOKEN: ${VAULT_MCP_TOKEN:-}
-  # File Mount Dokploy: config/harness.yaml из раздела Files стека попадает в ../files/.
-  volumes:
-    - ../files/harness.yaml:/app/config/harness.yaml:ro
+  # Конфиг сервера зашит в образ (config/harness.example.yaml): секретов в нём нет, File Mount не нужен.
   # default — внутренняя сеть стека, по имени `postgres` и `server`; dokploy-network — для маршрутизации Dokploy.
   networks:
     - default
