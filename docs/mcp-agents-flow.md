@@ -37,6 +37,6 @@
 | Workspace/агенты | `list_workspaces`, `get_workspace`, `update_workspace`, `list_agents`, `update_agent` | `console-settings` |
 | Skills | `list_skills`, `upsert_skill`, `attach_skill`, `delete_skill`(confirm) | `skills-library` |
 | Интеграции/MCP | `list_integrations`, `upsert_integration`, `list_mcp`, `set_mcp_value`, `delete_mcp_value` | `integrations-mcp-config` |
-| Профиль | `get_profile`, `update_profile`, `get_bootstrap_link` | `sandbox-profile` |
+| Профиль | `get_profile`, `update_profile` | `sandbox-profile` |
 | Бюджет/сессии | `usage(period)`, `list_sessions`, `force_handoff` | `budget-usage`, `agent-sessions` |
 | Откат | `revert_task` | `revert-task` |

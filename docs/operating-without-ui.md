@@ -8,8 +8,8 @@
 - Текст и голос в Telegram принимаются, классифицируются через Polza (`work`, `status`, `unknown`).
 - Для `work` бот присылает карточку задачи с кнопками проектов; нажатие кнопки переводит задачу в статус `planning`.
 - На запрос о состоянии («что сейчас в работе») бот отвечает списком открытых задач из БД.
-- Песочница управляется CLI: `harness-server sandbox status|pause|resume|bootstrap`.
-- Live-тесты запускаются вручную для Polza, Novita, Telegram и пути агента в песочнице.
+- Проект на машине агента подготавливается командой `agent init <project>` (D-64). В проде worker работает на этой машине как systemd user unit; в Compose worker нет. См. [deployment.md](deployment.md).
+- Live-тесты запускаются вручную для Polza, Telegram и пути агента. Состав live-тестов меняется задачей 5.6 `local-agent-machine`.
 
 Планировщик и исполнитель (код, MR) появятся в mvp-08 и mvp-09. До них задача после выбора проекта
 остаётся в статусе `planning`.
@@ -41,8 +41,7 @@ set -a; . ./.env; set +a
 | `TELEGRAM_CHAT_ID` | Id чата владельца; без него сервер не стартует |
 | `TELEGRAM_WEBHOOK_SECRET` | Секрет webhook, Telegram присылает его в заголовке |
 | `POLZA_AI_KEY`, `POLZA_AI_MODEL` | Маршрутизатор. Модель выбирает владелец, в коде её нет |
-| `NOVITA_API_KEY` | Песочница Novita |
-| `CLAUDE_CODE_OAUTH_TOKEN` | Токен подписки Claude для агента в песочнице: `claude setup-token` |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Токен подписки Claude для агента: `claude setup-token` |
 | `HARNESS_ADMIN_TOKEN` | Доступ к `GET /tasks/{id}`; не короче 32 символов без пробелов по краям |
 | `HARNESS_PUBLIC_URL` | Публичный https-адрес сервера (туннель, см. шаг 4) |
 
@@ -61,10 +60,9 @@ curl "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/getUpdates"
 3. В ответе найдите поле `message.chat.id` и впишите его в `.env`. Ответ содержит личные данные,
    не вставляйте его в чаты, документы и коммиты.
 
-### Песочница в `harness.yaml`
+### Машина агента и проект
 
-В `config/harness.yaml` укажите `sandbox.provider_id` — id песочницы Novita. Найти его можно через API
-или в кабинете Novita. Песочницу создаёт владелец вручную (D-38).
+В `config/harness.yaml` укажите `sandbox.provider_id` — его проверяет `LocalSandboxProvider` (D-64). Для подготовки каждого проекта выполните `agent init <project>` от пользователя worker. Команде нужны `HARNESS_CONFIG`, `VAULT_MCP_URL`, `VAULT_MCP_TOKEN` и `HARNESS_PUBLIC_URL`; `DATABASE_URL` и переменные Telegram ей не нужны. Подробности — в [development.md](development.md) и [apps/server/README.md](../apps/server/README.md).
 
 ### Файл `.env.live` для live-тестов
 
@@ -75,8 +73,6 @@ LIVE_POLZA_API_KEY=${POLZA_AI_KEY}
 LIVE_POLZA_MODEL=${POLZA_AI_MODEL}
 LIVE_TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
 LIVE_TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
-LIVE_NOVITA_API_KEY=${NOVITA_API_KEY}
-LIVE_NOVITA_SANDBOX_ID=<id песочницы>
 LIVE_CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}
 ```
 
@@ -92,8 +88,8 @@ set -a; . ./.env; . ./.env.live; set +a
 
 - Переменная `all_proxy=socks5://…` ломает httpx: в проекте не установлен пакет `socksio`, и запросы падают
   с `ImportError … socksio`. Снимайте `all_proxy` и `ALL_PROXY`.
-- HTTP-прокси (`http_proxy`, `https_proxy`) оставляйте. Через него доступны Telegram API и Novita.
-  Напрямую из некоторых сетей Telegram отвечает `ConnectTimeout`, Novita — таймаутом.
+- HTTP-прокси (`http_proxy`, `https_proxy`) оставляйте. Через него доступен Telegram API.
+  Напрямую из некоторых сетей Telegram отвечает `ConnectTimeout`.
 - Polza через зарубежный прокси не отвечает. Добавьте её домены в `no_proxy`.
 
 Итоговый префикс команд, которые ходят во внешние сервисы:
@@ -221,43 +217,34 @@ docker exec harness-pg psql -U harness -d harness -c "select created_at, decisio
   и `telegram_messages` — через `psql` тем же способом.
 - Лог: окно, в котором запущен `./tools/harness dev`.
 
-## 8. Песочница через CLI
+## 8. Подготовка проекта на машине агента
 
 ```bash
-uv run harness-server sandbox status      # статус и закреплённая задача
-uv run harness-server sandbox pause       # пауза; отказ (код 1), если песочница занята задачей
-uv run harness-server sandbox resume      # возобновление; смысл — см. apps/server/README.md
-uv run harness-server sandbox bootstrap   # подготовка: версии claude/openspec, клоны репозиториев
+agent init <project>                      # подготовить проект из harness.yaml
 ```
 
-- `bootstrap` клонирует репозитории workspace из `harness.yaml`. Ключ каждого репозитория берётся из vault по
-  `repo.access_ref` своего workspace и уходит git только на адрес этого репозитория. Целевой вариант — ключ только на
-  этот проект; пока workspace использует главный ключ владельца (решение 2026-10-19). Workspace без ключа клонируется
-  анонимно с предупреждением. Повторный запуск безопасен, команда идемпотентна.
-- Если песочница не возобновляется (`500: Failed to place sandbox`), пересоздайте её в кабинете Novita
-  по шаблону с Node.js и git, затем обновите id в `harness.yaml`.
-- Песочница в статусе `error` с закреплённой задачей требует ручного разбора. См. [deployment.md](deployment.md),
-  раздел «Песочница в `error` с закреплённой задачей».
+- Команда клонирует репозиторий workspace из `harness.yaml`; ключ берётся из vault по `repo.access_ref` и доступен только git-команде этого проекта. Без ключа публичный репозиторий клонируется анонимно с предупреждением.
+- Проект без маркера `projects/<id>.ready` не запускается: причина `project_not_initialized`. Повторный запуск `agent init` ещё не принят (задача 4.5 `local-agent-machine`).
+- Состояние задач смотрите через `GET /tasks/{id}` и Telegram; CLI паузы для локальной машины нет.
 
 ## 9. Live-тесты
 
-Live-тесты ходят во внешние сервисы и не запускаются по умолчанию. Запускайте их вручную с загруженными `.env` и `.env.live`
+Live-тесты ходят во внешние сервисы и не запускаются по умолчанию. Живая проверка машины агента — TODO (задача 5.6 `local-agent-machine`). Запускайте их вручную с загруженными `.env` и `.env.live`
 и с префиксом прокси из шага 2:
 
 ```bash
 uv run pytest -m live apps/server/tests/test_polza_live.py          # маршрутизатор Polza
-uv run pytest -m live apps/server/tests/test_novita_live.py         # песочница: exec, файлы, pause/connect, claude, изоляция
 uv run pytest -m live apps/server/tests/test_agent_runtime_live.py  # activate → run_agent → wait_agent → cleanup_task
 uv run pytest -m live apps/server/tests/test_telegram_live.py       # сообщение настоящим ботом
 ```
 
-Агент в песочнице работает по токену подписки Claude, поэтому расход идёт в лимиты этой подписки.
+Агент работает по токену подписки Claude, поэтому расход идёт в лимиты этой подписки.
 
 ## 10. Остановка
 
 - Окно `./tools/harness dev`: Ctrl+C.
 - Окно туннеля: закрыть.
-- Песочница на паузу, чтобы не тратить ресурсы: `uv run harness-server sandbox pause`.
+- Worker на хосте останавливается через свой systemd user unit; перед остановкой убедитесь, что активные процессы агента завершились. См. [deployment.md](deployment.md).
 - Postgres: `docker stop harness-pg`. Данные сохраняются в контейнере. Удалить контейнер вместе с данными:
   `docker rm harness-pg`, если контейнер остановлен, или `docker rm -f harness-pg`, если работает.
 
@@ -269,8 +256,6 @@ uv run pytest -m live apps/server/tests/test_telegram_live.py       # сообщ
 | `telegram setWebhook failed: ConnectTimeout` | Telegram недоступен без прокси | Оставить `http_proxy`/`https_proxy` |
 | `bad webhook: Failed to resolve host` | Туннель не опубликован | Использовать localhost.run (шаг 4) |
 | В логе `routing failed: timeout`, карточка со всеми проектами | Polza идёт через прокси | Добавить `polza.ai,.polza.ai` в `no_proxy` |
-| Novita `ReadTimeout` | Прямой доступ к Novita недоступен | Нужен HTTP-прокси |
-| `500: Failed to place sandbox` | Песочница не возобновляется | Пересоздать песочницу в кабинете Novita, обновить id |
 | Сервер не стартует, `TELEGRAM_CHAT_ID` пустой | Переменная не задана | Заполнить по инструкции из шага 1 |
 
 Остальные ошибки конфигурации сервер печатает с именем переменной, например `некорректные ENV: TELEGRAM_BOT_TOKEN: Field required`.

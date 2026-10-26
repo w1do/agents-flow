@@ -439,35 +439,6 @@ def test_workspaces_with_different_providers_accepted(tmp_path: Path) -> None:
     assert [ws.repo.provider for ws in config.workspaces] == ["github", "gitlab"]
 
 
-def test_sandbox_versions_and_turn_limit_have_pinned_defaults(tmp_path: Path) -> None:
-    config = load_config(_write(tmp_path, _workspace_body(agent_max_turns=None) + TAIL))
-
-    assert config.sandbox.claude_code_version == "2.1.292"
-    assert config.sandbox.openspec_version == "1.14.3"
-    assert config.workspaces[0].agent_max_turns == 50
-
-
-@pytest.mark.parametrize("value", [0, 501])
-def test_agent_max_turns_out_of_range_rejected(tmp_path: Path, value: int) -> None:
-    body = _workspace_body(agent_max_turns=value) + TAIL
-
-    with pytest.raises(ConfigError) as info:
-        load_config(_write(tmp_path, body))
-
-    assert "workspaces[0].agent_max_turns" in str(info.value)
-
-
-def test_sandbox_version_override_is_read(tmp_path: Path) -> None:
-    body = (
-        _workspace_body(agent_max_turns=None)
-        + "sandbox:\n  provider_id: sbx-1\n  claude_code_version: 2.2.0\n"
-    )
-
-    config = load_config(_write(tmp_path, body))
-
-    assert config.sandbox.claude_code_version == "2.2.0"
-
-
 def _workspace_body(agent_max_turns: int | None) -> str:
     body = (
         "workspaces:\n"
@@ -481,122 +452,53 @@ def _workspace_body(agent_max_turns: int | None) -> str:
     return body
 
 
-@pytest.mark.parametrize(
-    "version", ["latest", "2.1", "2.1.292-beta", "v2.1.292", "2.1.292; rm -rf /"]
-)
-def test_sandbox_version_must_be_semver(tmp_path: Path, version: str) -> None:
+@pytest.mark.parametrize("field", ["claude_code_version", "openspec_version"])
+def test_removed_sandbox_fields_are_actionable(tmp_path: Path, field: str) -> None:
     body = (
-        _workspace_body(agent_max_turns=None)
-        + f"sandbox:\n  provider_id: sbx-1\n  claude_code_version: '{version}'\n"
+        _workspace_body(agent_max_turns=None) + f"sandbox:\n  provider_id: sbx-1\n  {field}: old\n"
     )
-
-    with pytest.raises(ConfigError) as info:
+    with pytest.raises(ConfigError, match=field):
         load_config(_write(tmp_path, body))
 
-    assert "sandbox.claude_code_version" in str(info.value)
+
+@pytest.mark.parametrize("turns", [0, 501])
+def test_agent_max_turns_out_of_range_rejected(tmp_path: Path, turns: int) -> None:
+    body = (
+        "workspaces:\n  - id: demo\n    name: Demo\n    voice_aliases: []\n"
+        "    repo:\n      provider: gitlab\n      project: group/demo\n"
+        f"    agent_max_turns: {turns}\n"
+        "sandbox:\n  provider_id: local\n"
+    )
+    with pytest.raises(ConfigError, match="agent_max_turns"):
+        load_config(_write(tmp_path, body))
 
 
-WORKSPACE_ONLY = (
-    "workspaces:\n"
-    "  - id: demo\n"
-    "    name: Demo\n"
-    "    voice_aliases: []\n"
-    "    repo:\n      provider: gitlab\n      project: group/demo\n"
-)
+WORKSPACE_ONLY = _workspace_body(agent_max_turns=None)
 
 
 def _memory_body(memory_lines: str) -> str:
-    """Конфиг с блоком sandbox.memory; memory_lines — строки под memory (с отступом 4)."""
-    return WORKSPACE_ONLY + "sandbox:\n" + "  provider_id: sbx-1\n" + "  memory:\n" + memory_lines
+    return WORKSPACE_ONLY + "sandbox:\n  provider_id: sbx-1\n  memory:\n" + memory_lines
 
 
 def test_memory_block_is_optional_and_parsed(tmp_path: Path) -> None:
     plain = load_config(_write(tmp_path, WORKSPACE_ONLY + TAIL))
     assert plain.sandbox.memory is None
-
-    body = _memory_body(f"    ref: {MEMORY_REF}\n    embedding_ref: vault:demo/polza/embeddings\n")
-    config = load_config(_write(tmp_path, body))
-
+    config = load_config(
+        _write(tmp_path, _memory_body("    embedding_ref: vault:demo/polza/embeddings\n"))
+    )
     assert config.sandbox.memory is not None
-    assert config.sandbox.memory.ref == MEMORY_REF
-    assert config.sandbox.memory.repo == "w1do/memory-agent"
     assert config.sandbox.memory.embedding_ref == "vault:demo/polza/embeddings"
 
 
-@pytest.mark.parametrize(
-    "ref",
-    [
-        "v1.0.0",  # тег изменяем
-        "main",  # ветка изменяема
-        "09e5e63",  # короткий sha неоднозначен
-        MEMORY_REF.upper(),  # sha в верхнем регистре
-        MEMORY_REF + "0",  # 41 символ
-    ],
-)
-def test_memory_ref_must_be_full_commit_sha(tmp_path: Path, ref: str) -> None:
-    with pytest.raises(ConfigError) as info:
-        load_config(_write(tmp_path, _memory_body(f"    ref: {ref}\n")))
-
-    assert "memory.ref" in str(info.value)
-    assert ref not in str(info.value)
-
-
-def test_memory_ref_is_required(tmp_path: Path) -> None:
-    with pytest.raises(ConfigError) as info:
-        load_config(
-            _write(tmp_path, _memory_body("    embedding_ref: vault:demo/polza/embeddings\n"))
-        )
-
-    assert "memory.ref" in str(info.value)
-
-
-@pytest.mark.parametrize("repo", ["a/b/c", "w1do", "w1do/memory agent"])
-def test_memory_repo_must_be_owner_slash_name(tmp_path: Path, repo: str) -> None:
-    with pytest.raises(ConfigError) as info:
-        load_config(_write(tmp_path, _memory_body(f"    repo: {repo}\n    ref: {MEMORY_REF}\n")))
-
-    assert "memory.repo" in str(info.value)
-
-
-@pytest.mark.parametrize("repo", ["../..", "./.", "-x/y", "x./y", "w1do/-agent", "w1do/agent."])
-def test_memory_repo_segments_must_start_and_end_with_alnum(tmp_path: Path, repo: str) -> None:
-    with pytest.raises(ConfigError) as info:
-        load_config(_write(tmp_path, _memory_body(f"    repo: {repo}\n    ref: {MEMORY_REF}\n")))
-
-    assert "memory.repo" in str(info.value)
-
-
-def test_memory_repo_accepts_fork_name(tmp_path: Path) -> None:
-    body = _memory_body(f"    repo: other-org/memory-agent.fork\n    ref: {MEMORY_REF}\n")
-
-    config = load_config(_write(tmp_path, body))
-
-    assert config.sandbox.memory is not None
-    assert config.sandbox.memory.repo == "other-org/memory-agent.fork"
-
-
-def test_memory_version_field_is_rejected(tmp_path: Path) -> None:
-    body = _memory_body(f"    version: 1.2.3\n    ref: {MEMORY_REF}\n")
-
-    with pytest.raises(ConfigError) as info:
-        load_config(_write(tmp_path, body))
-
-    assert "version" in str(info.value)
+@pytest.mark.parametrize("field", ["repo", "ref"])
+def test_removed_memory_fields_are_actionable(tmp_path: Path, field: str) -> None:
+    with pytest.raises(ConfigError, match=field):
+        load_config(_write(tmp_path, _memory_body(f"    {field}: old\n")))
 
 
 def test_memory_embedding_ref_must_be_vault_reference(tmp_path: Path) -> None:
-    body = (
-        WORKSPACE_ONLY
-        + "sandbox:\n"
-        + "  provider_id: sbx-1\n"
-        + "  memory:\n"
-        + f"    ref: {MEMORY_REF}\n"
-        + "    embedding_ref: sk-plain-key-value\n"
-    )
-
     with pytest.raises(ConfigError) as info:
-        load_config(_write(tmp_path, body))
-
+        load_config(_write(tmp_path, _memory_body("    embedding_ref: sk-plain-key-value\n")))
     assert "sk-plain-key-value" not in str(info.value)
 
 

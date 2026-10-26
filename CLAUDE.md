@@ -20,6 +20,7 @@
 - Тесты: pytest + pytest-asyncio, Postgres в testcontainers или сервисе CI. Линт: ruff, mypy `--strict`.
 - Консоль (MVP, `mvp-10-operator-console`, D-39): React + shadcn/ui, ESLint + Prettier, типы из `packages/shared-types`.
 - Git-хостинг: GitLab (MR, CI, Registry). Деплой: Dokploy.
+- Машина агента: локальный sandbox provider; worker работает на хосте как systemd user service, не в Compose.
 
 ## 3. Жёсткие правила
 
@@ -79,4 +80,5 @@
 | `./tools/harness dev` | Локальный server + worker |
 | `./tools/harness migrate` | `alembic upgrade head` |
 | `./tools/harness sandbox pause\|resume` | Пауза/возобновление песочницы из конфига |
+| `agent init <project>` | Подготовка проекта на машине агента; необходимые инструменты оператор ставит заранее |
 | `openspec list` / `openspec validate --all` | Состояние и проверка спецификаций |

@@ -15,8 +15,6 @@ dependencies = [
     "httpx>=0.27",
     "pyyaml>=6.0",
     "harness-shared",
-    # Точная версия: сигнатуры AsyncSandbox сверены с этой сборкой (D-35).
-    "novita-sandbox==2.1.1",
     # Точная версия (D-45): клиент vault MCP; mvp-07 использует ту же сборку.
     "mcp==2.3.0",
     # Прямой импорт в adapters/vault/mcp_client.py (HTTP-клиент SDK); версия та же, что в uv.lock.
@@ -25,6 +23,8 @@ dependencies = [
 
 [project.scripts]
 harness-server = "harness_server.cli:app"
+agent = "harness_server.agent_cli:app"
+harness-agent = "harness_server.agent_cli:app"
 
 [tool.uv.sources]
 harness-shared = { workspace = true }

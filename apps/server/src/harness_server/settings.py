@@ -90,8 +90,6 @@ class Settings(BaseSettings):
     stt_model: str | None = None
     # Лимит размера голосового файла: лимит getFile Telegram; ENV VOICE_MAX_BYTES.
     voice_max_bytes: int = Field(default=_VOICE_MAX_BYTES_LIMIT, gt=0, le=_VOICE_MAX_BYTES_LIMIT)
-    novita_api_key: SecretStr | None = None
-    novita_domain: str | None = None
     claude_code_oauth_token: SecretStr | None = None
     agent_run_timeout_min: int = Field(default=60, gt=0)
     tests_timeout_min: int = Field(default=15, gt=0)
@@ -209,3 +207,13 @@ def load_settings() -> Settings:
             for err in exc.errors(include_url=False, include_input=False, include_context=False)
         )
         raise SettingsError(f"некорректные ENV: {details}") from None
+
+
+class AgentSettings(BaseSettings):
+    """Minimal operator environment for agent init; it never loads .env."""
+
+    model_config = SettingsConfigDict(env_file=None, extra="ignore", env_ignore_empty=True)
+    harness_config: Path
+    vault_mcp_url: str | None = None
+    vault_mcp_token: SecretStr | None = None
+    harness_public_url: str | None = None

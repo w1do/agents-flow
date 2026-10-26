@@ -60,7 +60,7 @@ def test_common_block_builds_image_locally() -> None:
 def test_services_inherit_build_from_common_block() -> None:
     services = _load_compose()["services"]
 
-    # Слияние якоря <<: *harness-common даёт каждому сервису build и image: сборка одна на тег.
-    for name in ("migrate", "server", "worker"):
+    # Слияние якоря <<: *harness-common даёт migrate и server общий образ.
+    for name in ("migrate", "server"):
         assert services[name]["build"] == _common_block()["build"]
         assert services[name]["image"] == _common_block()["image"]

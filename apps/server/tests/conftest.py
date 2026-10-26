@@ -15,6 +15,7 @@ from harness_server.adapters.stt import SpeechToText
 from harness_server.adapters.telegram import FakeTelegramClient
 from harness_server.config import RepoConfig, WorkspaceConfig
 from harness_server.services.context import BotContext
+from live_agent_env import LiveAgentEnvironment, capture_live_agent_environment
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -47,8 +48,6 @@ ALL_ENV_NAMES = (
     "STT_API_URL",
     "STT_API_KEY",
     "STT_MODEL",
-    "NOVITA_API_KEY",
-    "NOVITA_DOMAIN",
     "GITLAB_URL",
     "GITLAB_TOKEN",
     "CLAUDE_CODE_OAUTH_TOKEN",
@@ -58,6 +57,13 @@ ALL_ENV_NAMES = (
     "ADMIN_PASSWORD",
     "WORKER_POLL_INTERVAL_SEC",
     "VOICE_MAX_BYTES",
+    # Unit clients use recorded transports; inherited proxies must not trigger network setup.
+    "ALL_PROXY",
+    "HTTPS_PROXY",
+    "HTTP_PROXY",
+    "all_proxy",
+    "https_proxy",
+    "http_proxy",
 )
 
 VALID_SECRET_KEY = "test-secret-key-0123456789abcdef0123"
@@ -73,6 +79,34 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Убирает переменные харнесса из окружения каждого теста."""
     for name in ALL_ENV_NAMES:
         monkeypatch.delenv(name, raising=False)
+
+
+@pytest.fixture(scope="session")
+def live_agent_environment() -> LiveAgentEnvironment:
+    """Capture opt-in live inputs before function-scoped ``clean_env`` removes settings."""
+    return capture_live_agent_environment()
+
+
+@pytest.fixture
+def owned_local_origin_git_access(monkeypatch: pytest.MonkeyPatch) -> Callable[[str], None]:
+    """Route git helpers to one test-owned bare origin without weakening production policy.
+
+    Production commands accept HTTPS only.  A local bare path uses git's file transport, so this
+    fixture also relaxes the protocol allow-list only in the test process that owns ``origin``.
+    """
+    from harness_server.services import git_access
+
+    anonymous_git_env = git_access.anonymous_git_env
+
+    def configure(origin: str) -> None:
+        monkeypatch.setattr(git_access, "clone_url", lambda _repo: origin)
+
+        def local_anonymous_git_env() -> dict[str, str]:
+            return {**anonymous_git_env(), "GIT_ALLOW_PROTOCOL": "file:https"}
+
+        monkeypatch.setattr(git_access, "anonymous_git_env", local_anonymous_git_env)
+
+    return configure
 
 
 @pytest.fixture

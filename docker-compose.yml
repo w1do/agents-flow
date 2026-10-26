@@ -1,9 +1,9 @@
-# Стек харнесса для Dokploy: migrate → server и worker. Postgres — отдельный стек (deploy/db).
+# Стек Dokploy для migrate → server. Worker запускается systemd-пользователем на машине агента.
 # Наружу порты не публикуются: домен и HTTPS выставляет Dokploy поверх expose.
 
 x-harness-common: &harness-common
   # Dokploy собирает образ из git по Dockerfile: реестра пока нет (GitLab CI не запускался, D-59).
-  # Локальный тег общий для migrate, server и worker: Compose собирает его один раз. Когда появится
+  # Локальный тег общий для migrate и server: Compose собирает его один раз. Когда появится
   # реестр GitLab, HARNESS_IMAGE задаётся в ENV Dokploy, и сборка не нужна.
   build:
     context: .
@@ -30,8 +30,6 @@ x-harness-common: &harness-common
     STT_API_URL: ${STT_API_URL:-}
     STT_API_KEY: ${STT_API_KEY:-}
     STT_MODEL: ${STT_MODEL:-}
-    NOVITA_API_KEY: ${NOVITA_API_KEY:-}
-    NOVITA_DOMAIN: ${NOVITA_DOMAIN:-}
     CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:-}
     AGENT_RUN_TIMEOUT_MIN: ${AGENT_RUN_TIMEOUT_MIN:-}
     TESTS_TIMEOUT_MIN: ${TESTS_TIMEOUT_MIN:-}
@@ -74,14 +72,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-    restart: unless-stopped
-
-  worker:
-    <<: *harness-common
-    command: ["harness-server", "worker"]
     depends_on:
       migrate:
         condition: service_completed_successfully

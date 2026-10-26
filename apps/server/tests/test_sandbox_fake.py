@@ -1,7 +1,7 @@
 """Минимальные тесты FakeSandbox: журнал без значений env, файлы, ответы exec, удаление."""
 
 import pytest
-from harness_server.adapters.novita import FakeSandbox, SandboxNotFound
+from harness_server.adapters.sandbox import FakeSandbox, SandboxNotFound
 
 pytestmark = pytest.mark.asyncio
 

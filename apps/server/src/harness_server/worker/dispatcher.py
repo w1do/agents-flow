@@ -22,7 +22,7 @@ from pydantic import SecretStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from harness_server.adapters.novita import SandboxError, SandboxProvider
+from harness_server.adapters.sandbox import SandboxError, SandboxProvider
 from harness_server.adapters.vault import SecretVault, VaultError
 from harness_server.config import HarnessConfig
 from harness_server.db.models import Sandbox, Task
@@ -201,9 +201,27 @@ async def _run_reserved(ctx: DispatchContext, pipeline: Pipeline, reservation: R
     task = reservation.task
     provider_id = reservation.provider_id
     runner = _Runner(ctx, pipeline, provider_id, task)
+    readiness_rejected = False
     # Отмена worker (BaseException) пробрасывается без очистки и без отзыва токенов: агент
     # продолжает работать, _recover продолжит задачу, а cleanup отзовёт токены (D-41).
     try:
+        marker = f'"$HOME/.harness/projects/{task.workspace_id}.ready"'
+        ready = await ctx.provider.exec(provider_id, f"test -f {marker}")
+        if ready.exit_code:
+            async with ctx.session_factory() as session:
+                info = await sandboxes.agent_run_info(session, provider_id)
+                live_token = await sandboxes.has_live_task_token(session, task.id)
+            artifacts = await ctx.provider.exec(
+                provider_id,
+                f'test -d "$HOME/.harness/worktrees/{task.id}" -o '
+                f'-f "$HOME/.harness/tasks/{task.id}/run.json"',
+            )
+            readiness_rejected = (
+                info.started_at is None and not live_token and artifacts.exit_code != 0
+            )
+            raise SandboxStepError(
+                f"project_not_initialized: выполните agent init {task.workspace_id}"
+            )
         # Ключ записи — из vault по repo.access_ref workspace задачи, до активации: без него задача
         # сразу уходит в error, fetch и worktree не выполняются (D-60). Значения сразу попадают в
         # redaction очистки и ответа агента (design 6).
@@ -244,6 +262,18 @@ async def _run_reserved(ctx: DispatchContext, pipeline: Pipeline, reservation: R
     except Exception as exc:
         # Тип исключения, а не его текст: сообщение может содержать вывод команды или ключ.
         await _record_failure(ctx, task.id, f"исключение: {type(exc).__name__}", None)
+
+    # A readiness rejection happens before fetch/worktree/token creation.  Running normal cleanup
+    # would turn that operator-actionable error into a sandbox error when the clone does not exist.
+    if readiness_rejected:
+        try:
+            async with ctx.session_factory() as session:
+                await sandboxes.release_sandbox(session, ctx.provider, provider_id)
+        except Exception as exc:
+            logger.error(
+                "sandbox release failed provider_id=%s type=%s", provider_id, type(exc).__name__
+            )
+        return
 
     try:
         async with ctx.session_factory() as session:

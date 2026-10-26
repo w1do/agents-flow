@@ -6,7 +6,7 @@
 
 Статусы: `todo` — не начато, `wip` — в работе, `review` — на ревью, `done` — принято и заархивировано, `blocked` — ждёт решения.
 
-## Текущее состояние (2026-10-20)
+## Текущее состояние (2026-10-25)
 
 - Готово: ТЗ v5 сохранено, CLAUDE.md, ARCHITECTURE.md, docs/, OpenSpec-изменения для MVP (9) и после MVP (40).
 - Готово и заархивировано: `git-providers` (6e, D-60, D-62), `bootstrap-in-image` (6f, D-63), `mvp-01-novita-spike`, `mvp-02-foundation`, `mvp-03-task-store`, `mvp-04-telegram-intake`,
@@ -21,6 +21,9 @@
   Workspace `chistotyumen` переведён на GitHub (`repo.provider: github`, `w1do/chistotyumen`), ключ берётся из vault (D-60);
   bootstrap песочницы выполнен владельцем из терминала worker 2026-10-20, exit 0.
 - Блокеров нет: вопрос 3 закрыт (GitLab, D-01); репозитории workspace — GitHub или GitLab по выбору workspace (D-60).
+- `local-agent-machine` — в работе, не принято целиком. Astra приняла только deployment artifacts task 6 (Compose worker removed, host systemd user unit, DB loopback publication); локальные artifact checks прошли. Unit/database/live runtime не развёртывались. Runtime task 3–5 остаётся заблокирован прежним finding: отсутствует успешный повторный тест 4.5; ранее отклонённые пункты не считаются принятыми. Живая приёмка владельцем (8.2) не заявлена.
+- `local-agent-machine`: task 7.1 proposal updates приняты нормативным ревью; documentation tasks 7.2–7.3 подготовлены. Это не означает полной приёмки изменения: пункты 3–5 отклонены/заблокированы до успешного повторного теста 4.5, а 8.2 требует живой приёмки владельцем.
+- Закрыты без реализации как superseded: `mvp-06b-vps-provider`, `sandbox-timeout-extend`, `cli-version-pin`. `opencode-only-client` остаётся частичным, клиентская часть сохранена; `sandbox-pool` и `integrations-mcp-config` остаются будущими возможностями.
 - Известное ограничение: пайплайн GitLab на реальном MR не запускался (remote репозитория — GitHub). Проверить при первом MR в GitLab; см. [docs/deployment.md](docs/deployment.md).
 - Следующее: `mvp-07-agents-flow-mcp`, затем `mvp-08`, `mvp-09` (D-53). Критерий владельца для 7 и 9 — D-56: агент коммитит и
   вызывает «сдать работу», push и MR делает харнесс после гейтов.
@@ -92,7 +95,7 @@ MR создан → сообщение в Telegram. Тот же поток ви�
 | [`confirm-second-factor`](openspec/changes/confirm-second-factor/) | Второй фактор для опасных команд | telegram-bot | control-commands | todo |
 | [`harness-snap`](openspec/changes/harness-snap/) | Снимки работы раз в минуту | agent-checkpoints | checkpoints | todo |
 | [`agent-heartbeat`](openspec/changes/agent-heartbeat/) | Heartbeat агента и статус stalled | sandbox-runtime | mvp-07 | todo |
-| [`sandbox-timeout-extend`](openspec/changes/sandbox-timeout-extend/) | Продление сессии и повтор связи | sandbox-runtime | mvp-06 | todo |
+| [`sandbox-timeout-extend`](openspec/changes/sandbox-timeout-extend/) | Superseded `local-agent-machine`, закрыто без реализации | sandbox-runtime | mvp-06 | closed |
 | [`agent-sessions`](openspec/changes/agent-sessions/) | Сессии агента, пороги контекста и handoff | agent-sessions | checkpoints, budget-usage | todo |
 | [`task-limits`](openspec/changes/task-limits/) | Лимиты задачи | budget | budget-usage | todo |
 | [`processes`](openspec/changes/processes/) | Процессы в песочнице | task-processes | mvp-09 | todo |
@@ -117,7 +120,7 @@ MR создан → сообщение в Telegram. Тот же поток ви�
 | [`repo-queue`](openspec/changes/repo-queue/) | Очередь на репозиторий | delivery-gates | sandbox-pool | todo |
 | [`idle-pause`](openspec/changes/idle-pause/) | Пауза простаивающих песочниц | sandbox-runtime | sandbox-pool | todo |
 | `keyed-git-outside-sandbox` | Git с ключом вне песочницы или песочница на workspace — закрытие R-1 (D-62) | sandbox-profile | git-providers | todo |
-| [`cli-version-pin`](openspec/changes/cli-version-pin/) | Закрепление версий CLI агентов | sandbox-profile | sandbox-profile | todo |
+| [`cli-version-pin`](openspec/changes/cli-version-pin/) | Superseded `local-agent-machine`, закрыто без реализации | sandbox-profile | sandbox-profile | closed |
 | [`skills-library`](openspec/changes/skills-library/) | Библиотека skills и агентов Claude через MCP (D-49) | skills-library | sandbox-profile, mvp-07 | todo |
 | [`codex-agent`](openspec/changes/codex-agent/) | Второй тип агента: Codex | sandbox-runtime | sandbox-pool, skills-library | todo |
 
@@ -155,4 +158,3 @@ MR создан → сообщение в Telegram. Тот же поток ви�
 | §16.1 C | harness-snap (C1), agent-heartbeat (C2), task-limits (C3), mvp-05 (C4), voice-robustness (C5), confirm-second-factor (C6), db-retention-backups (C7), cli-version-pin (C8), health-alerts (C9), dry-run (C10), idle-pause (C11), workspace-settings-snapshot (C12), spec-drift (C13) |
 | §15 | mvp-02, db-retention-backups |
 | §17 | см. docs/open-questions.md |
-

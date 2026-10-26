@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Один образ для migrate, server и worker: различаются только команды в docker-compose.yml.
+# Один образ для migrate и server: команды задаёт docker-compose.yml.
 
 # --- builder: зависимости и код в .venv ---
 FROM python:3.12-slim-bookworm AS builder
@@ -28,9 +28,6 @@ COPY apps ./apps
 COPY shared ./shared
 COPY db ./db
 COPY alembic.ini ./
-# Скрипт bootstrap песочницы: CLI читает его из образа (bootstrap-in-image, D-63).
-COPY deploy/sandbox ./deploy/sandbox
-
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --package harness-server
 

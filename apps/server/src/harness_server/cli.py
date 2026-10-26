@@ -10,19 +10,15 @@ import typer
 import uvicorn
 from alembic import command as alembic_command
 from alembic.config import Config as AlembicConfig
-from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from harness_server import wiring
-from harness_server.adapters.novita import SandboxError, SandboxProvider
+from harness_server.adapters.sandbox import SandboxError, SandboxProvider
 from harness_server.adapters.telegram import TelegramError
-from harness_server.adapters.vault import SecretVault, VaultError
 from harness_server.app import create_app
 from harness_server.config import ConfigError, HarnessConfig, load_config
 from harness_server.db.session import create_engine, create_session_factory
-from harness_server.security.redaction import redact
-from harness_server.services import git_access, sandboxes
-from harness_server.services import secrets as secret_refs
+from harness_server.services import sandboxes
 from harness_server.services.webhook import register_webhook, webhook_url
 from harness_server.settings import Settings, SettingsError, load_settings
 from harness_server.worker import serve_worker
@@ -30,8 +26,6 @@ from harness_server.worker import serve_worker
 # Корень приложения: uv ставит workspace editable, поэтому cli.py лежит в
 # <root>/apps/server/src/harness_server/ и в репозитории, и в образе (/app). Путь не зависит от cwd:
 # терминал Dokploy открывается в / (bootstrap-in-image, D-63).
-_APP_ROOT = Path(__file__).resolve().parents[4]
-DEFAULT_BOOTSTRAP_SCRIPT = _APP_ROOT / "deploy" / "sandbox" / "bootstrap.sh"
 
 app = typer.Typer(
     help="agents-flow harness: сервер, worker, миграции, проверка конфигурации.",
@@ -41,7 +35,8 @@ app = typer.Typer(
 telegram_app = typer.Typer(help="Telegram: регистрация webhook.", no_args_is_help=True)
 app.add_typer(telegram_app, name="telegram")
 sandbox_app = typer.Typer(
-    help="Песочница: bootstrap, пауза, возобновление, статус.", no_args_is_help=True
+    help="Песочница: пауза, возобновление, статус; проект подключается agent init <project>.",
+    no_args_is_help=True,
 )
 app.add_typer(sandbox_app, name="sandbox")
 
@@ -138,15 +133,6 @@ def set_webhook() -> None:
     typer.echo(f"webhook установлен: {url}")
 
 
-def _provider_or_exit(settings: Settings) -> SandboxProvider:
-    """Провайдер Novita. Без NOVITA_API_KEY команды песочницы не выполняются."""
-    provider = wiring.build_sandbox_provider(settings)
-    if provider is None:
-        typer.echo("Ошибка конфигурации: NOVITA_API_KEY: не задан", err=True)
-        raise typer.Exit(code=1)
-    return provider
-
-
 async def _with_session[T](settings: Settings, action: Callable[[AsyncSession], Awaitable[T]]) -> T:
     """Одна сессия БД на команду; engine закрывается при выходе."""
     engine = create_engine(settings.database_url.get_secret_value())
@@ -165,7 +151,7 @@ def _run_sandbox_action(
     done: str,
 ) -> None:
     """Выполняет действие над песочницей и печатает итог. Отказы сервиса — код выхода 1."""
-    provider = _provider_or_exit(settings)
+    provider = wiring.build_sandbox_provider(settings, config.sandbox.provider_id)
 
     async def run(session: AsyncSession) -> None:
         # Строка песочницы может отсутствовать, если worker ещё не стартовал (design 8).
@@ -225,98 +211,3 @@ def sandbox_resume() -> None:
         lambda s, p: sandboxes.resume_sandbox(s, p, provider_id),
         done="песочница возобновлена",
     )
-
-
-async def _resolve_repo_keys(
-    vault: SecretVault | None, config: HarnessConfig
-) -> dict[str, SecretStr]:
-    """Ключи записи по id workspace; без repo.access_ref workspace в словарь не попадает (D-60)."""
-    keys: dict[str, SecretStr] = {}
-    for workspace in config.workspaces:
-        token = await secret_refs.resolve(vault, workspace.repo.access_ref, fallback=None)
-        if token is not None:
-            keys[workspace.id] = token
-    return keys
-
-
-@sandbox_app.command("bootstrap")
-def sandbox_bootstrap(script: Path = DEFAULT_BOOTSTRAP_SCRIPT) -> None:
-    """Подготавливает песочницу: установки, клоны workspace и память (bootstrap.sh и git, D-62).
-
-    Ключи репозиториев (repo.access_ref) и embeddings берутся из vault по ссылкам harness.yaml и
-    передаются только в env своих команд; workspace без ключа клонируется анонимно с
-    предупреждением. Вывод проходит redaction, в том числе по значениям из vault.
-    """
-    settings, config = _load_or_exit()
-    _configure_logging()
-    provider = _provider_or_exit(settings)
-    try:
-        text = script.read_text(encoding="utf-8")
-    except OSError:
-        typer.echo(f"Ошибка: не читается скрипт {script}", err=True)
-        raise typer.Exit(code=1) from None
-    provider_id = config.sandbox.provider_id
-    try:
-        asyncio.run(_with_session(settings, lambda s: sandboxes.assert_not_busy(s, provider_id)))
-    except sandboxes.SandboxBusy as exc:
-        typer.echo(f"Ошибка: песочница занята задачей {exc.task_id}", err=True)
-        raise typer.Exit(code=1) from None
-    vault = wiring.build_vault(settings)
-    try:
-        repo_tokens = asyncio.run(_resolve_repo_keys(vault, config))
-        memory = config.sandbox.memory
-        embedding_key = (
-            asyncio.run(secret_refs.resolve(vault, memory.embedding_ref, fallback=None))
-            if memory is not None
-            else None
-        )
-    except VaultError as exc:
-        # Строка песочницы не меняется: ошибка до любого вызова провайдера.
-        typer.echo(f"Ошибка vault: {exc.reason}", err=True)
-        raise typer.Exit(code=1) from None
-    for workspace in config.workspaces:
-        if workspace.id not in repo_tokens:
-            typer.echo(
-                f"workspace {workspace.id}: нет repo.access_ref, клон анонимный "
-                "(только публичный репозиторий)",
-                err=True,
-            )
-    # Значения из vault известны только здесь: redaction вывода покрывает их вместе с ENV.
-    vault_values = tuple(
-        value.get_secret_value()
-        for value in (*repo_tokens.values(), embedding_key)
-        if value is not None
-    )
-    # Заголовок Basic и его base64-часть тоже секреты: попадают в git-команды (D-52, D-60).
-    for workspace in config.workspaces:
-        token = repo_tokens.get(workspace.id)
-        if token is not None:
-            vault_values += git_access.git_auth_secret_values(
-                workspace.repo.provider, token.get_secret_value()
-            )
-    try:
-        result = asyncio.run(
-            sandboxes.bootstrap(
-                provider,
-                config.sandbox.provider_id,
-                config,
-                script=text,
-                repo_tokens=repo_tokens,
-                memory_ref=memory.ref if memory is not None else None,
-                memory_repo=memory.repo if memory is not None else None,
-                embedding_key=embedding_key,
-            )
-        )
-    except sandboxes.SandboxStepError as exc:
-        typer.echo(f"Ошибка песочницы: {exc.reason}", err=True)
-        raise typer.Exit(code=1) from None
-    except SandboxError as exc:
-        typer.echo(f"Ошибка песочницы: {type(exc).__name__}", err=True)
-        raise typer.Exit(code=1) from None
-    if result.exit_code != 0:
-        detail = redact(
-            result.stderr, extra_values=(*wiring.secret_values(settings), *vault_values)
-        )
-        typer.echo(f"bootstrap завершился с кодом {result.exit_code}\n{detail[-2000:]}", err=True)
-        raise typer.Exit(code=1)
-    typer.echo("bootstrap выполнен")

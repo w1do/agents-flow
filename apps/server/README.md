@@ -14,8 +14,24 @@
 | `harness-server migrate` | `alembic upgrade head`, нужен `DATABASE_URL` |
 | `harness-server telegram set-webhook` | Регистрирует webhook в Telegram: адрес `HARNESS_PUBLIC_URL` + `/telegram/webhook` (только https), секрет из `TELEGRAM_WEBHOOK_SECRET`. Выполняется после деплоя и при смене адреса; ошибки — код 1 без токена и секрета в выводе |
 | `harness-server sandbox status` | Строка песочницы из `harness.yaml`: статус и закреплённая задача (нужен `DATABASE_URL`) |
-| `harness-server sandbox bootstrap [--script PATH]` | Подготавливает песочницу скриптом: версии `claude`/`openspec`, каталоги, клоны. По умолчанию `deploy/sandbox/bootstrap.sh` от корня приложения (`/app` в образе), не от cwd. Нужен `NOVITA_API_KEY`; ключи репозиториев и embeddings берутся из vault по ссылкам `repo.access_ref` (D-60); вывод проходит redaction |
-| `harness-server sandbox pause` / `resume` | Пауза и возобновление песочницы. Пауза отказывает (код 1), если за песочницей закреплена задача; `resume` сбрасывает `error` в `paused` после успешного connect, если за песочницей не закреплена задача; иначе — ручной разбор (см. [docs/deployment.md](../../docs/deployment.md)) |
+| `harness-server sandbox pause` / `resume` | Совместимые команды состояния песочницы. У локального провайдера `pause` — пустая операция; команда не останавливает процессы. `resume` проверяет подключение и сбрасывает состояние только если задача не закреплена (см. [docs/deployment.md](../../docs/deployment.md)) |
+
+### Команда `agent init <project>` (D-64)
+
+Отдельный вход `agent` (`agent_cli.py`), не `harness-server`. Готовит проект на машине worker: проверка
+prerequisites, каталоги `~/.harness` и `~/work`, клон репозитория с ключом из vault, память (если задана в
+`sandbox.memory`), маркер `projects/<id>.ready`. Нужны `HARNESS_CONFIG`, `VAULT_MCP_URL`, `VAULT_MCP_TOKEN`,
+`HARNESS_PUBLIC_URL`; `DATABASE_URL` и Telegram не нужны.
+
+| Код | Значение |
+|---|---|
+| 0 | Проект подготовлен |
+| 1 | Ошибка шага (клон, память, vault) |
+| 2 | Неизвестный проект |
+| 3 | Не хватает prerequisites (один отчёт, без `sudo`) |
+
+Запускайте от непривилегированного пользователя. Инструменты ставит оператор, см. [docs/deployment.md](../../docs/deployment.md).
+Повторный запуск пока не принят (задача 4.5 `local-agent-machine`).
 
 ## HTTP-эндпоинты задач
 
@@ -45,7 +61,7 @@
   вида `token`, `key`, `password`, `secret`, `apikey`, `credential` (и их варианты во множественном числе,
   `passwd`, `pwd`) сервер отклоняет; `repo.base_url` с учётными данными тоже.
 - Ключ репозитория workspace — ссылка `repo.access_ref` (`vault:<project>/<service>/<name>`). Без неё задача по
-  этому workspace уходит в `error` с причиной `repo_access_ref`, а `sandbox bootstrap` клонирует репозиторий
+  этому workspace уходит в `error` с причиной `repo_access_ref`, а `agent init` клонирует репозиторий
   анонимно (только публичный) и предупреждает. Ключ уходит только в env git-команд своего workspace (D-60, D-62).
 
 ## Запуск
@@ -99,16 +115,9 @@ uv run pytest -m live apps/server/tests/test_telegram_live.py
 
 ### Живая проверка песочницы (`-m live`)
 
-Тесты `tests/test_novita_live.py` работают с настоящей песочницей Novita и запускаются владельцем вручную.
-Нужны `LIVE_NOVITA_API_KEY`, `LIVE_NOVITA_SANDBOX_ID` и `LIVE_CLAUDE_CODE_OAUTH_TOKEN`; без них тесты
-пропускаются. Проверяют exec, запись и чтение файлов, pause/connect, многоходовой `claude -p` с
-`--max-turns 1` и изоляцию (hook из `.claude/settings.json` и сервер из `.mcp.json` worktree не срабатывают),
-а также отсутствие значения токена на диске песочницы (`grep -rF`).
-
-```bash
-LIVE_NOVITA_API_KEY=… LIVE_NOVITA_SANDBOX_ID=… LIVE_CLAUDE_CODE_OAUTH_TOKEN=… \
-  uv run pytest -m live apps/server/tests/test_novita_live.py
-```
+Живая проверка локальной машины агента — TODO: `tests/test_agent_runtime_live.py` и
+`tests/test_sandbox_profile_live.py` должны проверять локальную машину и `agent init` (задача 5.6
+`local-agent-machine`, не закрыта).
 
 ## Маршрутизация текста владельца (mvp-05)
 
@@ -159,7 +168,10 @@ src/harness_server/
 ├── services/webhook.py  # webhook_url, register_webhook (set-webhook)
 ├── services/sandboxes.py # токены задач, резервирование песочницы, активация, запуск и опрос агента, очистка, пауза (mvp-06)
 ├── services/agent_result.py # parse_result (событие result потока), parse_exit_code, parse_pid (mvp-06)
-├── adapters/novita/     # protocol.py (SandboxProvider), client.py (NovitaSandboxProvider на AsyncSandbox), errors.py, fake.py (FakeSandbox) (mvp-06)
+├── services/machine.py # проверка prerequisites, каталоги, клон, память, init_project для `agent init` (D-64)
+├── adapters/sandbox/   # protocol.py (SandboxProvider), errors.py, fake.py (FakeSandbox) (mvp-06, D-64)
+├── adapters/local/     # provider.py (LocalSandboxProvider: очищенное окружение, exec в группе процессов) (D-64)
+├── agent_cli.py        # команда `agent init <project>` (D-64)
 ├── worker/              # __init__.py (цикл worker), dispatcher.py (шаги песочницы), pipeline.py (контракт Pipeline, реестр пуст до mvp-08)
 ├── services/context.py  # BotContext: фабрика сессий, адаптеры, workspace, владелец
 ├── telegram/parse.py    # update → IncomingText | IncomingVoice | ButtonPress, dedup_key (без I/O)

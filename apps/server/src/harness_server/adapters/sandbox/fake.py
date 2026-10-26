@@ -1,22 +1,17 @@
-"""Фейк песочницы для тестов: файлы в памяти, журнал вызовов, программируемый exec. Без сети.
-
-Журнал не содержит значений env (только ключи), как и реальный журнал сервера. Значения env фейк
-держит отдельно и отдаёт через received_env: так тест проверяет, что секрет ушёл в команду, но не
-записан в журнал. Проверка «значение не лежит на диске» — через files_containing.
-"""
+"""Фейк песочницы для тестов: файлы в памяти и журнал без значений env."""
 
 from dataclasses import dataclass, field
 from typing import Final
 
-from harness_server.adapters.novita.errors import SandboxNotFound
-from harness_server.adapters.novita.protocol import ExecResult
+from harness_server.adapters.sandbox.errors import SandboxNotFound
+from harness_server.adapters.sandbox.protocol import ExecResult
 
 _DEFAULT_RESULT: Final = ExecResult(exit_code=0, stdout="", stderr="")
 
 
 @dataclass(frozen=True, slots=True)
 class JournalEntry:
-    """Одна запись журнала. cmd — команда для exec и путь для файловых операций."""
+    """Одна запись журнала; значения env намеренно не сохраняются."""
 
     method: str
     cmd: str | None
@@ -32,14 +27,10 @@ class _Response:
 
 @dataclass(slots=True)
 class FakeSandbox:
-    """SandboxProvider для одной песочницы sandbox_id. Ненулевой код exec — обычный ExecResult.
-
-    kill() имитирует удалённую песочницу: дальше любой вызов бросает SandboxNotFound.
-    """
+    """SandboxProvider для одной песочницы; kill имитирует удаление провайдером."""
 
     sandbox_id: str = "sbx-fake"
     paused: bool = False
-    timeout_s: int | None = None
     journal: list[JournalEntry] = field(default_factory=list)
     _files: dict[str, str] = field(default_factory=dict)
     _responses: list[_Response] = field(default_factory=list)
@@ -49,21 +40,21 @@ class FakeSandbox:
     def respond(
         self, prefix: str, *, exit_code: int = 0, stdout: str = "", stderr: str = ""
     ) -> None:
-        """Задаёт ответ exec для команд, начинающихся с prefix. Побеждает самый длинный префикс."""
+        """Задаёт ответ exec; побеждает самый длинный префикс."""
         self._responses.append(
             _Response(prefix, ExecResult(exit_code=exit_code, stdout=stdout, stderr=stderr))
         )
 
     def kill(self) -> None:
-        """Песочница удалена провайдером: все последующие вызовы бросают SandboxNotFound."""
+        """После удаления все обращения возвращают SandboxNotFound."""
         self._killed = True
 
     def received_env(self, key: str) -> str | None:
-        """Последнее значение env, переданное в exec под этим ключом. В журнале значений нет."""
+        """Возвращает последнее переданное значение вне журнала."""
         return self._env_values.get(key)
 
     def files_containing(self, needle: str) -> list[str]:
-        """Пути файлов песочницы, в тексте которых есть needle. Для проверки «креды не на диске»."""
+        """Ищет текст в файлах фейка для проверок отсутствия секретов."""
         if not needle:
             raise ValueError("needle must not be empty")
         return sorted(path for path, text in self._files.items() if needle in text)
@@ -87,10 +78,10 @@ class FakeSandbox:
         self.journal.append(JournalEntry("exec", cmd, env_keys, cwd))
         if envs:
             self._env_values.update(envs)
-        matches = [r for r in self._responses if cmd.startswith(r.prefix)]
+        matches = [response for response in self._responses if cmd.startswith(response.prefix)]
         if not matches:
             return _DEFAULT_RESULT
-        return max(matches, key=lambda r: len(r.prefix)).result
+        return max(matches, key=lambda response: len(response.prefix)).result
 
     async def write_file(self, sandbox_id: str, path: str, data: str) -> None:
         self._check(sandbox_id)
@@ -106,11 +97,6 @@ class FakeSandbox:
         self._check(sandbox_id)
         self.paused = True
         self.journal.append(JournalEntry("pause", None, (), None))
-
-    async def extend_timeout(self, sandbox_id: str, seconds: int) -> None:
-        self._check(sandbox_id)
-        self.timeout_s = seconds
-        self.journal.append(JournalEntry("extend_timeout", None, (), None))
 
     def _check(self, sandbox_id: str) -> None:
         if self._killed or sandbox_id != self.sandbox_id:
