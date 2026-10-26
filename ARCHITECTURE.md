@@ -270,9 +270,12 @@ sandbox (provider_id,
 (D-60): конфиг с ними не загружается, сообщение называет поля для переноса (`docs/deployment.md`, «Переход на D-60»).
 
 Обязательные ENV (решение D-20): `DATABASE_URL`, `HARNESS_CONFIG`, `HARNESS_SECRET_KEY`, `TELEGRAM_BOT_TOKEN`,
-`TELEGRAM_CHAT_ID`, `TELEGRAM_WEBHOOK_SECRET`. Сервер не стартует, если их нет или они пустые.
+`TELEGRAM_CHAT_ID`, `TELEGRAM_WEBHOOK_SECRET`. Команды `serve` и `check-config` проверяют полный
+серверный ENV и завершаются с ошибкой, если обязательных переменных нет или они пустые.
+Команде `migrate` нужен только `DATABASE_URL`; конфиг, серверные секреты и Telegram ей не нужны.
 Worker использует отдельный `WorkerSettings`: обязательны только `HARNESS_CONFIG`,
 `HARNESS_PUBLIC_URL` и `WORKER_API_TOKEN`; для запуска агента также нужен `CLAUDE_CODE_OAUTH_TOKEN`.
+Команда `worker` читает конфиг по `HARNESS_CONFIG`, не загружая серверные `Settings`.
 Остальные опциональны, пока их не использует свой этап («с этапа» — в `.env.example`).
 Секреты в таблице помечены «секрет»; в коде это `SecretStr`.
 

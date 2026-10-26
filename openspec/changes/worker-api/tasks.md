@@ -37,6 +37,7 @@
 - [x] 5.1 Клиент API в `worker/` через httpx (адрес сервера и `WORKER_API_TOKEN` из ENV); прямой импорт БД в worker убран
 - [x] 5.2 Тесты клиента на записанных ответах (respx), без реальных ключей
 - [x] 5.3 Переход `worker/dispatcher.py` и `worker/pipeline.py` на клиент API
+- [x] 5.4 Регрессия CLI: `worker` загружает только `WorkerSettings` и `HARNESS_CONFIG`; запуск с минимальным ENV без БД, ключа сервера и Telegram покрыт тестами, `serve` и `check-config` требуют полный серверный ENV, `migrate` — только `DATABASE_URL`
 
 ## 6. Документация и проверки
 

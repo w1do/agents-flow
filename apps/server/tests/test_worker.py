@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 from asgi_lifespan import LifespanManager
+from conftest import EXAMPLE_CONFIG
 from harness_server.adapters.telegram import FakeTelegramClient
 from harness_server.app import create_app
 from harness_server.config import load_config
@@ -26,12 +27,18 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 
+@pytest.mark.parametrize("with_credentials", [False, True])
 def test_worker_stops_cleanly_on_sigterm(
-    valid_env: dict[str, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, with_credentials: bool
 ) -> None:
+    monkeypatch.setenv("HARNESS_CONFIG", str(EXAMPLE_CONFIG))
     monkeypatch.setenv("WORKER_POLL_INTERVAL_SEC", "0.2")
     monkeypatch.setenv("WORKER_API_TOKEN", "test-worker-token-0123456789abcdef01")
     monkeypatch.setenv("HARNESS_PUBLIC_URL", "http://127.0.0.1:1")
+    if with_credentials:
+        monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "test-oauth-token")
+        monkeypatch.setenv("VAULT_MCP_URL", "https://vault.test/mcp")
+        monkeypatch.setenv("VAULT_MCP_TOKEN", "test-vault-token")
     # Консольный скрипт лежит рядом с интерпретатором venv; так тест не зависит от uv.
 
     process = subprocess.Popen(

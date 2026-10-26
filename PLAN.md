@@ -15,6 +15,12 @@
   deployment-теста учитывают postgres и console. Новые миграции 0006–0008. Полный `harness check` с Postgres (6.4) запускает
   оркестратор; ручная проверка 6.5 — за владельцем. Изменение не принято и не архивировано.
   Локальный прогон `test_worker.py`: SIGTERM пройден; recovery заблокирован доступом к Docker.
+  Регрессия CLI ENV (5.4): `worker` проверяется с минимальным `WorkerSettings`, без серверных
+  секретов, БД и Telegram; `serve` и `check-config` проверяют полный серверный ENV.
+  Регрессия `migrate` исправлена: требуется только `DATABASE_URL`, как в Compose; существующий
+  тест миграции пустой БД сохранён без изменений. Проверки выполняются через `uv run --no-sync`.
+  Локально: CLI ENV — 36 passed; `test_migrate.py` и `test_cli.py` — 24 passed, 5 ошибок подготовки
+  БД из-за запрета доступа к Docker. Ruff check/format и mypy strict по затронутому коду прошли.
 
 - Готово: ТЗ v5 сохранено, CLAUDE.md, ARCHITECTURE.md, docs/, OpenSpec-изменения для MVP (9) и после MVP (40).
 - Готово и заархивировано: `git-providers` (6e, D-60, D-62), `bootstrap-in-image` (6f, D-63), `mvp-01-novita-spike`, `mvp-02-foundation`, `mvp-03-task-store`, `mvp-04-telegram-intake`,
