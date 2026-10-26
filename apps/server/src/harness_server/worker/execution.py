@@ -5,7 +5,8 @@ import logging
 from contextlib import suppress
 from uuid import uuid4
 
-from harness_shared.tasks import TaskStatus
+from harness_shared.planning import PlanFinishIn
+from harness_shared.tasks import TaskKind, TaskStatus
 from harness_shared.worker import ClaimOut
 from harness_shared.worker_reports import EventIn, StatusIn
 
@@ -34,9 +35,16 @@ async def _failure(runner: Runner, reason: str, text: str | None = None) -> None
     message = truncate_log_text(redact(message, extra_values=runner.secrets))
     body = StatusIn(external_key=str(uuid4()), text=message, status=TaskStatus.ERROR)
     try:
-        await runner.ctx.client.report(
-            runner.claim.task.id, "status", body, runner.claim.task_token
-        )
+        if runner.claim.task.kind == TaskKind.PLAN:
+            await runner.ctx.client.plan_finish(
+                runner.claim.task.id,
+                PlanFinishIn(external_key=body.external_key, status="error", text=message),
+                runner.claim.task_token,
+            )
+        else:
+            await runner.ctx.client.report(
+                runner.claim.task.id, "status", body, runner.claim.task_token
+            )
     except WorkerAPIError as exc:
         if exc.status_code != 409:
             raise
@@ -84,6 +92,7 @@ async def run_reserved(
             if repo_token is None:
                 raise SandboxStepError(REPO_ACCESS_REF_REASON.format(workspace_id=workspace.id))
             value = repo_token.get_secret_value()
+            runner.repo_token = repo_token
             runner.secrets = (
                 *runner.secrets,
                 value,
@@ -102,7 +111,7 @@ async def run_reserved(
                 ctx.provider,
                 provider_id,
                 task,
-                base_ref=pipeline.base_ref(task, ctx.config),
+                base_ref=pipeline.base_ref(task, workspace),
                 timeout_min=ctx.timeout_min,
                 repo=workspace.repo,
                 repo_token=repo_token,

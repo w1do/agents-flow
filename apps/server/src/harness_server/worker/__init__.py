@@ -24,11 +24,21 @@ async def run_worker(
     stop: asyncio.Event,
     dispatch: Callable[[], Awaitable[bool]] | None = None,
 ) -> None:
-    """Крутит цикл опроса до установки stop. Ожидание прерывается сразу после установки stop.
-
-    dispatch — один шаг диспетчера песочницы; ошибка шага логируется, цикл продолжается.
-    """
+    """Остановка отменяет текущий шаг и дожидается его завершения до закрытия HTTP."""
     logger.info("worker started, poll interval %.2f s", poll_interval_sec)
+    async with asyncio.TaskGroup() as tasks:
+        # SIGTERM должен прерывать и HTTP/backoff внутри dispatch, а не только паузу опроса.
+        polling = tasks.create_task(_poll_worker(poll_interval_sec, stop, dispatch))
+        await stop.wait()
+        polling.cancel()
+    logger.info("worker stopped")
+
+
+async def _poll_worker(
+    poll_interval_sec: float,
+    stop: asyncio.Event,
+    dispatch: Callable[[], Awaitable[bool]] | None,
+) -> None:
     while not stop.is_set():
         if dispatch is not None:
             try:
@@ -38,7 +48,6 @@ async def run_worker(
                 logger.error("dispatch step failed: %s", type(exc).__name__)
         with contextlib.suppress(TimeoutError):
             await asyncio.wait_for(stop.wait(), timeout=poll_interval_sec)
-    logger.info("worker stopped")
 
 
 async def start_worker(
@@ -82,7 +91,7 @@ async def _build_dispatch(
 
 
 async def serve_worker(settings: WorkerSettings, config: HarnessConfig) -> None:
-    """SIGTERM/SIGINT останавливают цикл после текущего шага."""
+    """SIGTERM/SIGINT прерывают текущий шаг и останавливают worker."""
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):

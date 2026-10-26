@@ -13,6 +13,7 @@ from uuid import UUID
 from harness_shared.tasks import TaskEventSource, TaskKind, TaskSource, TaskStatus
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from harness_server.db.models import Project, Sandbox, SpecItem, Task, TaskEvent, TaskToken
 from harness_server.domain.errors import NotFound, UnknownWorkspace
@@ -220,6 +221,18 @@ async def lock_next_task(
     if to_status is not None:
         ensure_transition(kind, from_status, to_status)
     stmt = select(Task).where(Task.kind == kind, Task.status == from_status)
+    if kind == TaskKind.IMPLEMENT:
+        parent = aliased(Task)
+        ready_plan = (
+            select(parent.id)
+            .where(
+                parent.id == Task.parent_id,
+                parent.kind == TaskKind.PLAN,
+                parent.status == TaskStatus.READY,
+            )
+            .exists()
+        )
+        stmt = stmt.where(Task.parent_id.is_(None) | ready_plan)
     if worker_api:
         active_project = (
             select(Project.id)

@@ -8,6 +8,7 @@ import pytest
 import respx
 from harness_server.adapters.worker_api import HttpWorkerAPI, WorkerAPIError
 from harness_server.worker.client import WorkerClient
+from harness_shared.planning import PlanFinishIn
 from harness_shared.tasks import TaskKind
 from harness_shared.worker_reports import CheckpointIn, EventIn, ResultIn, StatusIn
 
@@ -104,3 +105,30 @@ async def test_network_error_and_invalid_response_are_safe() -> None:
             with pytest.raises(WorkerAPIError, match="invalid_response") as invalid:
                 await client.claim(TaskKind.IMPLEMENT, "local")
             assert TOKEN not in str(invalid.value)
+
+
+@respx.mock
+async def test_plan_state_and_finish_contracts() -> None:
+    base = f"{BASE}/worker/tasks/{UUID(int=1)}/plan"
+    state = respx.post(base + "/state").respond(
+        200,
+        json={"children": [], "items": [], "report_status": "completed"},
+    )
+    finish = respx.post(base + "/finish")
+    fixture = (FIXTURES / "event.json").read_text()
+    finish.side_effect = [httpx.Response(503), httpx.Response(200, text=fixture)]
+    async with httpx.AsyncClient() as http:
+        client = WorkerClient(HttpWorkerAPI(http, BASE, TOKEN, sleep=_no_sleep))
+        assert (await client.plan_state(UUID(int=1), "task-token")).report_status == "completed"
+        await client.plan_finish(
+            UUID(int=1),
+            PlanFinishIn(
+                external_key="reject",
+                status="error",
+                text="отказ",
+            ),
+            "task-token",
+        )
+    assert state.calls[0].request.headers["X-Task-Token"] == "task-token"
+    assert finish.call_count == 2
+    assert finish.calls[0].request.content == finish.calls[1].request.content

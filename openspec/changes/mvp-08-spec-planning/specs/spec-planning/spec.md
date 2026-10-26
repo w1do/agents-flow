@@ -45,3 +45,89 @@
 
 - **WHEN** открыта задача реализации
 - **THEN** у неё есть ключ пункта спецификации и идентификатор задачи плана
+
+### Requirement: Авторизация MCP
+
+Сервер SHALL предоставлять `/mcp` через официальный SDK и stateless Streamable HTTP.
+Каждый запрос MUST проверять срок, роль и отзыв bearer-токена задачи; каждый инструмент
+повторяет проверку под блокировкой. Значения ключей MUST не попадать в ошибки и результаты.
+
+#### Scenario: Отозванный токен
+
+- **WHEN** токен задачи отозван или истёк
+- **THEN** MCP отвечает unauthorized без значения токена и не выполняет инструмент
+
+### Requirement: MCP sync_spec
+
+`sync_spec(change_id, items)` SHALL идемпотентно зеркалировать пункты с ключами
+`<change_id>#<номер группы>` и ссылкой на текущий план. Запись MUST быть разрешена только
+planner в planning до финального отчёта. Ключи чужого плана MUST не перехватываться.
+
+#### Scenario: Повторная синхронизация
+
+- **WHEN** планировщик повторяет sync_spec с тем же ключом
+- **THEN** обновляется прежний пункт своего плана без дубля
+
+### Requirement: MCP create_task
+
+`create_task(text, spec_item_key, priority?)` SHALL идемпотентно создавать implement в backlog
+своего workspace с parent_id текущего плана и ссылкой на его пункт. Вызов MUST быть разрешён
+только planner в planning до финального отчёта. Повтор по пункту SHALL возвращать прежнюю задачу.
+
+#### Scenario: Изоляция и повтор
+
+- **WHEN** планировщик повторяет create_task своего пункта или передаёт чужой ключ
+- **THEN** свой пункт имеет одну задачу, чужой ключ отклоняется без записи
+
+### Requirement: MCP report_task
+
+`report_task(status, text)` SHALL записывать очищенные отчёты started/progress/completed/failed
+агента. Финальный сигнал MUST быть идемпотентным и SHALL не переводить задачу в ready.
+
+#### Scenario: Завершён только агент
+
+- **WHEN** планировщик сообщает completed
+- **THEN** план остаётся в planning до механических проверок worker
+
+### Requirement: MCP list_tasks
+
+`list_tasks(status?)` SHALL показывать только задачи workspace, принадлежащего токену,
+с необязательным фильтром статуса. Токен без workspace MUST отклоняться.
+
+#### Scenario: Чужой workspace
+
+- **WHEN** агент запрашивает список задач
+- **THEN** задачи других workspace в ответ не попадают
+
+### Requirement: Worker API состояния плана
+
+`POST /worker/tasks/{id}/plan/state` SHALL возвращать дочерние implement, пункты и последний
+финальный отчёт агента. Вход MUST проверять worker-токен и принадлежащий плану токен задачи.
+
+#### Scenario: Чужой токен задачи
+
+- **WHEN** worker читает состояние плана с чужим токеном задачи
+- **THEN** API отвечает unauthorized без данных плана
+
+### Requirement: Worker API завершения плана
+
+`POST /worker/tasks/{id}/plan/finish` SHALL принимать external_key, ready/error, text, branch;
+MUST проверять worker-токен и токен плана. Повтор ключа SHALL возвращать прежнее событие.
+Отказ SHALL записывать error плана, trash его backlog-задач implement и события одной транзакцией.
+Успех SHALL сохранять task/<plan_id> и ready только при completed и связанных задачах в backlog.
+
+#### Scenario: Атомарное отклонение
+
+- **WHEN** worker отклоняет план и повторяет запрос с тем же external_key
+- **THEN** план в error, его задачи в trash, чужие задачи не изменены, события не дублируются
+
+### Requirement: Очередь задач плана
+
+Дочерние implement SHALL не выдаваться исполнителю до ready родительского плана.
+Worker MUST до push проверить новое закоммиченное изменение относительно origin/<default_branch>,
+openspec validate и отсутствие секретов в diff.
+
+#### Scenario: План ещё не проверен
+
+- **WHEN** дочерние задачи уже созданы, но план ещё в planning
+- **THEN** worker реализации не получает эти задачи

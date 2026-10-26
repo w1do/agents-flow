@@ -18,6 +18,7 @@ from harness_server.adapters.telegram.types import MessageNotEditable, TelegramE
 from harness_server.db.models import Task, TelegramMessage
 from harness_server.security.redaction import redact
 from harness_server.services.context import BotContext
+from harness_server.services.plan_notify import plan_ready as plan_ready
 from harness_server.services.tasks import get_task
 from harness_server.telegram.render import (
     STAGE_CHOOSING,
@@ -65,7 +66,13 @@ async def send_task_card(
         await session.commit()
 
 
-async def append_stage(ctx: BotContext, task_id: UUID, stage: str) -> None:
+async def append_stage(
+    ctx: BotContext,
+    task_id: UUID,
+    stage: str,
+    *,
+    deduplicate: bool = False,
+) -> None:
     """Дописывает строку этапа в сообщение задачи и перерисовывает его.
 
     Строка карточки блокируется FOR UPDATE, поэтому два этапа одной задачи не потеряют
@@ -74,6 +81,9 @@ async def append_stage(ctx: BotContext, task_id: UUID, stage: str) -> None:
     """
     async with ctx.session_factory() as session:
         task = await get_task(session, task_id)
+        if deduplicate:
+            # Блокируем также отсутствие карточки: два retry не должны отправить две новые.
+            await session.scalar(select(Task.id).where(Task.id == task_id).with_for_update())
         source = _clean_text(ctx, task.text)
         line = stage_line(short_title(source), stage)
         card = (
@@ -101,6 +111,8 @@ async def append_stage(ctx: BotContext, task_id: UUID, stage: str) -> None:
             await session.commit()
             return
 
+        if deduplicate and line in card.lines:
+            return
         # Новый список, а не append: JSONB без MutableList не видит изменения на месте.
         lines = [*card.lines, line]
         text = redact(render_card(source, lines), ctx.secret_values)

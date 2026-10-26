@@ -212,3 +212,18 @@ uv run pytest apps/server/tests/test_worker_client.py apps/server/tests/test_wor
 `test_worker_reports.py`, `test_worker_heartbeat.py`, `test_worker_sandbox_api.py`,
 `test_worker_migrations.py` и HTTP-сценарии `test_dispatcher.py` с настоящей Postgres.
 Полная проверка — `./tools/harness check`; Docker/Postgres запускает оркестратор.
+
+## Планировщик (mvp-08)
+
+В `PIPELINES` зарегистрирован plan. После `agent init <project>` worker активирует ветку
+`task/<plan_id>` от `origin/<default_branch>`, запускает планировщика, проверяет коммит,
+новое изменение OpenSpec, validate, дочерние задачи и секреты, затем публикует ветку без MR.
+MCP `/mcp` предоставляет sync_spec, create_task, report_task, list_tasks под токеном задачи.
+Worker API `POST /worker/tasks/{id}/plan/state` возвращает детей, пункты и финальный сигнал;
+`POST …/plan/finish` идемпотентно фиксирует ready/error. При error дети уходят в trash той же
+транзакцией. До ready родителя исполнители не получают эти задачи.
+DTO: `harness_shared/planning.py`; новые ENV и миграции не требуются.
+
+Проверки без БД: `test_plan_pipeline.py`, `test_plan_local_git.py` (локальный bare origin),
+`test_planner_transport.py` (официальный SDK), `test_plan_summary.py`, `test_gates.py`.
+Проверки с Postgres: `test_planner_mcp.py`, `test_worker_plan_api.py`, `test_plan_dispatch_api.py`.

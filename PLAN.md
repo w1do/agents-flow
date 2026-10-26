@@ -8,6 +8,22 @@
 
 ## Текущее состояние (2026-10-26)
 
+- `mvp-08-spec-planning` — `blocked` на проверках Postgres: код гейтов, MCP планировщика,
+  worker API состояния/завершения, зарегистрированного plan и Telegram-итога реализован (D-67).
+  Проверены пайплайн с фейками, официальный MCP-транспорт и настоящий Git/OpenSpec на локальном origin.
+  Postgres-набор не дошёл до сценариев из-за запрета Docker; атомарность и серверная изоляция
+  требуют прогона в среде оркестратора. Пункты с неподтверждёнными сценариями не отмечены.
+  Исправлено удержание блокировки плана при повторном finish перед Telegram-уведомлением;
+  регрессия проверяет параллельные и последовательные повторы для одной и трёх дочерних задач.
+  Прогон регрессии с Postgres пока заблокирован доступом к Docker; TEST_DATABASE_URL не задан.
+  3.3 — за владельцем, 4.1 и полный harness check — за оркестратором.
+  Исправлена остановка worker после регистрации plan: SIGTERM/SIGINT отменяют текущий dispatch,
+  включая ожидание recover/claim, до закрытия HTTP. Два исходных SIGTERM-теста и три регрессии
+  остановки прошли; полный прогон test_worker.py/test_worker_plan_api.py: 5 passed, 5 ошибок
+  подготовки Postgres из-за запрета Docker. Ruff check/format и mypy strict затронутых файлов прошли.
+  `timeout 120 ./tools/harness check`: общие ruff/format/mypy прошли, pytest остановлен
+  таймаутом (exit 124) на test_local_provider.py после ошибок подготовки БД.
+
 - `worker-api` — `review`: реализованы 1–5, включая добавленную группу 4a (D-41),
   и документация 6.1–6.3. Worker использует HTTP API без БД; восстановление Telegram работает
   на сервере в фоне без ожидания БД при старте. Тест recovery ждёт завершения фонового прохода
@@ -67,7 +83,7 @@ MR создан → сообщение в Telegram. Тот же поток ви�
 | 6e | [`git-providers`](openspec/changes/archive/2026-10-20-git-providers/) | Репозиторий workspace на GitHub или GitLab: `workspaces[].repo`, ключ из vault по workspace, git-заголовок на префикс репозитория (D-60). Ревью и security-ревью APPROVED (D-62: перекрытия конфига git, bootstrap в три шага; `GIT_AUTH_HEADER_<i>` удалён). Live: прод bootstrap 2026-10-20, exit 0 (`w1do/chistotyumen`, главный ключ GitHub) | platform-config, sandbox-profile, sandbox-runtime | sandbox-profile | done |
 | 6f | [`bootstrap-in-image`](openspec/changes/archive/2026-10-20-bootstrap-in-image/) | Скрипт bootstrap в образе, путь по умолчанию от корня приложения, не от cwd (D-63): bootstrap из терминала Dokploy | sandbox-profile | sandbox-profile | done |
 | 7 | [`mvp-07-agents-flow-mcp`](openspec/changes/mvp-07-agents-flow-mcp/) | MCP: токен задачи, report_task, sync_spec, create_task | agents-flow-mcp | mvp-03, mvp-06 | todo |
-| 8 | [`mvp-08-spec-planning`](openspec/changes/mvp-08-spec-planning/) | Планировщик OpenSpec → задачи в backlog | spec-planning | mvp-05, mvp-06, mvp-07 | todo |
+| 8 | [`mvp-08-spec-planning`](openspec/changes/mvp-08-spec-planning/) | Планировщик OpenSpec → задачи в backlog | spec-planning | mvp-05, mvp-06, mvp-07 | blocked |
 | 9 | [`mvp-09-delivery-mr`](openspec/changes/mvp-09-delivery-mr/) | Исполнитель, базовые гейты безопасности и гейты проекта (D-58), MR в GitLab или PR в GitHub (`adapters/git`, D-60), итог в Telegram | delivery-gates | mvp-08, git-providers | todo |
 | 10 | [`mvp-10-operator-console`](openspec/changes/mvp-10-operator-console/) | Веб-панель: вход, канбан, карточка и создание задачи, песочница и логи агента | operator-console | mvp-06, mvp-09 | todo |
 

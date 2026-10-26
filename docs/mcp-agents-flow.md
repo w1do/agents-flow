@@ -2,7 +2,7 @@
 
 Адрес: `${HARNESS_PUBLIC_URL}/mcp` (Streamable HTTP). Авторизация: `Authorization: Bearer <token>`.
 Логика каждого инструмента — функция в `services/`; инструмент только проверяет доступ и валидирует вход.
-Каждый вызов пишет событие с источником (`agent`, `telegram`, `console`, `external`).
+Отчёты пишут TaskEvent с источником `agent`; sync_spec сохраняет зеркало, create_task — задачу.
 
 ## Доступ
 
@@ -19,10 +19,17 @@
 
 | Инструмент | Роль | Вход | Эффект |
 |---|---|---|---|
-| `report_task` | planner, implementer | `status`: `started`\|`progress`\|`completed`\|`failed`, `text` | `TaskEvent`; `completed` у исполнителя запускает гейты; обновление сообщения в Telegram |
+| `report_task` | planner, implementer | `status`: `started`\|`progress`\|`completed`\|`failed`, `text` | `TaskEvent`; финальный сигнал для worker, сам не меняет статус задачи |
 | `sync_spec` | planner | `change_id`, `items[]`: `key`, `text`, `status` | Upsert `SpecItem` по (`workspace`, `change_id`, `key`); возвращает список с id |
 | `create_task` | planner | `text`, `spec_item_key`, `priority?` | Задача `implement` в `backlog` в своём workspace, `source=spec`, `parent_id` = задача плана |
 | `list_tasks` | planner, implementer | `status?` | Задачи своего workspace (id, kind, status, text) |
+
+Минимальный набор реализован в mvp-08 (D-67). SDK работает stateless: срок и отзыв токена
+перепроверяются на каждом запросе. У sync_spec ключ `<change_id>#<номер группы>`;
+пункт связан с текущим планом. create_task повторно возвращает прежнюю задачу этого пункта.
+sync_spec/create_task разрешены только planner в planning до completed/failed.
+completed не означает ready: worker ждёт завершения процесса и выполняет механические проверки.
+После ready плана сервер обновляет карточку Telegram; пайплайн implement добавляется в mvp-09.
 
 ## После MVP
 

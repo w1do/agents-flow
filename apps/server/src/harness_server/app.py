@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
+from starlette.routing import Route
 
 from harness_server.api.health import router as health_router
 from harness_server.api.projects import console_router as projects_console_router
@@ -13,10 +14,12 @@ from harness_server.api.tasks import router as tasks_router
 from harness_server.api.telegram_webhook import router as telegram_router
 from harness_server.api.worker import router as worker_router
 from harness_server.api.worker_cleanup import router as worker_cleanup_router
+from harness_server.api.worker_plan import router as worker_plan_router
 from harness_server.api.worker_reports import router as worker_reports_router
 from harness_server.api.worker_sandbox import router as worker_sandbox_router
 from harness_server.config import HarnessConfig
 from harness_server.db.session import create_engine, create_session_factory
+from harness_server.mcp.server import PlannerMCP
 from harness_server.services.server_recovery import recovery_loop
 from harness_server.services.worker_heartbeat import monitor
 from harness_server.settings import Settings
@@ -25,6 +28,7 @@ from harness_server.wiring import (
     build_adapters,
     build_bot_context,
     build_http_client,
+    secret_values,
 )
 
 
@@ -53,7 +57,8 @@ def create_app(
             bot_adapters = adapters if adapters is not None else build_adapters(settings, http)
             app.state.bot = build_bot_context(settings, app.state.session_factory, bot_adapters)
             recovery_task = asyncio.create_task(recovery_loop(app.state.bot))
-            yield
+            async with planner_mcp.manager.run():
+                yield
         finally:
             if recovery_task is not None:
                 recovery_task.cancel()
@@ -82,4 +87,12 @@ def create_app(
     app.include_router(worker_reports_router)
     app.include_router(worker_sandbox_router)
     app.include_router(worker_cleanup_router)
+    app.include_router(worker_plan_router)
+    planner_mcp = PlannerMCP(
+        lambda: app.state.session_factory,
+        settings.harness_secret_key.get_secret_value(),
+        secret_values(settings),
+    )
+    app.router.routes.append(Route("/mcp", endpoint=planner_mcp))
+    app.router.routes.append(Route("/mcp/", endpoint=planner_mcp))
     return app

@@ -35,7 +35,7 @@ from harness_server.worker.client import WorkerClient
 from harness_server.worker.dispatcher import DispatchContext, build_dispatch_context, dispatch_once
 from harness_server.worker.pipeline import AgentRunner, Outcome
 from harness_server.worker.settings import WorkerSettings, load_worker_settings
-from harness_shared.projects import ProjectRepo, ProjectUpdate
+from harness_shared.projects import ProjectRepo, ProjectUpdate, Workspace
 from harness_shared.sandboxes import AgentRole, SandboxStatus
 from harness_shared.tasks import TaskKind, TaskOut, TaskSource, TaskStatus
 from pydantic import SecretStr
@@ -177,7 +177,7 @@ class _Pipeline:
         self._agent_finishes = agent_finishes
         self._stream_line = stream_line
 
-    def base_ref(self, task: TaskOut, config: HarnessConfig) -> str:
+    def base_ref(self, task: TaskOut, workspace: Workspace) -> str:
         return "main"
 
     async def run(self, runner: AgentRunner, task: TaskOut) -> Outcome:

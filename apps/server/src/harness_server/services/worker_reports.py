@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from hashlib import sha256
 from uuid import UUID
 
-from harness_shared.tasks import TaskEventOut, TaskEventSource
+from harness_shared.tasks import TaskEventOut, TaskEventSource, TaskKind, TaskStatus
 from harness_shared.worker_reports import CheckpointIn, EventIn, ResultIn, StatusIn
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from harness_server.db.models import Checkpoint, TaskEvent
 from harness_server.domain.statuses import ensure_transition
 from harness_server.security.redaction import redact
+from harness_server.services.plan_failure import discard_children
 from harness_server.services.worker_access import authorize_task
 
 
@@ -37,6 +38,8 @@ async def report(
     )
     if isinstance(safe, StatusIn):
         ensure_transition(task.kind, task.status, safe.status)
+        if task.kind == TaskKind.PLAN and safe.status == TaskStatus.ERROR:
+            await discard_children(session, task, safe.text)
         task.status = safe.status
     if isinstance(safe, CheckpointIn):
         session.add(Checkpoint(task_id=task_id, **safe.model_dump(exclude={"external_key"})))

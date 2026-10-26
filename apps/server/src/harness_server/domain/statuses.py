@@ -19,7 +19,7 @@ TRANSITIONS: Final[Mapping[TaskKind, Mapping[TaskStatus, frozenset[TaskStatus]]]
         TaskStatus.PLANNING: frozenset({TaskStatus.READY, TaskStatus.ERROR, TaskStatus.STALLED}),
     },
     TaskKind.IMPLEMENT: {
-        TaskStatus.BACKLOG: frozenset({TaskStatus.ACTIVE}),
+        TaskStatus.BACKLOG: frozenset({TaskStatus.ACTIVE, TaskStatus.TRASH}),
         TaskStatus.ACTIVE: frozenset({TaskStatus.TESTING, TaskStatus.ERROR, TaskStatus.STALLED}),
         TaskStatus.TESTING: frozenset({TaskStatus.READY, TaskStatus.ERROR, TaskStatus.STALLED}),
         TaskStatus.READY: frozenset({TaskStatus.MERGED}),
@@ -37,7 +37,7 @@ TERMINAL_STATUSES: Final[Mapping[TaskKind, frozenset[TaskStatus]]] = {
     TaskKind.PLAN: frozenset(
         {TaskStatus.READY, TaskStatus.ERROR, TaskStatus.TRASH, TaskStatus.STALLED}
     ),
-    TaskKind.IMPLEMENT: frozenset({TaskStatus.MERGED, TaskStatus.STALLED}),
+    TaskKind.IMPLEMENT: frozenset({TaskStatus.MERGED, TaskStatus.STALLED, TaskStatus.TRASH}),
 }
 
 

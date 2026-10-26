@@ -7,6 +7,7 @@
 
 import re
 from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import Final
 
 REDACTED: Final = "[REDACTED]"
@@ -42,6 +43,32 @@ _PATTERNS: Final[tuple[tuple[re.Pattern[str], str], ...]] = (
     # Пароль в адресе https://user:pass@host: пользователь остаётся, пароль заменяется (D-62).
     (re.compile(r"(?i)\b(https?://[^\s/@:]+):[^\s/@]+@"), rf"\1:{REDACTED}@"),
 )
+
+
+@dataclass(frozen=True, slots=True)
+class SecretFinding:
+    """Место находки без совпавшего текста, имени файла и значения секрета."""
+
+    line: int
+    rule: str
+
+
+def scan_diff(diff: str, extra_values: Iterable[str] = ()) -> list[SecretFinding]:
+    """Находит шаблоны и все непустые точные значения, включая короткие ключи.
+
+    В отличие от redact, сканирование ничего не заменяет: короткое значение также должно
+    блокировать публикацию. Номер относится к строке diff, а не к исходному файлу.
+    """
+    rules = [(pattern, "token_pattern") for pattern, _ in _PATTERNS]
+    rules.extend(
+        (re.compile(re.escape(value)), "exact_value") for value in set(extra_values) if value
+    )
+    findings = {
+        SecretFinding(diff.count("\n", 0, match.start()) + 1, rule)
+        for pattern, rule in rules
+        for match in pattern.finditer(diff)
+    }
+    return sorted(findings, key=lambda finding: (finding.line, finding.rule))
 
 
 def redact(text: str, extra_values: Iterable[str] = ()) -> str:

@@ -2,19 +2,20 @@
 
 Пайплайн описывает, какую задачу брать из очереди, в каком статусе её оставить и что делать в
 песочнице.
-Реальные пайплайны (plan, implement) появятся в mvp-08/09; реестр PIPELINES в mvp-06 пуст.
+Plan зарегистрирован в mvp-08; implement добавляется в mvp-09.
 Пайплайн не работает с БД и песочницей напрямую: только через AgentRunner, который выдаёт диспетчер.
 """
 
 from dataclasses import dataclass
 from typing import Final, Protocol
 
+from harness_shared.projects import Workspace
 from harness_shared.sandboxes import AgentRole
 from harness_shared.tasks import TaskKind, TaskOut, TaskStatus
 
-from harness_server.config import HarnessConfig
 from harness_server.services.agent_result import AgentRun
 from harness_server.services.sandboxes import AgentStart
+from harness_server.worker.pipelines.plan import PlanPipeline
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,13 +51,13 @@ class Pipeline(Protocol):
 
     @property
     def to_status(self) -> TaskStatus | None:
-        """None — задача берётся без смены статуса (план остаётся в planning до mvp-08)."""
+        """None — задача берётся без смены статуса (plan остаётся в planning до проверок)."""
         ...
 
     @property
     def role(self) -> AgentRole: ...
 
-    def base_ref(self, task: TaskOut, config: HarnessConfig) -> str:
+    def base_ref(self, task: TaskOut, workspace: Workspace) -> str:
         """Базовая ветка для worktree задачи."""
         ...
 
@@ -65,6 +66,4 @@ class Pipeline(Protocol):
         ...
 
 
-# Реестр пуст в mvp-06: тесты передают свой реестр в dispatch_once, mvp-08/09 добавят пайплайны
-# сюда.
-PIPELINES: Final[dict[TaskKind, Pipeline]] = {}
+PIPELINES: Final[dict[TaskKind, Pipeline]] = {TaskKind.PLAN: PlanPipeline()}

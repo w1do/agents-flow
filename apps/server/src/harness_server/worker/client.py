@@ -2,6 +2,7 @@
 
 from uuid import UUID
 
+from harness_shared.planning import PlanFinishIn, PlanState
 from harness_shared.tasks import TaskEventOut, TaskKind
 from harness_shared.worker import ClaimIn, ClaimOut
 from harness_shared.worker_reports import CheckpointIn, EventIn
@@ -24,6 +25,25 @@ class WorkerClient:
 
     def __init__(self, api: WorkerAPI) -> None:
         self.api = api
+
+    async def plan_state(self, task_id: UUID, token: str) -> PlanState:
+        return parse(
+            PlanState,
+            await self.api.post(
+                f"/worker/tasks/{task_id}/plan/state",
+                token=token,
+            ),
+        )
+
+    async def plan_finish(self, task_id: UUID, body: PlanFinishIn, token: str) -> TaskEventOut:
+        return parse(
+            TaskEventOut,
+            await self.api.post(
+                f"/worker/tasks/{task_id}/plan/finish",
+                body,
+                token=token,
+            ),
+        )
 
     async def claim(self, kind: TaskKind, provider_id: str) -> ClaimOut | None:
         data = await self.api.post(

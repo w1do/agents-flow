@@ -34,6 +34,9 @@ Heartbeat хранится в `tasks.worker_heartbeat_at` (`0007`); сервер
 запуска и очистки. После начала очистки её операции авторизуются worker-токеном и закреплением,
 поскольку токены задачи уже отозваны. Восстановление такой очистки не выдаёт новый токен задачи.
 HTTP-адаптер повторяет сетевые ошибки/5xx до трёх попыток с backoff 0.25/0.5 сек; редиректы запрещены.
+SIGTERM/SIGINT отменяют текущий шаг диспетчера, включая HTTP-запрос или backoff;
+worker дожидается отмены шага перед закрытием HTTP-клиента. Закрепление и процесс агента
+сохраняются для восстановления при следующем запуске (D-41).
 Восстановление апдейтов и карточек Telegram запускается из lifespan сервера в фоне: первая
 попытка сразу, затем раз в минуту. Подключение к БД не задерживает старт приложения; при
 остановке фоновая задача отменяется до закрытия HTTP-клиента и engine БД.
@@ -88,7 +91,7 @@ apps/server/src/harness_server/
 ├── domain/            # statuses.py (таблица переходов), errors.py (DomainError и коды), без I/O и sqlalchemy
 ├── db/                # base.py (Base, naming convention, enum-хелперы), ids.py (uuid7), session.py, models/ (9 таблиц)
 ├── adapters/          # внешние API за интерфейсами (Protocol) и фейки: telegram (httpx, mvp-04), stt (OpenAI-совместимый, mvp-04), polza (Router/PolzaRouter/FakeRouter, OpenAI-совместимый chat completions, mvp-05), sandbox (D-64), local (`LocalSandboxProvider`, D-64), gitlab
-├── worker/            # settings.py (минимальные ENV), client.py (DTO над adapters/worker_api), dispatcher.py и execution.py (HTTP-очередь → локальный запуск → очистка), pipeline.py (контракт Pipeline; реестр PIPELINES пуст до mvp-08/09), gates (mvp-09)
+├── worker/            # settings.py (минимальные ENV), client.py (DTO над adapters/worker_api), dispatcher.py и execution.py (HTTP-очередь → локальный запуск → очистка), pipeline.py (контракт Pipeline; зарегистрирован plan), pipelines/plan.py; gates.py (экспорт services/gates.py)
 └── security/          # redaction (фильтр секретов: шаблоны токенов и точные значения), task tokens
 ```
 
@@ -165,6 +168,21 @@ implement:  backlog → active → testing → ready (MR создан) → merge
    выдаёт токен задачи, делает `git fetch` и worktree на `task/<plan_id>` от `origin/<default_branch>`, запускает
    `claude -p` с промптом планировщика. До активации worker проверяет маркер `projects/<id>.ready`: без него задача не запускается, причина `project_not_initialized` (выполнить `agent init <id>`, D-64). Планировщик пишет OpenSpec-изменение, коммитит, вызывает
    `sync_spec` и `create_task(kind=implement)` → задачи в `backlog`. Сервер пушит ветку плана, задача `plan` → `ready`.
+   В `PIPELINES` зарегистрирован `worker/pipelines/plan.py`; правила выполняют
+   `services/plan_pipeline.py` и `plan_validation.py`. После завершения процесса и MCP-сигнала
+   completed проверяются ветка, чистый worktree, новое закоммиченное изменение относительно базы,
+   proposal/design/tasks/specs, `openspec validate` и связанные задачи implement.
+   `security/redaction.scan_diff` возвращает тип находки и номер строки; ошибка или усечение diff
+   закрывают гейт. Push сравнивает HEAD с `ls-remote` и использует адрес workspace и авторизацию D-62.
+   Worker без БД вызывает `POST /worker/tasks/{id}/plan/state` (дети, пункты, финальный сигнал)
+   и `POST /worker/tasks/{id}/plan/finish` (external_key, ready/error, text, branch).
+   Серверные `services/plan_result.py` и `plan_failure.py` обеспечивают идемпотентность и
+   атомарный error плана + trash его backlog-задач. До ready родителя дети не выдаются исполнителю.
+   Повтор finish завершает транзакцию и освобождает блокировку плана до уведомления,
+   которое блокирует ту же строку через отдельную сессию.
+   После ready `services/notify.plan_ready` дописывает в карточку «спецификация готова, задач: N»
+   и краткие названия; повтор finish не дублирует итог. Затем worker отзывает токены, очищает
+   worktree и локальную ветку, вызывает pause и освобождает закрепление. MR плана не создаётся.
 5. **Исполнитель.** Worker берёт задачу из `backlog` по приоритету, worktree на `task/<id>` от
    `origin/task/<plan_id>` (в ней есть спецификация), агент реализует пункт и вызывает `report_task`.
 6. **Гейты (сервер, exec, идемпотентно, три уровня — D-58).** Уровень 1 — базовые гейты безопасности в коде,
@@ -178,6 +196,13 @@ implement:  backlog → active → testing → ready (MR создан) → merge
 7. **Очистка.** Удаление worktree и локальной ветки, отзыв токена задачи; после успешной очистки блокировка машины освобождается.
 
 ## 6. MCP `agents-flow`
+
+Минимальные инструменты планировщика реализованы в `mvp-08` (D-67), без изменения других changes.
+`mcp/server.py` использует stateless Streamable HTTP и проверяет bearer на каждом запросе;
+сервисы `agent_access.py`, `agent_tools.py`, `spec.py` повторяют проверку токена под блокировкой
+перед операцией. Запись пунктов и создание задач доступны только planner в planning до финального
+отчёта; sync_spec и create_task идемпотентны по ключу пункта. DTO находятся в
+`shared/src/harness_shared/planning.py`. Новых таблиц, миграций и ENV нет.
 
 Смонтирован в FastAPI по пути `/mcp` (Streamable HTTP, официальный MCP Python SDK; host-приложение
 запускает `session_manager.run()` в своём lifespan). Каталог инструментов: [`docs/mcp-agents-flow.md`](docs/mcp-agents-flow.md).
