@@ -5,7 +5,7 @@ context: |
   Все артефакты OpenSpec пишутся на русском языке; ключевые слова SHALL/MUST, WHEN/THEN и имена сущностей — как в коде.
   Решения поверх ТЗ — docs/decisions.md; они обязательны для всех изменений.
   Стек: Python 3.12, FastAPI async, SQLAlchemy 2 async, Pydantic v2, Alembic, uv, MCP Python SDK (Streamable HTTP),
-  Postgres, GitLab (MR, CI, Registry), Dokploy, Novita Agent Sandbox, Polza AI, Telegram Bot API.
+  Postgres, GitLab (MR, CI, Registry), Dokploy, локальная машина агента, Polza AI, Telegram Bot API.
   Статусы задачи только из набора: new, choosing, planning, backlog, active, testing, ready, merged, error, stalled, paused, trash.
   Бизнес-логика только в services/, внешние API только через adapters/ с Protocol и фейком.
   Секреты не попадают в код, конфиги, логи, git, БД и Telegram.

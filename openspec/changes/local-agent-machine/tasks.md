@@ -24,7 +24,7 @@
 - [x] 3.1 `SandboxConfig`: удалить `claude_code_version`, `openspec_version`; `SandboxMemoryConfig`: удалить `repo`, `ref`, оставить `embedding_ref`; валидатор `before` с сообщением на каждое удалённое поле — файлы: `apps/server/src/harness_server/config.py` — проверка: `test_config.py` (4 поля отклоняются с именем, `memory: {}` валиден)
 - [x] 3.2 `Settings`: удалить `novita_api_key`, `novita_domain`; ENV Novita не читаются и не мешают старту — файлы: `settings.py` — проверка: `test_settings.py`
 - [x] 3.3 `AgentSettings` для `agent init` (`HARNESS_CONFIG`, `VAULT_MCP_URL`, `VAULT_MCP_TOKEN`, `HARNESS_PUBLIC_URL`) без `DATABASE_URL` и Telegram — файлы: `settings.py` (или `agent_settings.py`) — проверка: тест загрузки без БД и Telegram
-- [ ] 3.4 `.env.example`, `config/harness.example.yaml` (`provider_id: local`, без версий и `ref`), `docs/deployment.md` (раздел перехода), таблица ENV в ARCHITECTURE.md §9 — файлы: перечисленные — проверка: grep по `NOVITA` пуст, ревью
+- [x] 3.4 `.env.example`, `config/harness.example.yaml` (`provider_id: local`, без версий и `ref`), `docs/deployment.md` (раздел перехода), таблица ENV в ARCHITECTURE.md §9 — файлы: перечисленные — проверка: grep по `NOVITA` пуст, ревью
 
 ## 4. services/machine и команда agent
 
@@ -42,8 +42,8 @@
 - [x] 5.2 `services/sandboxes.py`: удалить `bootstrap`, `_sync_clone`, константы bootstrap, `_merge_results`, `_remove_bootstrap_script`; убрать `extend_timeout` из `activate`; `_sync_memory` без `ensure-docker.sh`; docstring-и без Novita — файлы: `services/sandboxes.py` — проверка: `test_sandbox_service.py` (activate без `extend_timeout`, `_sync_memory`, release/pause/resume логические)
 - [x] 5.3 `cli.py`: удалить `sandbox bootstrap`, `DEFAULT_BOOTSTRAP_SCRIPT`, `_resolve_repo_keys` (если не нужен), справку `sandbox_app` без bootstrap — файлы: `cli.py` — проверка: `test_cli.py` (команда не найдена, код 2)
 - [x] 5.4 `worker/dispatcher.py`: проверка маркера `projects/<id>.ready` перед `activate`, причина `project_not_initialized: выполните agent init <id>`, освобождение стандартным путём — файлы: `worker/dispatcher.py` — проверка: `test_dispatcher.py` (нет маркера, есть маркер, песочница освобождена)
-- [ ] 5.5 Удалить `adapters/novita/`, `docs/novita.md`, `tools/spikes/novita_check.py`, `deploy/sandbox/`, зависимость `novita-sandbox` из `apps/server/pyproject.toml` и `pyproject.toml`, `uv lock` — файлы: перечисленные, `uv.lock` — проверка: `grep -ri novita apps shared deploy docker-compose.yml .env.example config` пуст, `uv sync --frozen`
-- [ ] 5.6 Удалить тесты `test_novita_client.py`, `test_novita_live.py`, `test_sandbox_bootstrap.py`; `conftest.py` и остальные тесты без `NOVITA_*`; live-тесты `test_agent_runtime_live.py`, `test_sandbox_profile_live.py` перевести на локальную машину и `agent init` — файлы: `apps/server/tests/` — проверка: `./tools/harness check`; live — прогон владельцем `-m live`
+- [x] 5.5 Удалить `adapters/novita/`, `docs/novita.md`, `tools/spikes/novita_check.py`, `deploy/sandbox/`, зависимость `novita-sandbox` из `apps/server/pyproject.toml` и `pyproject.toml`, `uv lock` — файлы: перечисленные, `uv.lock` — проверка: `grep -ri novita apps shared deploy docker-compose.yml .env.example config` пуст, `uv sync --frozen`
+- [x] 5.6 Удалить тесты `test_novita_client.py`, `test_novita_live.py`, `test_sandbox_bootstrap.py`; `conftest.py` и остальные тесты без `NOVITA_*`; live-тесты `test_agent_runtime_live.py`, `test_sandbox_profile_live.py` перевести на локальную машину и `agent init` — файлы: `apps/server/tests/` — проверка: `./tools/harness check`; live — прогон владельцем `-m live`
 - [x] 5.7 Документация: ARCHITECTURE.md (§1 компоненты без bootstrap, §3 `sandboxes`, §7 песочница, §10), `docs/deployment.md` (раздел «Подготовка машины», «Изоляция» вместо Novita), `docs/open-questions.md`, `docs/README.md` — файлы: перечисленные — проверка: ревью
 
 ## 6. Деплой: worker на хосте
