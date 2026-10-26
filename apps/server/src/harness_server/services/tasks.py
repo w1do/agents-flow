@@ -14,7 +14,7 @@ from harness_shared.tasks import TaskEventSource, TaskKind, TaskSource, TaskStat
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from harness_server.db.models import Sandbox, SpecItem, Task, TaskEvent
+from harness_server.db.models import Project, Sandbox, SpecItem, Task, TaskEvent, TaskToken
 from harness_server.domain.errors import NotFound, UnknownWorkspace
 from harness_server.domain.statuses import (
     ensure_transition,
@@ -201,6 +201,7 @@ async def lock_next_task(
     to_status: TaskStatus | None,
     source: TaskEventSource = TaskEventSource.WORKER,
     text: str | None = None,
+    worker_api: bool = False,
 ) -> Task | None:
     """Блокирует следующую задачу очереди и пишет событие; БЕЗ commit (mvp-06, D-24 — исключение).
 
@@ -219,6 +220,18 @@ async def lock_next_task(
     if to_status is not None:
         ensure_transition(kind, from_status, to_status)
     stmt = select(Task).where(Task.kind == kind, Task.status == from_status)
+    if worker_api:
+        active_project = (
+            select(Project.id)
+            .where(Project.id == Task.workspace_id, Project.status == "active")
+            .exists()
+        )
+        claimed = (
+            select(TaskToken.id)
+            .where(TaskToken.task_id == Task.id, TaskToken.revoked_at.is_(None))
+            .exists()
+        )
+        stmt = stmt.where(active_project, ~claimed)
     if to_status is None:
         # Задача, уже закреплённая за песочницей, второй раз не берётся.
         pinned = select(Sandbox.id).where(Sandbox.current_task_id == Task.id).exists()

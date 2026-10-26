@@ -10,7 +10,7 @@
 | `harness-server --help` | Справка по командам |
 | `harness-server check-config` | Проверяет ENV и `harness.yaml`, печатает активные проекты из каталога на сервере (нужен `DATABASE_URL`) |
 | `harness-server serve --host 127.0.0.1 --port 8000` | HTTP-сервер: `GET /health`, `GET /health/ready`. По умолчанию слушает localhost; в контейнере `--host 0.0.0.0` |
-| `harness-server worker` | Цикл опроса очереди задач. При старте восстанавливает апдейты Telegram: необработанные старше 1 мин обрабатываются заново, старше 24 ч списываются без обработки (payload очищается), недостающие карточки досылаются. Остановка по SIGTERM |
+| `harness-server worker` | HTTP-очередь `/worker` и локальная машина агента. Нужны HARNESS_CONFIG, HARNESS_PUBLIC_URL, WORKER_API_TOKEN; для запуска агента — CLAUDE_CODE_OAUTH_TOKEN. БД и Telegram ENV не нужны; остановка по SIGTERM |
 | `harness-server migrate` | `alembic upgrade head`, нужен `DATABASE_URL` |
 | `harness-server telegram set-webhook` | Регистрирует webhook в Telegram: адрес `HARNESS_PUBLIC_URL` + `/telegram/webhook` (только https), секрет из `TELEGRAM_WEBHOOK_SECRET`. Выполняется после деплоя и при смене адреса; ошибки — код 1 без токена и секрета в выводе |
 | `harness-server sandbox status` | Строка песочницы из `harness.yaml`: статус и закреплённая задача (нужен `DATABASE_URL`) |
@@ -193,3 +193,22 @@ src/harness_server/
 ```
 
 Модели ответов, видимые снаружи, лежат в `shared/` (пакет `harness_shared`).
+
+## Worker API (D-66)
+
+Полный контракт и порядок переключения — [ARCHITECTURE.md](../../ARCHITECTURE.md) и
+[docs/deployment.md](../../docs/deployment.md). `/worker` принимает отдельный bearer; записи задачи
+дополнительно проверяют `X-Task-Token`. Диспетчер вызывает `worker/client.py`, сеть изолирована
+`adapters/worker_api.py`; `worker/settings.py` не читает ENV сервера. Telegram recovery работает
+в lifespan сервера. Миграции 0006–0008 применяются перед переключением.
+
+Контрактные проверки без Postgres:
+
+```bash
+uv run pytest apps/server/tests/test_worker_client.py apps/server/tests/test_worker_remote_store.py apps/server/tests/test_worker_settings.py
+```
+
+Очередь, отчёты, heartbeat, учёт песочницы и миграции проверяют тесты `test_worker_queue.py`,
+`test_worker_reports.py`, `test_worker_heartbeat.py`, `test_worker_sandbox_api.py`,
+`test_worker_migrations.py` и HTTP-сценарии `test_dispatcher.py` с настоящей Postgres.
+Полная проверка — `./tools/harness check`; Docker/Postgres запускает оркестратор.

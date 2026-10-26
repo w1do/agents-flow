@@ -16,12 +16,12 @@ TRANSITIONS: Final[Mapping[TaskKind, Mapping[TaskStatus, frozenset[TaskStatus]]]
     TaskKind.PLAN: {
         TaskStatus.NEW: frozenset({TaskStatus.CHOOSING}),
         TaskStatus.CHOOSING: frozenset({TaskStatus.PLANNING, TaskStatus.TRASH}),
-        TaskStatus.PLANNING: frozenset({TaskStatus.READY, TaskStatus.ERROR}),
+        TaskStatus.PLANNING: frozenset({TaskStatus.READY, TaskStatus.ERROR, TaskStatus.STALLED}),
     },
     TaskKind.IMPLEMENT: {
         TaskStatus.BACKLOG: frozenset({TaskStatus.ACTIVE}),
-        TaskStatus.ACTIVE: frozenset({TaskStatus.TESTING, TaskStatus.ERROR}),
-        TaskStatus.TESTING: frozenset({TaskStatus.READY, TaskStatus.ERROR}),
+        TaskStatus.ACTIVE: frozenset({TaskStatus.TESTING, TaskStatus.ERROR, TaskStatus.STALLED}),
+        TaskStatus.TESTING: frozenset({TaskStatus.READY, TaskStatus.ERROR, TaskStatus.STALLED}),
         TaskStatus.READY: frozenset({TaskStatus.MERGED}),
         # error → backlog: повтор задачи после сбоя, а не откат к активной работе.
         TaskStatus.ERROR: frozenset({TaskStatus.BACKLOG}),
@@ -34,8 +34,10 @@ INITIAL_STATUS: Final[Mapping[TaskKind, TaskStatus]] = {
 }
 
 TERMINAL_STATUSES: Final[Mapping[TaskKind, frozenset[TaskStatus]]] = {
-    TaskKind.PLAN: frozenset({TaskStatus.READY, TaskStatus.ERROR, TaskStatus.TRASH}),
-    TaskKind.IMPLEMENT: frozenset({TaskStatus.MERGED}),
+    TaskKind.PLAN: frozenset(
+        {TaskStatus.READY, TaskStatus.ERROR, TaskStatus.TRASH, TaskStatus.STALLED}
+    ),
+    TaskKind.IMPLEMENT: frozenset({TaskStatus.MERGED, TaskStatus.STALLED}),
 }
 
 

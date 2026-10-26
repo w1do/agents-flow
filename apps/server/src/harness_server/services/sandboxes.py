@@ -19,9 +19,11 @@ from uuid import UUID
 
 from harness_shared.projects import ProjectRepo, Workspace
 from harness_shared.sandboxes import AgentRole, SandboxStatus
-from harness_shared.tasks import TaskEventSource, TaskKind, TaskStatus
+from harness_shared.tasks import TaskEventSource, TaskKind, TaskOut, TaskStatus
+from harness_shared.worker_sandbox import AgentRunInfo as AgentRunInfo
 from pydantic import SecretStr
 from sqlalchemy import select, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from harness_server.adapters.sandbox import ExecResult, SandboxError, SandboxProvider
@@ -41,6 +43,7 @@ from harness_server.services.agent_result import (
     parse_result,
     truncate_log_text,
 )
+from harness_server.services.agent_store import AgentStore, agent_store
 from harness_server.services.projects import get_workspace
 from harness_server.services.tasks import get_task, lock_next_task
 
@@ -133,7 +136,9 @@ async def has_live_task_token(session: AsyncSession, task_id: UUID) -> bool:
     """Whether a crash left a usable task token that requires full cleanup."""
     return (
         await session.execute(
-            select(TaskToken.id).where(TaskToken.task_id == task_id, TaskToken.revoked_at.is_(None))
+            select(TaskToken.id)
+            .where(TaskToken.task_id == task_id, TaskToken.revoked_at.is_(None))
+            .limit(1)
         )
     ).scalar_one_or_none() is not None
 
@@ -199,14 +204,6 @@ class AgentStart:
 
 
 @dataclass(frozen=True, slots=True)
-class AgentRunInfo:
-    """Серверная запись запуска агента: время и pid из БД, а не из файлов песочницы (D-41)."""
-
-    started_at: datetime | None
-    pid: int | None
-
-
-@dataclass(frozen=True, slots=True)
 class Reservation:
     """Песочница и задача, закреплённые одной транзакцией (design 9)."""
 
@@ -255,18 +252,18 @@ async def ensure_sandbox(session: AsyncSession, config: HarnessConfig) -> Sandbo
     Статус существующей строки не сбрасывается: активная песочница не должна стать paused.
     """
     provider_id = config.sandbox.provider_id
-    row = (
-        await session.execute(select(Sandbox).where(Sandbox.provider_id == provider_id))
-    ).scalar_one_or_none()
-    if row is None:
-        row = Sandbox(
+    await session.execute(
+        insert(Sandbox)
+        .values(
             provider_id=provider_id,
             agent_type=CLAUDE_CODE_AGENT_TYPE,
             status=SandboxStatus.PAUSED,
         )
-        session.add(row)
-        await session.commit()
-        logger.info("sandbox created provider_id=%s", provider_id)
+        .on_conflict_do_nothing(index_elements=[Sandbox.provider_id])
+    )
+    await session.commit()
+    row = await session.scalar(select(Sandbox).where(Sandbox.provider_id == provider_id))
+    assert row is not None
     return row
 
 
@@ -392,7 +389,7 @@ async def _exec_ok(
 async def activate(
     provider: SandboxProvider,
     provider_id: str,
-    task: Task,
+    task: Task | TaskOut,
     *,
     base_ref: str,
     timeout_min: int,
@@ -482,7 +479,7 @@ async def activate(
 async def _sync_memory(
     provider: SandboxProvider,
     provider_id: str,
-    task: Task,
+    task: Task | TaskOut,
     *,
     home: str,
     repo: str,
@@ -541,15 +538,15 @@ def _run_script(directory: str, worktree: str, max_turns: int) -> str:
 
 
 async def run_agent(
-    session: AsyncSession,
+    session: AsyncSession | AgentStore,
     provider: SandboxProvider,
     provider_id: str,
-    task: Task,
+    task: Task | TaskOut,
     *,
     prompt: str,
     max_turns: int,
     timeout_min: int,
-    secret_key: SecretStr,
+    secret_key: SecretStr | None = None,
     oauth_token: SecretStr,
     agents_flow_url: str,
     now: datetime | None = None,
@@ -560,7 +557,8 @@ async def run_agent(
 
     Идемпотентно по серверной записи agent_started_at (D-41): запуск есть в БД — второй не делается.
     Файлы песочницы без серверной записи (status.json, pid) агента не запускают: итог DIED,
-    повторного запуска нет. Токен задачи выдаётся непосредственно перед запуском (D-37). Креды
+    повторного запуска нет. HTTP-путь использует токен захвата (D-66), ORM-путь выдаёт токен
+    перед запуском (D-37). Креды
     передаются только в env команды запуска; в файлы попадают только prompt, run.json и run.sh без
     значений.
 
@@ -568,9 +566,10 @@ async def run_agent(
     переменные их перекрывают. memory_enabled — добавить HARNESS_MEMORY_PROJECT с путём клона:
     без памяти переменной нет, как и до mvp-память (D-47).
     """
+    store = agent_store(session, provider_id)
     home = await home_dir(provider, provider_id)
     directory = task_dir(home, task.id)
-    info = await agent_run_info(session, provider_id)
+    info = await store.info()
     if info.started_at is not None:
         # Запуск уже был. Pid берём из БД; если его нет (сбой между запуском и записью), из файла.
         pid = info.pid
@@ -578,7 +577,7 @@ async def run_agent(
             pid_text = await provider.read_file(provider_id, f"{directory}/pid")
             pid = parse_pid(pid_text) if pid_text is not None else None
             if pid is not None:
-                await record_agent_pid(session, provider_id, pid)
+                await store.record_pid(pid)
         if pid is not None and await _is_alive(provider, provider_id, pid):
             return AgentStart(AgentStartState.ALREADY_RUNNING)
         if await provider.read_file(provider_id, f"{directory}/status.json") is not None:
@@ -613,15 +612,9 @@ async def run_agent(
         _run_script(directory, worktree_dir(home, task.id), max_turns),
     )
 
-    token = await issue_task_token(
-        session,
-        task.id,
-        secret_key=secret_key.get_secret_value(),
-        agent_run_timeout_min=timeout_min,
-        now=started_at,
-    )
-    # Время запуска пишется до команды: сбой после неё не теряет отсчёт таймаута (D-41).
-    await _record_agent_started(session, provider_id, started_at)
+    token = await store.issue_token(task.id, secret_key, timeout_min, started_at)
+    if not await store.record_started(started_at):
+        return AgentStart(AgentStartState.ALREADY_RUNNING)
     # pid возвращается в stdout и сохраняется сервером; файл pid — запасной путь при восстановлении.
     launch = (
         f"setsid nohup bash {shlex.quote(f'{directory}/run.sh')} >/dev/null 2>&1 < /dev/null & "
@@ -647,7 +640,7 @@ async def run_agent(
     pid = parse_pid(launched.stdout)
     if pid is None:
         raise SandboxStepError("launch_pid")
-    await record_agent_pid(session, provider_id, pid)
+    await store.record_pid(pid)
     logger.info("agent started task=%s", task.id)
     return AgentStart(AgentStartState.STARTED, token=SecretStr(token))
 
@@ -702,18 +695,16 @@ async def _probe_group(provider: SandboxProvider, provider_id: str, pid: int) ->
     return None
 
 
-async def _cleanup_failed(session: AsyncSession, provider_id: str) -> NoReturn:
-    """Keep the reservation and evidence for an operator after an unsafe cleanup stop."""
-    row = await _locked_sandbox(session, provider_id)
-    row.status = SandboxStatus.ERROR
-    await session.commit()
+async def _cleanup_failed(session: AsyncSession | AgentStore, provider_id: str) -> NoReturn:
+    """Сохраняет закрепление и доказательства при небезопасной очистке."""
+    await agent_store(session, provider_id).mark_error()
     raise CleanupFailed("command")
 
 
 async def wait_agent(
     provider: SandboxProvider,
     provider_id: str,
-    task: Task,
+    task: Task | TaskOut,
     *,
     started_at: datetime | None,
     pid: int | None,
@@ -793,10 +784,10 @@ async def wait_agent(
 
 
 async def cleanup_task(
-    session: AsyncSession,
+    session: AsyncSession | AgentStore,
     provider: SandboxProvider,
     provider_id: str,
-    task: Task,
+    task: Task | TaskOut,
     *,
     secrets: Sequence[str],
 ) -> None:
@@ -807,44 +798,45 @@ async def cleanup_task(
     Ненулевой код любой команды — песочница в error, current_task_id сохраняется, CleanupFailed.
     Причина в лог проходит redaction.
     """
-    await revoke_task_tokens(session, task.id)
+    store = agent_store(session, provider_id)
+    await store.revoke_tokens(task.id)
     # Агент мог запуститься до сбоя между записью started_at и agent_pid.  Only that recorded
     # launch permits the pid-file recovery path; without it a file is untrusted agent input.
-    row = await sandbox_status(session, provider_id)
-    started_at = row.agent_started_at if row is not None else None
-    pid = parse_pid(str(row.agent_pid)) if row is not None and row.agent_pid is not None else None
-    if row is not None and row.agent_pid is None and started_at is not None:
+    row = await store.info()
+    started_at = row.started_at if row is not None else None
+    pid = parse_pid(str(row.pid)) if row is not None and row.pid is not None else None
+    if row is not None and row.pid is None and started_at is not None:
         try:
             home = await home_dir(provider, provider_id)
             pid_text = await provider.read_file(provider_id, f"{task_dir(home, task.id)}/pid")
         except (OSError, UnicodeError, SandboxError):
-            await _cleanup_failed(session, provider_id)
+            await _cleanup_failed(store, provider_id)
         pid = parse_pid(pid_text) if pid_text is not None else None
         # A started record with no usable pid is a crash window, not proof of death.  Preserve the
         # directory because it may still contain the only evidence of a live process.
         if pid is None:
-            await _cleanup_failed(session, provider_id)
-        await record_agent_pid(session, provider_id, pid)
+            await _cleanup_failed(store, provider_id)
+        await store.record_pid(pid)
     if pid is not None:
         try:
             alive = await _probe_group(provider, provider_id, pid)
         except SandboxError:
-            await _cleanup_failed(session, provider_id)
+            await _cleanup_failed(store, provider_id)
         if alive is None:
-            await _cleanup_failed(session, provider_id)
+            await _cleanup_failed(store, provider_id)
         if alive:
             try:
                 killed = await _kill_group(provider, provider_id, pid)
                 if killed is not None and killed.exit_code != 0:
-                    await _cleanup_failed(session, provider_id)
+                    await _cleanup_failed(store, provider_id)
                 for _ in range(KILL_REAP_PROBES):
                     alive = await _probe_group(provider, provider_id, pid)
                     if alive is not True:
                         break
             except SandboxError:
-                await _cleanup_failed(session, provider_id)
+                await _cleanup_failed(store, provider_id)
             if alive is not False:
-                await _cleanup_failed(session, provider_id)
+                await _cleanup_failed(store, provider_id)
     home = await home_dir(provider, provider_id)
     commands: list[str] = []
     if task.workspace_id is not None:
@@ -874,9 +866,7 @@ async def cleanup_task(
                 result.exit_code,
                 detail,
             )
-            row = await _locked_sandbox(session, provider_id)
-            row.status = SandboxStatus.ERROR
-            await session.commit()
+            await store.mark_error()
             raise CleanupFailed("command")
     logger.info("task cleanup done task=%s", task.id)
 

@@ -6,7 +6,17 @@ import uuid
 from datetime import datetime
 
 from harness_shared.tasks import TaskEventSource, TaskKind, TaskSource, TaskStatus, TestsState
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, Uuid, func
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    Uuid,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from harness_server.db.base import Base, TimestampMixin, enum_check, enum_type
@@ -43,6 +53,9 @@ class Task(TimestampMixin, Base):
         ForeignKey("spec_items.id", ondelete="SET NULL", use_alter=True),
         nullable=True,
     )
+    worker_heartbeat_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     branch: Mapped[str | None] = mapped_column(String(255), nullable=True)
     mr_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     result: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -62,6 +75,7 @@ class TaskEvent(Base):
         enum_check("status", TaskStatus),
         enum_check("source", TaskEventSource),
         Index("ix_task_events_task_id_created_at", "task_id", "created_at"),
+        UniqueConstraint("task_id", "external_key", name="uq_task_events_external_key"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid7)
@@ -69,6 +83,7 @@ class TaskEvent(Base):
         Uuid(as_uuid=True), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False
     )
     status: Mapped[TaskStatus] = mapped_column(enum_type(TaskStatus), nullable=False)
+    external_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
     text: Mapped[str | None] = mapped_column(Text, nullable=True)
     source: Mapped[TaskEventSource] = mapped_column(enum_type(TaskEventSource), nullable=False)
     created_at: Mapped[datetime] = mapped_column(

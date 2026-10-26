@@ -17,7 +17,8 @@ def _yaml(path: Path) -> dict[str, Any]:
 def test_dokploy_compose_has_no_worker_service() -> None:
     services = _yaml(ROOT / "docker-compose.yml")["services"]
     assert isinstance(services, dict)
-    assert set(services) == {"migrate", "server"}
+    assert set(services) == {"migrate", "server", "postgres", "console"}
+    assert "worker" not in services
 
 
 def test_db_publishes_postgres_only_on_loopback() -> None:

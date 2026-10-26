@@ -10,10 +10,9 @@ from dataclasses import dataclass
 from typing import Final, Protocol
 
 from harness_shared.sandboxes import AgentRole
-from harness_shared.tasks import TaskKind, TaskStatus
+from harness_shared.tasks import TaskKind, TaskOut, TaskStatus
 
 from harness_server.config import HarnessConfig
-from harness_server.db.models import Task
 from harness_server.services.agent_result import AgentRun
 from harness_server.services.sandboxes import AgentStart
 
@@ -57,11 +56,11 @@ class Pipeline(Protocol):
     @property
     def role(self) -> AgentRole: ...
 
-    def base_ref(self, task: Task, config: HarnessConfig) -> str:
+    def base_ref(self, task: TaskOut, config: HarnessConfig) -> str:
         """Базовая ветка для worktree задачи."""
         ...
 
-    async def run(self, runner: AgentRunner, task: Task) -> Outcome:
+    async def run(self, runner: AgentRunner, task: TaskOut) -> Outcome:
         """Выполняет этап задачи через runner. Исключение равнозначно ok=False."""
         ...
 

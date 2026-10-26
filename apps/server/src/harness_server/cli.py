@@ -23,6 +23,7 @@ from harness_server.services.projects import list_workspaces
 from harness_server.services.webhook import register_webhook, webhook_url
 from harness_server.settings import Settings, SettingsError, load_settings
 from harness_server.worker import serve_worker
+from harness_server.worker.settings import load_worker_settings
 
 # Корень приложения: uv ставит workspace editable, поэтому cli.py лежит в
 # <root>/apps/server/src/harness_server/ и в репозитории, и в образе (/app). Путь не зависит от cwd:
@@ -77,7 +78,12 @@ def serve(host: str = "127.0.0.1", port: int = 8000) -> None:
 @app.command()
 def worker() -> None:
     """Запускает worker: цикл опроса очереди, корректная остановка по SIGTERM."""
-    settings, config = _load_or_exit()
+    try:
+        settings = load_worker_settings()
+        config = load_config(settings.harness_config)
+    except (SettingsError, ConfigError) as exc:
+        typer.echo(f"Ошибка конфигурации: {exc}", err=True)
+        raise typer.Exit(code=1) from None
     _configure_logging()
     asyncio.run(serve_worker(settings, config))
 

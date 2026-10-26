@@ -1,5 +1,67 @@
 # Деплой (Dokploy + GitLab CI)
 
+## Worker через HTTP API (D-66)
+
+Worker обращается к серверу через `/worker`; БД, Telegram и `HARNESS_SECRET_KEY` на машине
+агента не нужны. Восстановление апдейтов и карточек Telegram теперь выполняет сервер при старте
+и раз в минуту. Интеграционные проверки Postgres запускает оркестратор; 6.5 остаётся за владельцем.
+
+Порядок переключения:
+
+1. Прекратить новые назначения и дождаться завершения активных агентов. Остановить прежний worker.
+   Остановка процесса worker сама по себе не завершает агентскую группу: перед миграцией проверить её завершение.
+2. На тестовой Postgres выполнить полный `./tools/harness check`, затем применить `harness-server migrate`
+   на сервере (ревизии 0006–0008), обновить сервер и проверить `/health/ready`.
+3. Задать один `WORKER_API_TOKEN` в окружении процесса сервера и машины агента. Минимум 32 символа,
+   без пробелов по краям; он отличается от `HARNESS_ADMIN_TOKEN`. Сервер без него закрывает `/worker`
+   ответом 401. Значение не хранится в БД или файлах проекта. Ротация — замена ENV на обеих сторонах
+   и перезапуск процессов; отдельной миграции для ротации нет.
+4. В Dokploy проверить именно окружение контейнера server. Текущий `docker-compose.yml` не пробрасывает
+   `WORKER_API_TOKEN`; добавить его в environment сервиса через конфигурацию деплоя/Compose override:
+
+   ```yaml
+   services:
+     server:
+       environment:
+         WORKER_API_TOKEN: ${WORKER_API_TOKEN:?required}
+         WORKER_HEARTBEAT_TIMEOUT_SEC: ${WORKER_HEARTBEAT_TIMEOUT_SEC:-120}
+   ```
+
+   Этот override задаёт оператор при выкладке. Compose, `.env.example` и `deploy/worker/README.md`
+   вне разрешённых путей текущего задания; примеры ENV в этом разделе актуальны для worker-api.
+5. На машине агента подготовить проект через `agent init <project>` (его отдельный операторский токен
+   нужен только для подготовки) и убедиться, что `sandbox.provider_id` совпадает на сервере и машине.
+   В EnvironmentFile systemd user unit оставить минимальные переменные ниже; файлу задать права 0600.
+6. Запустить `uv run harness-server worker` из checkout на машине агента или прежний systemd user unit.
+   Для worker не задавать `DATABASE_URL`, Telegram ENV, `HARNESS_SECRET_KEY` и `HARNESS_ADMIN_TOKEN`.
+   Доступ к Postgres с машины агента не требуется. Снять дренирование и выполнить ручную проверку 6.5
+   на задаче владельца. Производственная выкладка в рамках этого задания не выполнялась.
+
+Минимальные ENV worker (реальные секреты задаются оператором, в git не попадают):
+
+```dotenv
+HARNESS_CONFIG=/absolute/path/to/harness.yaml
+HARNESS_PUBLIC_URL=https://harness.example.invalid
+WORKER_API_TOKEN=<тот же секрет, что у сервера>
+CLAUDE_CODE_OAUTH_TOKEN=<подписка агента>
+```
+
+Если нужны ссылки vault: задать `VAULT_MCP_URL` и `VAULT_MCP_TOKEN`. Необязательные настройки:
+`WORKER_POLL_INTERVAL_SEC=5`, `AGENT_POLL_INTERVAL_SEC=15`, `AGENT_RUN_TIMEOUT_MIN=60`.
+HTTP допускается только для loopback (`localhost`, `127.0.0.1`, `::1`); адрес без credentials, query
+и fragment. Внешний адрес — HTTPS, редиректы не выполняются.
+
+Серверный `WORKER_HEARTBEAT_TIMEOUT_SEC` — 120 секунд по умолчанию, минимум 30.
+Worker отправляет heartbeat каждые 10 секунд во время активации и работы пайплайна. Нет heartbeat
+дольше срока — сервер ставит `stalled` и событие, задача видна в обычном списке оператору.
+Сетевые ошибки и 5xx повторяются до трёх попыток; повторы отчётов сохраняют `external_key`.
+
+После рестарта worker запрашивает `sandbox/recover`: сведения о запуске берёт с сервера, а не из
+`run.json`. Работающий агент не запускается повторно. Очистка сначала отзывает все токены задачи,
+затем удаляет локальные артефакты, выполняет паузу и подтверждает освобождение серверу. При сбое
+очистки остаётся песочница в error с закреплённой задачей для разбора; не обнулять её вручную.
+Начатая очистка после рестарта продолжается без запуска пайплайна и без выдачи нового токена задачи.
+
 ## Переход на локальную машину агента
 
 Это руководство описывает ручную процедуру; ничего здесь автоматически не устанавливается и не выполняется. Выполняет оператор. Изменение `local-agent-machine` ещё не принято целиком: runtime-пункты 3–5 заблокированы до успешного повторного теста `4.5`; не проводить производственный rollout до снятия этого блокера и приёмки.
@@ -45,7 +107,7 @@
 | Стек | Файл | Сервисы | Заметки |
 |---|---|---|---|
 | Харнесс (основной) | `docker-compose.yml` | `postgres` → `migrate` → `server`; `console` | Один стек: `docker compose up` поднимает всё. Worker запускается на хосте systemd user unit |
-| БД (отдельный, для host worker) | `deploy/db/docker-compose.yml` | `postgres` | Volume `pgdata`; порт только на `127.0.0.1:5432` хоста, нужен host worker. См. ниже |
+| БД (отдельный серверный стек) | `deploy/db/docker-compose.yml` | `postgres` | Volume `pgdata`; порт только на `127.0.0.1:5432` серверного хоста; worker использует HTTPS API |
 
 - `server` и `console` подключены к внешней сети `dokploy-network` (маршрутизация Dokploy); `postgres` доступен только
   внутри стека (сеть `default`) и наружу не публикуется. Наружу только `expose`.
@@ -66,9 +128,9 @@
 1. **Postgres и ENV БД.** Postgres входит в стек `docker-compose.yml`: задайте в Environment Dokploy `POSTGRES_PASSWORD`
    (обязательно), при необходимости `POSTGRES_USER` (по умолчанию `harness`) и `POSTGRES_DB` (по умолчанию `harness`).
    `DATABASE_URL` задавать не нужно: он собирается из этих значений. Пароль в документацию и репозиторий не пишется.
-   Если host worker должен ходить в ту же БД по `127.0.0.1:5432`, остаётся `deploy/db/docker-compose.yml`: его volume
-   и порт на loopback не меняются. Тогда задайте `DATABASE_URL` явно на адрес этой БД (порт опубликован только на loopback
-   хоста, `postgres` стека его не видит) и не запускайте второй экземпляр БД для тех же данных.
+   При сохранении существующей БД `deploy/db/docker-compose.yml` её volume не менять.
+   Задайте серверный `DATABASE_URL` на адрес этой БД в Docker-сети и не запускайте второй экземпляр
+   для тех же данных. Машина worker использует API, доступ к порту 5432 ей не нужен.
 2. **Стек харнесса.** Dokploy → Compose → Source: GitHub `w1do/agents-flow`, ветка `main`, Compose Path `docker-compose.yml`.
    Dokploy выполняет `build` из `Dockerfile` (migrate, server) и `apps/console/Dockerfile` (console, контекст — корень репозитория);
    образ server получает локальный тег `agents-flow:local`, общий для migrate и server.
@@ -131,7 +193,7 @@ Job `deploy:dokploy` не добавляет `curl -v` и `--trace`: при ош
 репозиторий workspace, настраивает память при необходимости и ставит маркер готовности проекта. Команда не устанавливает
 инструменты и не требует `sudo`.
 
-Worker запускается на этой же машине как systemd user unit по [`deploy/worker/README.md`](../deploy/worker/README.md).
+Worker запускается на этой же машине как systemd user unit по [`deploy/worker/README.md`](../deploy/worker/README.md); ENV для worker-api — в разделе D-66 выше.
 `LocalSandboxProvider` выполняет команды локально с ограничением времени и очищенным окружением подпроцессов. Это
 изоляция на уровне процессов: отдельная VM или контейнер для агента не создаётся, а права и исходящую сеть машины
 контролирует оператор.
@@ -139,14 +201,14 @@ Worker запускается на этой же машине как systemd use
 ## Первый запуск
 
 1. Задеплоить стек харнесса (`docker-compose.yml`) с ENV из ARCHITECTURE.md §9 и `POSTGRES_PASSWORD`. Для прода с
-   host worker, который уже работает с `deploy/db`, см. пункт 1 «Первого деплоя».
+   сервером, который уже работает с `deploy/db`, см. пункт 1 «Первого деплоя».
 2. `harness-server telegram set-webhook` — регистрирует `${HARNESS_PUBLIC_URL}/telegram/webhook` с секретом
    `TELEGRAM_WEBHOOK_SECRET`. Запускается в контейнере `server` после деплоя и при каждой смене `HARNESS_PUBLIC_URL`
    или секрета. `HARNESS_PUBLIC_URL` должен быть https без учётных данных, иначе команда завершится с кодом 1 и
    понятным сообщением. Вывод команды токен и секрет не содержат.
 3. Подготовить машину агента по разделу «Подготовка машины агента» и выполнить `agent init <project>` для каждого
    проекта. `sandbox.provider_id` в `harness.yaml` задаёт id, который проверяет `LocalSandboxProvider` (D-64).
-4. Worker запускать на хосте как systemd user unit по инструкции [`deploy/worker/README.md`](../deploy/worker/README.md);
+4. Worker запускать на хосте как systemd user unit по инструкции [`deploy/worker/README.md`](../deploy/worker/README.md) с ENV из раздела D-66;
    остановка unit не завершает процессы агента автоматически.
 
 ### Задача осталась закреплена за машиной

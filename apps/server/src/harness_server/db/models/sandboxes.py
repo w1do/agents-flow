@@ -4,7 +4,17 @@ import uuid
 from datetime import datetime
 
 from harness_shared.sandboxes import AgentRole, SandboxStatus
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, Uuid, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+    Uuid,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from harness_server.db.base import Base, TimestampMixin, enum_check, enum_type
@@ -32,6 +42,13 @@ class Sandbox(TimestampMixin, Base):
         Uuid(as_uuid=True), ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True
     )
     profile_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    last_released_task_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True
+    )
+    agent_launch_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    cleanup_started: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     agent_started_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

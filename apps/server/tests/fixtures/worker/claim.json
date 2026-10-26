@@ -1,0 +1,37 @@
+{
+  "task": {
+    "id": "00000000-0000-0000-0000-000000000001",
+    "kind": "implement",
+    "workspace_id": "demo",
+    "parent_id": null,
+    "text": "сделай задачу",
+    "status": "active",
+    "priority": 0,
+    "source": "api",
+    "spec_item_id": null,
+    "branch": null,
+    "mr_url": null,
+    "result": null,
+    "tests_state": "not_run",
+    "created_at": "2026-10-26T00:00:00Z",
+    "updated_at": "2026-10-26T00:00:00Z"
+  },
+  "project": {
+    "id": "demo",
+    "name": "Demo",
+    "voice_aliases": [],
+    "repo": {
+      "provider": "gitlab",
+      "base_url": "https://gitlab.com",
+      "project": "group/demo",
+      "access_ref": "vault:demo/gitlab/main"
+    },
+    "default_branch": "main",
+    "test_command": null,
+    "agent": "claude-code",
+    "agent_max_turns": 50
+  },
+  "task_token": "fixture-task-token-not-a-real-secret",
+  "role": "implementer",
+  "expires_at": "2026-10-26T00:00:00Z"
+}

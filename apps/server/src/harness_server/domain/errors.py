@@ -102,3 +102,15 @@ class ProjectDisabled(DomainError):
     def __init__(self, project_id: str) -> None:
         super().__init__(f"проект отключён: {project_id}")
         self.project_id = project_id
+
+
+class WorkerUnauthorized(DomainError):
+    """Токен задачи отсутствует, чужой, истёк или отозван."""
+
+    code = "worker_unauthorized"
+
+
+class WorkerConflict(DomainError):
+    """Операция worker противоречит серверной записи."""
+
+    code = "worker_conflict"

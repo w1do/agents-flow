@@ -1,4 +1,4 @@
-"""Сценарий 3.2: worker работает в цикле и завершается с кодом 0 по SIGTERM."""
+"""Остановка worker по SIGTERM и восстановление Telegram при старте сервера."""
 
 import asyncio
 import os
@@ -11,14 +11,17 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from asgi_lifespan import LifespanManager
 from harness_server.adapters.telegram import FakeTelegramClient
+from harness_server.app import create_app
 from harness_server.config import load_config
 from harness_server.db.models import TelegramUpdate
+from harness_server.services.context import BotContext
+from harness_server.services.intake import recover_pending
 from harness_server.services.tasks import list_tasks
 from harness_server.settings import load_settings
 from harness_server.telegram.parse import dedup_key, dump_incoming, parse_update
 from harness_server.wiring import BotAdapters
-from harness_server.worker import start_worker
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -27,11 +30,12 @@ def test_worker_stops_cleanly_on_sigterm(
     valid_env: dict[str, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("WORKER_POLL_INTERVAL_SEC", "0.2")
+    monkeypatch.setenv("WORKER_API_TOKEN", "test-worker-token-0123456789abcdef01")
+    monkeypatch.setenv("HARNESS_PUBLIC_URL", "http://127.0.0.1:1")
     # Консольный скрипт лежит рядом с интерпретатором venv; так тест не зависит от uv.
-    script = Path(sys.executable).parent / "harness-server"
 
     process = subprocess.Popen(
-        [str(script), "worker"],
+        [sys.executable, "-c", "from harness_server.cli import app; app()", "worker"],
         cwd=tmp_path,
         env=os.environ.copy(),
         stdout=subprocess.PIPE,
@@ -58,14 +62,14 @@ def test_worker_stops_cleanly_on_sigterm(
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_start_worker_runs_recovery(
+async def test_server_startup_runs_telegram_recovery(
     valid_env: dict[str, str],
     migrated_database_url: str,
     committed_session_factory: async_sessionmaker[AsyncSession],
     telegram_update: Callable[[str], dict[str, Any]],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Строка апдейта старше порога обрабатывается, когда worker стартует (stop уже установлен)."""
+    """Старт сервера обрабатывает старый апдейт; повторный старт не создаёт дублей."""
     monkeypatch.setenv("DATABASE_URL", migrated_database_url)
     settings = load_settings()
     config = load_config(settings.harness_config)
@@ -83,15 +87,29 @@ async def test_start_worker_runs_recovery(
         )
         await session.commit()
     fake = FakeTelegramClient()
-    stop = asyncio.Event()
-    stop.set()
+    recovered: asyncio.Queue[int] = asyncio.Queue()
 
-    await start_worker(settings, config, stop, adapters=BotAdapters(telegram=fake, stt=None))
+    async def observed_recovery(bot: BotContext) -> int:
+        count = await recover_pending(bot)
+        recovered.put_nowait(count)
+        return count
 
-    async with committed_session_factory() as session:
-        tasks = await list_tasks(session)
-        row = await session.get(TelegramUpdate, (kind, external_id))
-    assert len(tasks) == 1
-    assert row is not None
-    assert row.processed_at is not None
-    assert len(fake.sent) == 1
+    # Наблюдаем настоящий проход recovery: выход из lifespan отменяет фоновую задачу.
+    monkeypatch.setattr(
+        "harness_server.services.server_recovery.recover_pending", observed_recovery
+    )
+    task_ids = []
+    for expected_count in (1, 0):
+        app = create_app(settings, config, adapters=BotAdapters(telegram=fake, stt=None))
+        async with LifespanManager(app):
+            assert await asyncio.wait_for(recovered.get(), timeout=5) == expected_count
+
+        async with committed_session_factory() as session:
+            tasks = await list_tasks(session)
+            row = await session.get(TelegramUpdate, (kind, external_id))
+        assert len(tasks) == 1
+        assert row is not None
+        assert row.processed_at is not None
+        assert len(fake.sent) == 1
+        task_ids.append(tasks[0].id)
+    assert task_ids[0] == task_ids[1]

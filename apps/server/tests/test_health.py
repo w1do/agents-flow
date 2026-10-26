@@ -1,11 +1,43 @@
 """Сценарий 3 platform-config: /health без внешних вызовов, /health/ready 503 без БД."""
 
+import asyncio
+
 import httpx
 import pytest
 from asgi_lifespan import LifespanManager
 from harness_server.app import create_app
 from harness_server.config import load_config
+from harness_server.services.context import BotContext
 from harness_server.settings import load_settings
+
+
+async def test_slow_recovery_does_not_block_startup_or_shutdown(
+    valid_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    started = asyncio.Event()
+    stopped = asyncio.Event()
+
+    async def blocked_recovery(bot: BotContext) -> int:
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            stopped.set()
+        return 0
+
+    monkeypatch.setattr("harness_server.services.server_recovery.recover_pending", blocked_recovery)
+    settings = load_settings()
+    app = create_app(settings, load_config(settings.harness_config))
+
+    async with (
+        LifespanManager(app, startup_timeout=1, shutdown_timeout=1),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client,
+    ):
+        await asyncio.wait_for(started.wait(), timeout=1)
+        assert (await client.get("/health")).status_code == 200
+        assert not stopped.is_set()
+
+    assert stopped.is_set()
 
 
 async def test_health_ok_and_ready_503_when_database_unreachable(valid_env: dict[str, str]) -> None:

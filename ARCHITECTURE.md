@@ -7,6 +7,39 @@
 План работ и статус: [`PLAN.md`](PLAN.md). Этот файл описывает **целевое** устройство системы и
 обновляется тем же изменением, что и код (эндпоинт, статус, таблица, ENV, сервис).
 
+`worker-api` реализован: worker → HTTPS `/worker` → `services` → Postgres (D-66).
+На машине агента нет сессий БД, серверного ключа или Telegram ENV. Захват возвращает `task`,
+`project` (со ссылкой `repo.access_ref`), токен задачи, роль и срок. Пустая очередь — JSON `null`.
+Проверка с Postgres и ручная приёмка остаются за оркестратором и владельцем соответственно.
+
+Канал требует `Authorization: Bearer WORKER_API_TOKEN`; операции задачи дополнительно требуют
+`X-Task-Token` (срок, роль, принадлежность и отзыв проверяет сервер).
+
+| POST `/worker/...` | Назначение |
+|---|---|
+| `tasks/claim` | `kind=plan|implement`, необязательный `provider_id`; при его указании задача и свободная песочница закрепляются атомарно |
+| `tasks/{id}/events`, `status`, `checkpoints`, `result` | Pydantic DTO из `shared/worker_reports.py`; общий `external_key`, атомарная запись и повтор с тем же ответом |
+| `tasks/{id}/heartbeat` | Ответ 204; обновление последнего heartbeat |
+| `sandbox/recover` | Настроенный `provider_id`; задача, проект, серверные время и pid, новый токен для worker. Токен работающего агента сохраняется до очистки |
+| `tasks/{id}/sandbox/reserve`, `state`, `start`, `pid` | Закрепление, чтение состояния, время до exec и pid после exec. Иной ключ запуска не разрешает новый процесс |
+| `tasks/{id}/sandbox/cleanup`, `release` | Отзыв всех токенов до локальных команд; успех после очистки и паузы освобождает машину, ошибка сохраняет закрепление в error |
+
+Повторы отчётов защищает UNIQUE `(task_id, external_key)` в `task_events` (миграция `0006`).
+В БД сохраняются SHA256 ключей событий и запуска: случайно переданное значение секрета не хранится.
+Heartbeat хранится в `tasks.worker_heartbeat_at` (`0007`); сервер проверяет его каждые 15 секунд
+или чаще при коротком таймауте. Из `planning`, `active`, `testing` разрешён переход в `stalled`;
+автоматического выхода из `stalled` нет, задача видна оператору через обычный список задач.
+У старых задач с NULL heartbeat поведение не меняется.
+`sandboxes.agent_launch_key`, `cleanup_started`, `last_released_task_id` (`0008`) сохраняют фазы
+запуска и очистки. После начала очистки её операции авторизуются worker-токеном и закреплением,
+поскольку токены задачи уже отозваны. Восстановление такой очистки не выдаёт новый токен задачи.
+HTTP-адаптер повторяет сетевые ошибки/5xx до трёх попыток с backoff 0.25/0.5 сек; редиректы запрещены.
+Восстановление апдейтов и карточек Telegram запускается из lifespan сервера в фоне: первая
+попытка сразу, затем раз в минуту. Подключение к БД не задерживает старт приложения; при
+остановке фоновая задача отменяется до закрытия HTTP-клиента и engine БД.
+Регрессионный тест в `apps/server/tests/test_worker.py` ждёт завершения первого прохода
+recovery в lifespan и проверяет повторный старт без дублей задач и сообщений.
+
 ## 1. Компоненты
 
 ```
@@ -21,8 +54,8 @@
  │                     ▲                                                    │
  │ adapters: telegram, stt, polza, sandbox, local, gitlab, vault                           │
  └─────────────────────┼────────────────────────────────────────────────────┘
-                       │ та же кодовая база, отдельный процесс
- ┌──────── worker (диспетчер, polling Postgres) ────────┐
+                       │ HTTPS /worker, отдельная машина агента
+ ┌──────── worker (диспетчер, polling HTTP API) ────────┐
  │ выбирает задачу → активирует машину → exec агента │──► локальная машина агента
  │ → гейты (секреты, коммит, тесты, push, MR)           │      └ claude, git, openspec
  └──────────────────────────────────────────────────────┘──► Git-провайдер: GitLab (MR) или GitHub (PR), адаптер `adapters/git`
@@ -55,7 +88,7 @@ apps/server/src/harness_server/
 ├── domain/            # statuses.py (таблица переходов), errors.py (DomainError и коды), без I/O и sqlalchemy
 ├── db/                # base.py (Base, naming convention, enum-хелперы), ids.py (uuid7), session.py, models/ (9 таблиц)
 ├── adapters/          # внешние API за интерфейсами (Protocol) и фейки: telegram (httpx, mvp-04), stt (OpenAI-совместимый, mvp-04), polza (Router/PolzaRouter/FakeRouter, OpenAI-совместимый chat completions, mvp-05), sandbox (D-64), local (`LocalSandboxProvider`, D-64), gitlab
-├── worker/            # __init__.py (цикл worker, API не меняется), dispatcher.py (восстановление → reserve → activate → run → cleanup → pause), pipeline.py (контракт Pipeline; реестр PIPELINES пуст до mvp-08/09), gates (mvp-09)
+├── worker/            # settings.py (минимальные ENV), client.py (DTO над adapters/worker_api), dispatcher.py и execution.py (HTTP-очередь → локальный запуск → очистка), pipeline.py (контракт Pipeline; реестр PIPELINES пуст до mvp-08/09), gates (mvp-09)
 └── security/          # redaction (фильтр секретов: шаблоны токенов и точные значения), task tokens
 ```
 
@@ -73,11 +106,11 @@ apps/server/src/harness_server/
 | Таблица | Ключевые поля | Назначение |
 |---|---|---|
 | `projects` | id (до 28 символов, D-28), name, voice_aliases, repo_provider, repo_base_url, repo_project, access_ref (ссылка vault или NULL — анонимный клон), default_branch, test_command, agent, agent_max_turns, status (`active`/`disabled`) | Каталог проектов (D-65): заводит оператор через консоль или API, ключ хранится только ссылкой |
-| `tasks` | id, kind (`plan`/`implement`/`check`), workspace_id, parent_id, text, status, priority, source (`telegram`/`spec`/`mcp`/`api`), spec_item_id, branch, mr_url, result, tests_state, created_at, updated_at | Задача и канбан (представление по статусам) |
-| `task_events` | id, task_id, status, text, source (`telegram`/`agent`/`worker`/`api`), created_at | Лента этапов для Telegram и журнала |
+| `tasks` | id, kind (`plan`/`implement`/`check`), workspace_id, parent_id, text, status, priority, source (`telegram`/`spec`/`mcp`/`api`), spec_item_id, branch, mr_url, result, tests_state, worker_heartbeat_at, created_at, updated_at | Задача и канбан (представление по статусам) |
+| `task_events` | id, task_id, external_key (nullable, UNIQUE с task_id), status, text, source (`telegram`/`agent`/`worker`/`api`), created_at | Лента этапов для Telegram и журнала |
 | `routings` | id, task_id (NULL для status, unknown и ожидающего уточнения), command_class (`work`/`status`/`unknown`), decision (`auto`/`clarify`/`fallback`), options (JSON), chosen_workspace_id, raw_response, confidence, error (причина запасного пути), source_text (до нажатия «Сделать задачу», затем NULL), resolved_at | Решение Polza и выбор пользователя (mvp-05, D-32, миграция `0003`) |
 | `spec_items` | id, workspace_id, plan_task_id, change_id, key, text, status, last_checkpoint_id; UNIQUE (workspace_id, change_id, key) | Зеркало пунктов OpenSpec |
-| `sandboxes` | id, provider_id, agent_type, status (`paused`/`active`/`error`), current_task_id, profile_version, agent_started_at (время запуска агента, NULL — не запускался), agent_pid (pid группы агента, NULL — неизвестен) | Локальная машина агента (`provider_id` из harness.yaml), подготовленная через `agent init`; колонки агента — серверный учёт запуска, файлам рабочей копии не доверяем (D-41, D-64, миграция `0004`) |
+| `sandboxes` | id, provider_id, agent_type, status (`paused`/`active`/`error`), current_task_id, profile_version, agent_started_at (время запуска агента, NULL — не запускался), agent_pid (pid группы агента, NULL — неизвестен), agent_launch_key, cleanup_started, last_released_task_id | Локальная машина агента (`provider_id` из harness.yaml), подготовленная через `agent init`; колонки агента — серверный учёт запуска, файлам рабочей копии не доверяем (D-41, D-64, миграция `0004`) |
 | `checkpoints` | id, task_id, summary, files (JSON), diff_redacted, next_step, status, tokens | Чекпоинты (MVP: от сервера после агента) |
 | `telegram_messages` | task_id, chat_id, message_id, lines (JSON) | Одно обновляемое сообщение на задачу |
 | `telegram_updates` | kind (`update`/`callback`) + external_id (составной PK), received_at, processed_at, payload (JSONB NULL) | Идемпотентность входа (A4). `payload` — нормализованный апдейт владельца (текст, голос или нажатие кнопки, без имён и `from`) до обработки; после обработки обнуляется (D-27) |
@@ -166,7 +199,7 @@ implement:  backlog → active → testing → ready (MR создан) → merge
   `pause` — пустая операция; `exec` запускает команду в отдельной группе процессов (`start_new_session`), ограничивает
   вывод и по таймауту убивает всю группу (`killpg`); работать от root (uid 0) отказывается.
 - Окружение подпроцессов очищено: белый список `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_*`, `TERM` плюс явные
-  `envs` (имена проверяются, NUL в значениях запрещён). Секреты worker (`DATABASE_URL`, `TELEGRAM_BOT_TOKEN`) в
+  `envs` (имена проверяются, NUL в значениях запрещён). Секреты родительского процесса в
   подпроцессах не видны; значения не попадают в argv.
 - Файлы песочницы: `write_file` атомарный, права 0600 у файлов и 0700 у каталогов; `read_file` при отсутствии файла
   возвращает `None`.
@@ -237,7 +270,9 @@ sandbox (provider_id,
 (D-60): конфиг с ними не загружается, сообщение называет поля для переноса (`docs/deployment.md`, «Переход на D-60»).
 
 Обязательные ENV (решение D-20): `DATABASE_URL`, `HARNESS_CONFIG`, `HARNESS_SECRET_KEY`, `TELEGRAM_BOT_TOKEN`,
-`TELEGRAM_CHAT_ID`, `TELEGRAM_WEBHOOK_SECRET`. Сервер и worker не стартуют, если их нет или они пустые.
+`TELEGRAM_CHAT_ID`, `TELEGRAM_WEBHOOK_SECRET`. Сервер не стартует, если их нет или они пустые.
+Worker использует отдельный `WorkerSettings`: обязательны только `HARNESS_CONFIG`,
+`HARNESS_PUBLIC_URL` и `WORKER_API_TOKEN`; для запуска агента также нужен `CLAUDE_CODE_OAUTH_TOKEN`.
 Остальные опциональны, пока их не использует свой этап («с этапа» — в `.env.example`).
 Секреты в таблице помечены «секрет»; в коде это `SecretStr`.
 
@@ -248,6 +283,8 @@ sandbox (provider_id,
 | `HARNESS_SECRET_KEY` | **Обязательная.** Соль/ключ для хешей токенов. Секрет |
 | `HARNESS_PUBLIC_URL` | Публичный HTTPS-адрес сервера: им пользуется MCP-конфиг агента и `harness-server telegram set-webhook` (адрес webhook = этот адрес + `/telegram/webhook`); только `https://`, без query и fragment |
 | `HARNESS_ADMIN_TOKEN` | Временный операторский bearer для `POST /tasks`, `GET /tasks/{id}` (до `operator-tokens`). Если задан, должен быть не короче 32 символов (`openssl rand -hex 32`), иначе сервер не стартует. Не задан — `/tasks` отвечает 401 (fail-closed, D-23). Секрет |
+| `WORKER_API_TOKEN` | Отдельный bearer для `/worker`: секрет, минимум 32 символа, без пробелов по краям, отличается от `HARNESS_ADMIN_TOKEN`. Не задан — канал закрыт (401); в БД не хранится (D-66). Обязателен на машине worker |
+| `WORKER_HEARTBEAT_TIMEOUT_SEC` | Серверный срок без heartbeat до stalled, секунды (по умолчанию 120, минимум 30). Worker отправляет heartbeat каждые 10 секунд |
 | `TELEGRAM_BOT_TOKEN` | **Обязательная.** Токен бота. Секрет |
 | `TELEGRAM_CHAT_ID` | **Обязательная.** Владелец бота: положительное целое число, id личного чата. Групповые чаты не поддерживаются (D-30) |
 | `TELEGRAM_WEBHOOK_SECRET` | **Обязательная.** Секрет webhook: от 32 до 256 символов `A-Za-z0-9_-` (`openssl rand -hex 32`), иначе сервер не стартует. Секрет |
@@ -275,7 +312,7 @@ Dokploy, два Compose-стека:
 
 - `deploy/db/docker-compose.yml` — Postgres отдельно; редеплой харнесса не трогает данные.
 - `docker-compose.yml` — `migrate` (одноразовый, `alembic upgrade head`) → `server`; `console` — `mvp-10` (D-39).
-- Worker работает на хосте как systemd user unit рядом с локальной машиной агента; Compose БД публикует порт 5432 только на loopback хоста (`127.0.0.1`), сохраняя внешнюю сеть и volume. Контейнерный server подключается через Docker-сеть, worker — через loopback. См. [инструкцию деплоя](docs/deployment.md) и [настройку worker](deploy/worker/README.md).
+- Worker работает на хосте как systemd user unit рядом с локальной машиной агента; Compose БД публикует порт 5432 только на loopback хоста (`127.0.0.1`), сохраняя внешнюю сеть и volume. Контейнерный server подключается через Docker-сеть; worker использует HTTPS API и не подключается к порту БД. См. [инструкцию деплоя](docs/deployment.md) и [настройку worker](deploy/worker/README.md).
 
 Compose-сервисы используют внешнюю сеть `dokploy-network`; Postgres additionally binds only to host loopback. Домен и HTTPS — в Dokploy.
 CI: `.gitlab-ci.yml`, стадии `check → build → deploy`; образы в GitLab Registry с тегами

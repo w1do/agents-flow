@@ -38,6 +38,8 @@ x-harness-common: &harness-common
     ADMIN_EMAIL: ${ADMIN_EMAIL:-}
     ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     WORKER_POLL_INTERVAL_SEC: ${WORKER_POLL_INTERVAL_SEC:-}
+    WORKER_API_TOKEN: ${WORKER_API_TOKEN:-}
+    WORKER_HEARTBEAT_TIMEOUT_SEC: ${WORKER_HEARTBEAT_TIMEOUT_SEC:-}
     VOICE_MAX_BYTES: ${VOICE_MAX_BYTES:-}
     AGENT_POLL_INTERVAL_SEC: ${AGENT_POLL_INTERVAL_SEC:-}
     # Vault с ключами владельца (D-45): без этих ENV ссылки vault:… не разрешаются.
