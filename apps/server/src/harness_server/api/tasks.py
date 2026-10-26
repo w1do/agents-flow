@@ -16,28 +16,36 @@ from harness_shared.tasks import (
     TaskSource,
 )
 
-from harness_server.api.deps import ConfigDep, SessionDep, require_admin_token
-from harness_server.domain.errors import NotFound, UnknownWorkspace
+from harness_server.api.deps import SessionDep, require_admin_token
+from harness_server.domain.errors import NotFound, ProjectDisabled, UnknownWorkspace
+from harness_server.services.projects import ensure_accepts_tasks, list_workspaces
 from harness_server.services.tasks import create_task, get_task, list_task_events
 
 router = APIRouter(prefix="/tasks", tags=["tasks"], dependencies=[Depends(require_admin_token)])
 
 
 @router.post("", status_code=201, response_model=TaskOut)
-async def create_task_endpoint(
-    body: TaskCreateIn, session: SessionDep, config: ConfigDep
-) -> TaskOut:
-    """Создаёт задачу plan в статусе new с источником api (D-25)."""
+async def create_task_endpoint(body: TaskCreateIn, session: SessionDep) -> TaskOut:
+    """Создаёт задачу plan в статусе new с источником api (D-25).
+
+    Проект берётся из каталога на сервере (project-catalog): отключённый проект отклоняется кодом
+    project_disabled, неизвестный — unknown_workspace.
+    """
     try:
+        if body.workspace_id is not None:
+            await ensure_accepts_tasks(session, body.workspace_id)
+        known = [workspace.id for workspace in await list_workspaces(session)]
         task = await create_task(
             session,
             kind=TaskKind.PLAN,
             text=body.text,
             source=TaskSource.API,
             workspace_id=body.workspace_id,
-            known_workspace_ids=[workspace.id for workspace in config.workspaces],
+            known_workspace_ids=known,
         )
-    except UnknownWorkspace:
+    except ProjectDisabled:
+        raise HTTPException(status_code=409, detail="project_disabled") from None
+    except (NotFound, UnknownWorkspace):
         raise HTTPException(status_code=422, detail="unknown_workspace") from None
     return TaskOut.model_validate(task)
 

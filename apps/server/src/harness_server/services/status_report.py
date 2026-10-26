@@ -23,8 +23,9 @@ STATUS_FETCH_LIMIT: Final = 500
 async def build_status_report(ctx: BotContext) -> str:
     """Отчёт об открытых задачах для Telegram: шаблон из БД, без LLM и без песочниц (D-34).
 
-    Группы идут в порядке harness.yaml, затем неизвестные workspace (по алфавиту), затем задачи без
-    проекта. Весь текст проходит redact: в названии задачи может оказаться секрет.
+    Группы идут в порядке id проектов, затем задачи проектов вне списка активных (по алфавиту, с
+    id вместо названия: отключённый проект), затем задачи без проекта. Весь текст проходит redact:
+    в названии задачи может оказаться секрет.
     """
     async with ctx.session_factory() as session:
         tasks = await list_tasks(session, statuses=OPEN_STATUSES, limit=STATUS_FETCH_LIMIT)
@@ -34,9 +35,10 @@ async def build_status_report(ctx: BotContext) -> str:
         title = short_title(redact(task.text, ctx.secret_values))
         grouped.setdefault(task.workspace_id, []).append((title, task.status.value))
 
-    known_ids = set(ctx.known_workspace_ids)
+    workspaces = await ctx.workspaces()
+    known_ids = {workspace.id for workspace in workspaces}
     labeled: list[tuple[str, list[tuple[str, str]]]] = []
-    for workspace in ctx.workspaces:
+    for workspace in workspaces:
         if workspace.id in grouped:
             labeled.append((workspace.name, grouped[workspace.id]))
     for workspace_id in sorted(k for k in grouped if k is not None and k not in known_ids):

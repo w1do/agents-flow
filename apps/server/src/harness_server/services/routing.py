@@ -15,6 +15,7 @@ from importlib import resources
 from typing import Any, Final
 from uuid import UUID
 
+from harness_shared.projects import Workspace
 from harness_shared.routing import (
     CommandClass,
     RoutingDecision,
@@ -26,7 +27,6 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from harness_server.adapters.polza.protocol import RouterError
-from harness_server.config import WorkspaceConfig
 from harness_server.db.models import Routing
 from harness_server.domain.errors import AlreadyResolved, NotFound
 from harness_server.security.redaction import redact
@@ -72,8 +72,8 @@ def load_prompt_template() -> str:
     )
 
 
-def build_system_prompt(workspaces: Sequence[WorkspaceConfig]) -> str:
-    """Промпт с перечнем проектов из harness.yaml.
+def build_system_prompt(workspaces: Sequence[Workspace]) -> str:
+    """Промпт с перечнем активных проектов из каталога на сервере (D-65).
 
     Замена маркера через str.replace: в промпте есть фигурные скобки JSON, str.format их сломает.
     """
@@ -119,7 +119,7 @@ def parse_decision(content: str) -> RoutingDecision | None:
 def rank_candidates(
     decision: RoutingDecision, known_workspace_ids: Collection[str]
 ) -> tuple[WorkspaceCandidate, ...]:
-    """Кандидаты только из конфига, без повторов, по убыванию score, не больше MAX_CANDIDATES.
+    """Кандидаты только из активных проектов, без повторов, по score, не больше MAX_CANDIDATES.
 
     Сортировка стабильная: при равных score порядок ответа модели сохраняется.
     """
@@ -157,7 +157,7 @@ async def classify(ctx: BotContext, text: str) -> RouteResult:
         return _fallback(ERROR_NOT_CONFIGURED, None)
     try:
         reply = await ctx.router.complete(
-            system_prompt=build_system_prompt(ctx.workspaces),
+            system_prompt=build_system_prompt(await ctx.workspaces()),
             user_text=text[:ROUTING_TEXT_LIMIT],
         )
     except RouterError as exc:
@@ -170,7 +170,7 @@ async def classify(ctx: BotContext, text: str) -> RouteResult:
         logger.warning("routing invalid decision")
         return _fallback(ERROR_INVALID_DECISION, raw)
 
-    candidates = rank_candidates(decision, ctx.known_workspace_ids)
+    candidates = rank_candidates(decision, await ctx.known_workspace_ids())
     kind = (
         RoutingDecisionKind.CLARIFY
         if decision.confidence < ctx.routing_min_confidence

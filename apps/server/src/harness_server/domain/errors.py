@@ -47,7 +47,7 @@ class UnsupportedKind(DomainError):
 
 
 class UnknownWorkspace(DomainError):
-    """workspace_id нет в harness.yaml."""
+    """workspace_id нет среди активных проектов каталога (D-65)."""
 
     code = "unknown_workspace"
 
@@ -82,3 +82,23 @@ class Forbidden(DomainError):
     """Действие запрещено текущему субъекту. Используется начиная с mvp-07."""
 
     code = "forbidden"
+
+
+class ProjectConflict(DomainError):
+    """Проект с таким id уже есть. Существующий проект не меняется."""
+
+    code = "project_conflict"
+
+    def __init__(self, project_id: str) -> None:
+        super().__init__(f"проект уже существует: {project_id}")
+        self.project_id = project_id
+
+
+class ProjectDisabled(DomainError):
+    """Проект отключён: новые задачи и настройки для машины агента не выдаются."""
+
+    code = "project_disabled"
+
+    def __init__(self, project_id: str) -> None:
+        super().__init__(f"проект отключён: {project_id}")
+        self.project_id = project_id

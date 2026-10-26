@@ -184,6 +184,40 @@ Worker запускается на этой же машине как systemd use
 - Claude Code запускается с `--setting-sources user` и `--strict-mcp-config`: hooks и MCP-серверы
   репозитория задачи не выполняются (D-36). Hooks и plugins в профиль пользователя не кладутся (D-48).
 
+## Переход на каталог проектов на сервере (D-65)
+
+Проекты (workspace) хранятся в таблице `projects` на сервере, а не в `harness.yaml`. Сервер не загружает
+`harness.yaml` с блоком `workspaces` и секцией `gitlab`: старая форма не запускает сервер и называет блок.
+Порядок выката (до выката образа с новым кодом выполняется шаги 1–4):
+
+1. Сделать бэкап БД, как в пункте 6 раздела «Переход на локальную машину агента».
+2. Применить миграцию `0005` (`harness-server migrate`, `alembic upgrade head`) на текущем образе: старый код
+   таблицу `projects` не читает, выкат безопасен.
+3. Для каждого проекта из блока `workspaces` завести запись через API. Тело — поля проекта: `id`, `name`,
+   `voice_aliases`, `repo` (`provider`, `project`, `access_ref`, при необходимости `base_url`), `default_branch`,
+   `test_command`, `agent`, `agent_max_turns`. Токен берётся из ENV оператора, в файл не пишется:
+
+   ```bash
+   curl -sS -X POST "$HARNESS_PUBLIC_URL/api/console/projects" \
+     -H "Authorization: Bearer $HARNESS_ADMIN_TOKEN" \
+     -H "Content-Type: application/json" \
+     --data @demo-project.json
+   ```
+
+   В `demo-project.json` — только поля проекта; ключ записи задаётся ссылкой `access_ref` (`vault:…`), не значением.
+4. Проверить `GET /api/console/projects`: список совпадает с прежним блоком `workspaces`. Старые `id` с подчёркиванием
+   не проходят проверку (D-65: латиница, цифры и дефисы, до 28 символов) — переименовать до переноса. Поле
+   `gitlab_project` переносится в `repo.project` (D-60).
+5. В файле `harness.yaml` (File Mount Dokploy) удалить блок `workspaces` и секцию `gitlab`, затем выкатить образ
+   с новым кодом. Без этой правки сервер не стартует и называет блок.
+6. На каждой машине агента для каждого проекта выполнить `agent init <id>` от непривилегированного пользователя.
+   Нужны `HARNESS_PUBLIC_URL` (https) и `HARNESS_ADMIN_TOKEN`. Локальный `~/.harness/projects/<id>.yaml` пишется
+   заново и не правится руками.
+7. Проверить `GET /health` и `harness-server check-config`: команда печатает активные проекты из каталога.
+
+Откат: вернуть прежний образ и файл `harness.yaml` с блоком `workspaces` (копию сохранить до правки). Записи в
+`projects` при откате не мешают: старый код их не читает.
+
 ## Переход на D-60 (провайдер репозитория, git-providers)
 
 Старая форма конфига не загружается: секция `gitlab:` и поле `workspaces[].gitlab_project` отклоняются с

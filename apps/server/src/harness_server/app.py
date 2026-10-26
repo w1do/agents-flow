@@ -6,6 +6,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from harness_server.api.health import router as health_router
+from harness_server.api.projects import console_router as projects_console_router
+from harness_server.api.projects import settings_router as projects_settings_router
 from harness_server.api.tasks import router as tasks_router
 from harness_server.api.telegram_webhook import router as telegram_router
 from harness_server.config import HarnessConfig
@@ -38,9 +40,7 @@ def create_app(
         http = build_http_client()
         try:
             bot_adapters = adapters if adapters is not None else build_adapters(settings, http)
-            app.state.bot = build_bot_context(
-                settings, config, app.state.session_factory, bot_adapters
-            )
+            app.state.bot = build_bot_context(settings, app.state.session_factory, bot_adapters)
             yield
         finally:
             await http.aclose()
@@ -56,5 +56,7 @@ def create_app(
     )
     app.include_router(health_router)
     app.include_router(tasks_router)
+    app.include_router(projects_console_router)
+    app.include_router(projects_settings_router)
     app.include_router(telegram_router)
     return app

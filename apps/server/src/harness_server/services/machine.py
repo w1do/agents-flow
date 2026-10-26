@@ -7,11 +7,13 @@ import stat
 import sys
 from pathlib import Path
 
+import yaml
+from harness_shared.projects import Workspace
 from pydantic import SecretStr
 
 from harness_server.adapters.sandbox import SandboxProvider
 from harness_server.adapters.vault import SecretVault, VaultError
-from harness_server.config import HarnessConfig, WorkspaceConfig
+from harness_server.config import HarnessConfig
 from harness_server.security.redaction import redact
 from harness_server.services import git_access
 from harness_server.services import secrets as secret_refs
@@ -174,7 +176,7 @@ async def write_mcp_config(provider: SandboxProvider, sandbox_id: str) -> None:
 async def sync_clone(
     provider: SandboxProvider,
     sandbox_id: str,
-    workspace: WorkspaceConfig,
+    workspace: Workspace,
     token: SecretStr | None,
 ) -> None:
     repo_dir = _home() / "work" / workspace.id
@@ -221,7 +223,7 @@ async def sync_clone(
 async def init_memory(
     provider: SandboxProvider,
     sandbox_id: str,
-    workspace: WorkspaceConfig,
+    workspace: Workspace,
     embedding: SecretStr | None,
 ) -> None:
     repo = _home() / "work" / workspace.id
@@ -261,19 +263,48 @@ async def init_memory(
         await provider.write_file(sandbox_id, str(marker), "ready\n")
 
 
+def write_project_config(workspace: Workspace, *, home: Path | None = None) -> Path:
+    """Пишет локальный конфиг проекта из серверной записи: ~/.harness/projects/<id>.yaml (0600).
+
+    Файл генерируется целиком и помечен как сгенерированный: правки руками перезаписываются при
+    следующем `agent init`. Значения ключей сюда не попадают: access_ref — только ссылка vault.
+    """
+    base = _home() if home is None else home
+    root = base / ".harness"
+    directory = root / "projects"
+    _assert_inside_home(directory, base)
+    for path in (root, directory):
+        _ensure_managed_directory(path, base)
+    target = directory / f"{workspace.id}.yaml"
+    _assert_inside_home(target, base)
+    body = yaml.safe_dump(
+        {"workspace": workspace.model_dump(mode="json")},
+        allow_unicode=True,
+        sort_keys=False,
+    )
+    text = (
+        "# Сгенерировано agent init из записи проекта на сервере. НЕ РЕДАКТИРОВАТЬ:\n"
+        "# файл перезаписывается при следующем `agent init`. Источник — сервер (project-catalog).\n"
+        f"{body}"
+    )
+    if target.is_symlink():
+        raise MachineError(1, "локальный конфиг проекта — симлинк")
+    # Права задаём при создании и явно на существующем файле: 0600 не зависит от umask.
+    descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        os.fchmod(handle.fileno(), 0o600)
+        handle.write(text)
+    return target
+
+
 async def init_project(
     config: HarnessConfig,
-    project: str,
+    workspace: Workspace,
     vault: SecretVault | None,
     *,
     provider: SandboxProvider | None = None,
 ) -> None:
-    """Prepare exactly one configured workspace; readiness appears only at the end."""
-    workspace = next((item for item in config.workspaces if item.id == project), None)
-    if workspace is None:
-        raise MachineError(
-            2, "неизвестный проект: " + ", ".join(item.id for item in config.workspaces)
-        )
+    """Prepare exactly one project from its server record; readiness appears only at the end."""
     try:
         require_non_root()
     except RootUserError:

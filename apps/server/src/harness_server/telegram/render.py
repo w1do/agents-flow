@@ -11,8 +11,9 @@ from collections.abc import Sequence
 from typing import Final, Literal
 from uuid import UUID
 
+from harness_shared.projects import Workspace
+
 from harness_server.adapters.telegram.types import InlineButton, InlineKeyboard
-from harness_server.config import WorkspaceConfig
 
 STAGE_CHOOSING: Final = "выберите проект"
 TEXT_STT_FAILED: Final = "не удалось распознать, пришлите текстом"
@@ -107,7 +108,7 @@ def parse_callback_data(data: str) -> tuple[UUID, str] | None:
     return task_id, workspace_id
 
 
-def workspace_keyboard(task_id: UUID, workspaces: Sequence[WorkspaceConfig]) -> InlineKeyboard:
+def workspace_keyboard(task_id: UUID, workspaces: Sequence[Workspace]) -> InlineKeyboard:
     """Кнопки выбора проекта: по одной в ряд, в порядке harness.yaml."""
     return InlineKeyboard(
         rows=tuple(

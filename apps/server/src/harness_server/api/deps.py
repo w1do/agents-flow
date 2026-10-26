@@ -10,7 +10,6 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from harness_server.config import HarnessConfig
 from harness_server.services.context import BotContext
 
 # auto_error=False: собственная проверка даёт один и тот же 401 для любого отказа, а не 403 от
@@ -50,12 +49,6 @@ async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
         yield session
 
 
-def get_config(request: Request) -> HarnessConfig:
-    """Конфиг harness.yaml, загруженный при старте приложения."""
-    config: HarnessConfig = request.app.state.config
-    return config
-
-
 async def require_webhook_secret(
     request: Request,
     x_telegram_bot_api_secret_token: Annotated[str | None, Header()] = None,
@@ -81,5 +74,4 @@ def get_bot_context(request: Request) -> BotContext:
 
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
-ConfigDep = Annotated[HarnessConfig, Depends(get_config)]
 BotContextDep = Annotated[BotContext, Depends(get_bot_context)]

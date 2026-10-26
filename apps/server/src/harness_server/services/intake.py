@@ -19,6 +19,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Final
 from uuid import UUID
 
+from harness_shared.projects import Workspace
 from harness_shared.routing import CommandClass, RoutingDecisionKind, WorkspaceCandidate
 from harness_shared.tasks import TaskEventSource, TaskKind, TaskSource, TaskStatus
 from sqlalchemy import select, update
@@ -27,7 +28,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from harness_server.adapters.stt.protocol import SttError
 from harness_server.adapters.telegram.types import TelegramError
-from harness_server.config import WorkspaceConfig
 from harness_server.db.models import Task, TelegramMessage, TelegramUpdate
 from harness_server.domain.errors import AlreadyResolved, DomainError, InvalidTransition, NotFound
 from harness_server.security.redaction import redact
@@ -92,7 +92,7 @@ class _CardReply:
     """Карточка задачи с кнопками: workspaces — кандидаты маршрутизатора или все (D-13)."""
 
     task: Task
-    workspaces: tuple[WorkspaceConfig, ...]
+    workspaces: tuple[Workspace, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -212,7 +212,7 @@ async def _route_text(ctx: BotContext, text: str) -> _Followup:
         # Запасной путь: задача со всеми workspace, как в mvp-04 (D-13).
         task = await _create_choosing_task(ctx, safe_text)
         await _record(ctx, result, task_id=task.id)
-        return _CardReply(task, ctx.workspaces)
+        return _CardReply(task, await ctx.workspaces())
     if result.command_class is CommandClass.STATUS:
         await _record(ctx, result, task_id=None)
         return _StatusReply()
@@ -221,7 +221,7 @@ async def _route_text(ctx: BotContext, text: str) -> _Followup:
         return _TextReply(TEXT_HELP)
     task = await _create_choosing_task(ctx, safe_text)
     await _record(ctx, result, task_id=task.id)
-    return _CardReply(task, _candidate_workspaces(ctx, result.candidates))
+    return _CardReply(task, await _candidate_workspaces(ctx, result.candidates))
 
 
 async def _record(
@@ -237,13 +237,14 @@ async def _record(
     return routing.id
 
 
-def _candidate_workspaces(
+async def _candidate_workspaces(
     ctx: BotContext, candidates: Sequence[WorkspaceCandidate]
-) -> tuple[WorkspaceConfig, ...]:
-    """Кнопки для кандидатов в порядке ранжирования; без известных кандидатов — все workspace."""
-    by_id = {workspace.id: workspace for workspace in ctx.workspaces}
+) -> tuple[Workspace, ...]:
+    """Кнопки для кандидатов в порядке ранжирования; без известных — все активные проекты."""
+    workspaces = await ctx.workspaces()
+    by_id = {workspace.id: workspace for workspace in workspaces}
     chosen = tuple(by_id[c.id] for c in candidates if c.id in by_id)
-    return chosen or ctx.workspaces
+    return chosen or workspaces
 
 
 async def _send_followup(ctx: BotContext, followup: _Followup) -> None:
@@ -310,7 +311,7 @@ async def resolve_clarification(ctx: BotContext, press: ButtonPress) -> None:
             await attach_task(session, routing_id, task.id)
         try:
             await send_task_card(
-                ctx, task, workspaces=_candidate_workspaces(ctx, claimed.candidates)
+                ctx, task, workspaces=await _candidate_workspaces(ctx, claimed.candidates)
             )
         except TelegramError as exc:
             # Карточку досылает recover_pending при старте worker.
@@ -335,7 +336,7 @@ async def _create_choosing_task(ctx: BotContext, text: str) -> Task:
             kind=TaskKind.PLAN,
             text=safe_text,
             source=TaskSource.TELEGRAM,
-            known_workspace_ids=ctx.known_workspace_ids,
+            known_workspace_ids=await ctx.known_workspace_ids(),
         )
         return await change_status(
             session, task.id, TaskStatus.CHOOSING, source=TaskEventSource.TELEGRAM
@@ -385,7 +386,7 @@ async def choose_workspace(ctx: BotContext, press: ButtonPress) -> None:
         await _answer(ctx, press.callback_query_id, TEXT_BAD_BUTTON)
         return
     task_id, workspace_id = parsed
-    workspace = next((w for w in ctx.workspaces if w.id == workspace_id), None)
+    workspace = next((w for w in await ctx.workspaces() if w.id == workspace_id), None)
     if workspace is None:
         await _answer(ctx, press.callback_query_id, TEXT_UNKNOWN_PROJECT)
         return
@@ -396,7 +397,7 @@ async def choose_workspace(ctx: BotContext, press: ButtonPress) -> None:
                 session,
                 task_id,
                 workspace_id,
-                known_workspace_ids=ctx.known_workspace_ids,
+                known_workspace_ids=await ctx.known_workspace_ids(),
                 source=TaskEventSource.TELEGRAM,
             )
     except NotFound:

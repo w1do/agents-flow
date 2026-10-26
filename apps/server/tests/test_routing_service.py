@@ -5,7 +5,6 @@ from collections.abc import Callable
 import pytest
 from harness_server.adapters.polza import FakeRouter, RouterError
 from harness_server.adapters.telegram import FakeTelegramClient
-from harness_server.config import RepoConfig, WorkspaceConfig
 from harness_server.db.ids import uuid7
 from harness_server.db.models import Routing
 from harness_server.domain.errors import AlreadyResolved, NotFound
@@ -24,6 +23,7 @@ from harness_server.services.routing import (
     record_routing,
 )
 from harness_server.services.tasks import create_task
+from harness_shared.projects import ProjectRepo, Workspace
 from harness_shared.routing import (
     CommandClass,
     RoutingDecision,
@@ -36,17 +36,17 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 # Значение из conftest.make_bot_context: секрет, который не должен уйти наружу.
 SECRET = "test-webhook-secret-0123456789abcdef"
-DEMO = WorkspaceConfig(
+DEMO = Workspace(
     id="demo",
     name="Демо-проект",
     voice_aliases=["демо", "демка"],
-    repo=RepoConfig(provider="gitlab", project="group/demo"),
+    repo=ProjectRepo(provider="gitlab", project="group/demo"),
 )
-SHOP = WorkspaceConfig(
+SHOP = Workspace(
     id="shop",
     name="Магазин",
     voice_aliases=[],
-    repo=RepoConfig(provider="gitlab", project="group/shop"),
+    repo=ProjectRepo(provider="gitlab", project="group/shop"),
 )
 
 

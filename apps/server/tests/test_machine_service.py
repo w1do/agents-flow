@@ -16,6 +16,7 @@ from harness_server.services.machine import (
     sync_clone,
     write_mcp_config,
 )
+from harness_shared.projects import ProjectRepo, Workspace
 from pydantic import SecretStr
 
 
@@ -23,18 +24,15 @@ def config(memory: bool = False) -> HarnessConfig:
     sandbox: dict[str, object] = {"provider_id": "local"}
     if memory:
         sandbox["memory"] = {}
-    return HarnessConfig.model_validate(
-        {
-            "workspaces": [
-                {
-                    "id": "demo",
-                    "name": "Demo",
-                    "voice_aliases": [],
-                    "repo": {"provider": "github", "project": "owner/demo"},
-                }
-            ],
-            "sandbox": sandbox,
-        }
+    return HarnessConfig.model_validate({"sandbox": sandbox})
+
+
+def demo_workspace(access_ref: str | None = None) -> Workspace:
+    """Проект из каталога сервера: в машине агента приходит уже проверенным (D-65)."""
+    return Workspace(
+        id="demo",
+        name="Demo",
+        repo=ProjectRepo(provider="github", project="owner/demo", access_ref=access_ref),
     )
 
 
@@ -119,7 +117,7 @@ async def test_memory_marker_and_exclude_are_idempotent(
 ) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
     provider = FakeSandbox("local")
-    workspace = config(True).workspaces[0]
+    workspace = demo_workspace()
     await init_memory(provider, "local", workspace, SecretStr("synthetic-embedding"))
     await init_memory(provider, "local", workspace, SecretStr("synthetic-embedding"))
     commands = [entry.cmd for entry in provider.journal if entry.method == "exec"]
@@ -142,7 +140,7 @@ async def test_init_memory_rejects_git_info_symlink_escape_before_read_or_memory
     monkeypatch.setenv("HOME", str(home))
     provider = FakeSandbox("local")
     with pytest.raises(MachineError, match="вне HOME"):
-        await init_memory(provider, "local", config(True).workspaces[0], None)
+        await init_memory(provider, "local", demo_workspace(), None)
     assert sentinel.read_text() == "outside"
     assert not [entry for entry in provider.journal if entry.cmd == "memory init"]
 
@@ -161,7 +159,7 @@ async def test_init_memory_rejects_memory_symlink_escape_before_command(
     monkeypatch.setenv("HOME", str(home))
     provider = FakeSandbox("local")
     with pytest.raises(MachineError, match="вне HOME"):
-        await init_memory(provider, "local", config(True).workspaces[0], None)
+        await init_memory(provider, "local", demo_workspace(), None)
     assert sentinel.read_text() == "outside"
     assert not [entry for entry in provider.journal if entry.cmd == "memory init"]
 
@@ -172,7 +170,7 @@ async def test_mcp_is_placeholder_only_and_clone_uses_env(
 ) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
     provider = FakeSandbox("local")
-    workspace = config().workspaces[0]
+    workspace = demo_workspace()
     await write_mcp_config(provider, "local")
     await sync_clone(provider, "local", workspace, SecretStr("synthetic-repo-key"))
     assert provider.files_containing("synthetic-repo-key") == []
@@ -193,7 +191,7 @@ async def test_non_repo_does_not_run_git(tmp_path: Path, monkeypatch: pytest.Mon
     (tmp_path / "work" / "demo").mkdir(parents=True)
     provider = FakeSandbox("local")
     with pytest.raises(MachineError, match="не является"):
-        await sync_clone(provider, "local", config().workspaces[0], None)
+        await sync_clone(provider, "local", demo_workspace(), None)
     assert provider.journal == []
 
 
@@ -212,7 +210,7 @@ async def test_sync_clone_rejects_external_git_directory_before_any_command(
     provider = FakeSandbox("local")
 
     with pytest.raises(MachineError, match="git metadata вне HOME"):
-        await sync_clone(provider, "local", config().workspaces[0], None)
+        await sync_clone(provider, "local", demo_workspace(), None)
 
     assert sentinel.read_text() == "outside"
     assert provider.journal == []
@@ -233,7 +231,7 @@ async def test_sync_clone_rejects_gitfile_before_any_command(
     provider = FakeSandbox("local")
 
     with pytest.raises(MachineError, match="git metadata вне HOME"):
-        await sync_clone(provider, "local", config().workspaces[0], None)
+        await sync_clone(provider, "local", demo_workspace(), None)
 
     assert sentinel.read_text() == "outside"
     assert provider.journal == []
@@ -256,7 +254,7 @@ async def test_sync_clone_rejects_real_repo_config_symlink_before_any_command(
     provider = FakeSandbox("local")
 
     with pytest.raises(MachineError, match="git metadata вне HOME"):
-        await sync_clone(provider, "local", config().workspaces[0], SecretStr("synthetic-repo-key"))
+        await sync_clone(provider, "local", demo_workspace(), SecretStr("synthetic-repo-key"))
 
     assert sentinel.read_text() == "outside"
     assert provider.journal == []
@@ -282,7 +280,7 @@ async def test_sync_clone_rejects_real_repo_objects_symlink_before_any_command(
     provider = FakeSandbox("local")
 
     with pytest.raises(MachineError, match="git metadata вне HOME"):
-        await sync_clone(provider, "local", config().workspaces[0], None)
+        await sync_clone(provider, "local", demo_workspace(), None)
 
     assert sentinel.read_text() == "outside"
     assert list(outside.iterdir()) == [sentinel]
@@ -299,7 +297,7 @@ async def test_sync_clone_existing_repo_restores_origin_before_fetch_with_env_on
     (repo / ".git" / "logs").mkdir()
     (repo / ".git" / "config").write_text("[core]\nrepositoryformatversion = 0\n")
     provider = FakeSandbox("local")
-    workspace = config().workspaces[0]
+    workspace = demo_workspace()
     key = "synthetic-repo-key"
 
     await sync_clone(provider, "local", workspace, SecretStr(key))
@@ -318,7 +316,7 @@ async def test_anonymous_clone_warns_to_stderr_without_secret(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
-    await sync_clone(FakeSandbox("local"), "local", config().workspaces[0], None)
+    await sync_clone(FakeSandbox("local"), "local", demo_workspace(), None)
 
     assert capsys.readouterr().err == "workspace demo: нет repo.access_ref, клон анонимный\n"
 
@@ -339,10 +337,9 @@ async def test_init_project_redacts_secret_from_stderr(
 
     monkeypatch.setattr("harness_server.services.machine.check_prerequisites", prerequisites)
     monkeypatch.setattr("harness_server.services.machine.secret_refs.resolve", resolve_fake)
-    cfg = config()
-    cfg.workspaces[0].id = secret_marker
+    marked = demo_workspace().model_copy(update={"id": secret_marker})
 
-    await init_project(cfg, secret_marker, None, provider=FakeSandbox("local"))
+    await init_project(config(), marked, None, provider=FakeSandbox("local"))
 
     captured = capsys.readouterr()
     output = captured.out + captured.err
@@ -366,7 +363,7 @@ async def test_init_rejects_harness_symlink_escape_before_outside_mutation(
 
     monkeypatch.setattr("harness_server.services.machine.check_prerequisites", no_prerequisites)
     with pytest.raises(MachineError, match="вне HOME"):
-        await init_project(config(), "demo", None)
+        await init_project(config(), demo_workspace(), None)
 
     assert list(outside.iterdir()) == []
 
@@ -390,7 +387,7 @@ async def test_init_does_not_unlink_ready_marker_through_projects_symlink(
 
     monkeypatch.setattr("harness_server.services.machine.check_prerequisites", no_prerequisites)
     with pytest.raises(MachineError, match="вне HOME"):
-        await init_project(config(), "demo", None)
+        await init_project(config(), demo_workspace(), None)
     assert ready.read_text() == "keep"
 
 
@@ -406,7 +403,7 @@ async def test_init_project_orders_ready_after_clone_and_mcp(
 
     monkeypatch.setattr("harness_server.services.machine.check_prerequisites", prerequisites)
     provider = FakeSandbox("local")
-    await init_project(config(), "demo", None, provider=provider)
+    await init_project(config(), demo_workspace(), None, provider=provider)
 
     journal = provider.journal
     clone = next(
@@ -438,7 +435,7 @@ async def test_init_project_failure_never_writes_ready_and_vault_precedes_mutati
     provider = FakeSandbox("local")
     provider.respond("git clone", exit_code=1, stderr="secret-value")
     with pytest.raises(MachineError, match="git"):
-        await init_project(config(), "demo", None, provider=provider)
+        await init_project(config(), demo_workspace(), None, provider=provider)
     ready_path = str(tmp_path / ".harness" / "projects" / "demo.ready")
     assert await provider.read_file("local", ready_path) is None
 
@@ -447,11 +444,15 @@ async def test_init_project_failure_never_writes_ready_and_vault_precedes_mutati
             raise VaultError("unavailable")
 
     secured = config()
-    secured.workspaces[0].repo.access_ref = "vault:demo/git/token"
     vault_home = tmp_path / "vault-home"
     monkeypatch.setenv("HOME", str(vault_home))
     with pytest.raises(MachineError, match="vault"):
-        await init_project(secured, "demo", _FailingVault(), provider=FakeSandbox("local"))
+        await init_project(
+            secured,
+            demo_workspace(access_ref="vault:demo/git/token"),
+            _FailingVault(),
+            provider=FakeSandbox("local"),
+        )
     assert not (vault_home / ".harness").exists()
 
 
@@ -498,14 +499,14 @@ async def test_init_project_repeat_removes_stale_ready_and_fetches_without_reclo
 
     monkeypatch.setattr("harness_server.services.machine.check_prerequisites", prerequisites)
     provider = StatefulProvider("local")
-    await init_project(config(), "demo", None, provider=provider)
+    await init_project(config(), demo_workspace(), None, provider=provider)
     marker = tmp_path / ".harness" / "projects" / "demo.ready"
     assert marker.read_text() == "ready\n"
     (tmp_path / "work" / "demo" / ".git").mkdir(parents=True)
     provider.fail_fetch = True
 
     with pytest.raises(MachineError, match="git") as error:
-        await init_project(config(), "demo", None, provider=provider)
+        await init_project(config(), demo_workspace(), None, provider=provider)
 
     commands = [entry.cmd or "" for entry in provider.journal]
     clone_command = next(command for command in commands if command.startswith("git clone"))
@@ -535,7 +536,7 @@ async def test_init_project_memory_enabled_uses_embedding_only_in_command_env(
     assert configured.sandbox.memory is not None
     configured.sandbox.memory.embedding_ref = "vault:demo/memory/key"
     provider = FakeSandbox("local")
-    await init_project(configured, "demo", Vault(), provider=provider)
+    await init_project(configured, demo_workspace(), Vault(), provider=provider)
 
     assert any(entry.cmd == "memory init" for entry in provider.journal)
     assert provider.received_env("EMBEDDING_API_KEY") == "synthetic-embedding-secret"

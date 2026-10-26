@@ -1,15 +1,17 @@
-"""Загрузка и проверка config/harness.yaml: несекретные настройки workspace (в том числе
-репозиторий), sandbox.
+"""Загрузка и проверка config/harness.yaml: глобальные настройки сервера и песочницы.
+
+Проекты (workspace) в файл не пишутся: они хранятся на сервере и заводятся в консоли или через
+API (project-catalog, D-65). Старая форма с блоком workspaces или секцией gitlab отклоняется
+с подсказкой.
 
 Секреты в YAML запрещены: ключи с сегментами token/tokens/key/password/passwd/pwd/secret/secrets/
 apikey/credential/credentials отклоняются до валидации Pydantic (D-20, D-26). Ошибки называют путь к
-полю (workspaces[0].repo.token), но не значение.
+полю, но не значение.
 """
 
 import re
-from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Final, Literal, Self
+from typing import Any
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
@@ -39,120 +41,15 @@ _SECRET_SEGMENTS = frozenset(
 _SEGMENT_SPLIT = re.compile(r"[_-]")
 # Граница camelCase: accessToken → access_Token, чтобы сегмент token не терялся внутри слова.
 _CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
-# Сегмент начинается и заканчивается буквой или цифрой: ./. и ../.. не проходят (L1).
-_GITHUB_REPO_SEGMENT = r"[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?"
-_GITHUB_REPO_PATTERN = rf"^{_GITHUB_REPO_SEGMENT}/{_GITHUB_REPO_SEGMENT}$"
-# GitLab допускает подгруппы: group/subgroup/name, минимум два сегмента (D-60).
-_GITLAB_PROJECT_PATTERN = rf"^{_GITHUB_REPO_SEGMENT}(/{_GITHUB_REPO_SEGMENT})+$"
-# Автор коммитов: без управляющих символов (в том числе перевода строки); адрес без @ и пробелов.
-_GIT_NAME_PATTERN = r"^[^\x00-\x1f\x7f]+$"
-_GIT_EMAIL_PATTERN = r"^[^@\s\x00-\x1f\x7f]+@[^@\s\x00-\x1f\x7f]+$"
 
-# Провайдер git-хостинга репозитория workspace (D-60); GitHub Enterprise пока не поддержан.
-GitProviderName = Literal["github", "gitlab"]
-GITHUB_BASE_URL: Final = "https://github.com"
-DEFAULT_REPO_BASE_URLS: Final[Mapping[str, str]] = {
-    "github": GITHUB_BASE_URL,
-    "gitlab": "https://gitlab.com",
-}
-# Метка хоста и сегмент пути base_url начинаются и заканчиваются буквой или цифрой: «.», «..»,
-# «-host» и «a..b» не проходят (D-62, F3).
-_HOST_LABEL = r"[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?"
-_URL_PATH_SEGMENT = r"[A-Za-z0-9]([A-Za-z0-9._~-]*[A-Za-z0-9])?"
-# Только https: заголовок с ключом не уходит открытым текстом (D-60). Без query, fragment, пробелов.
-_REPO_BASE_URL_PATTERN = (
-    rf"^https://{_HOST_LABEL}(\.{_HOST_LABEL})*(:[0-9]{{1,5}})?(/{_URL_PATH_SEGMENT})*/?$"
+_MOVED_WORKSPACES: str = (
+    "блок workspaces удалён: проекты заводятся на сервере (консоль или API "
+    "/api/console/projects), перенесите его по docs/deployment.md"
 )
-
-
-class RepoConfig(BaseModel):
-    """Репозиторий workspace (D-60): провайдер, адрес, проект и ссылка vault на ключ записи.
-
-    Адрес по умолчанию зависит от провайдера. Ключ не хранится здесь: access_ref — только ссылка
-    vault (D-45), а без него задача не запускается, потому что все пайплайны пушат ветку.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    provider: GitProviderName
-    # Пустое значение заменяет валидатор по умолчанию провайдера (_default_base_url), см. ниже.
-    base_url: str = ""
-    project: str = Field(min_length=1, max_length=255)
-    # Ключ записи из vault (D-45). Без него — только анонимный клон публичного репозитория.
-    access_ref: str | None = None
-
-    @model_validator(mode="before")
-    @classmethod
-    def _default_base_url(cls, data: Any) -> Any:
-        # Адрес по умолчанию подставляем до проверки поля, чтобы github без base_url не падал.
-        if isinstance(data, dict) and data.get("base_url") is None:
-            provider = data.get("provider")
-            if isinstance(provider, str) and provider in DEFAULT_REPO_BASE_URLS:
-                return {**data, "base_url": DEFAULT_REPO_BASE_URLS[provider]}
-        return data
-
-    @field_validator("base_url")
-    @classmethod
-    def _check_base_url(cls, value: str) -> str:
-        # Текст ошибки не содержит значения: pydantic выводит его без input (см. _format_errors).
-        if "@" in value:
-            raise ValueError(
-                "адрес не должен содержать учётные данные перед символом @; "
-                "ключ задаётся ссылкой repo.access_ref"
-            )
-        if re.fullmatch(_REPO_BASE_URL_PATTERN, value) is None:
-            raise ValueError(
-                "адрес репозитория — https://хост[:порт][/путь] без учётных данных, query, fragment"
-            )
-        return value.rstrip("/")
-
-    @field_validator("access_ref")
-    @classmethod
-    def _check_access_ref(cls, value: str | None) -> str | None:
-        return _check_vault_ref(value, "access_ref")
-
-    @model_validator(mode="after")
-    def _check_provider_rules(self) -> Self:
-        if self.project.lower().endswith(".git"):
-            raise ValueError("project указывается без .git")
-        if self.provider == "github":
-            if self.base_url != GITHUB_BASE_URL:
-                raise ValueError(
-                    "GitHub Enterprise пока не поддерживается: для github base_url — https://github.com"
-                )
-            if re.fullmatch(_GITHUB_REPO_PATTERN, self.project) is None:
-                raise ValueError("project для github — owner/name")
-        elif re.fullmatch(_GITLAB_PROJECT_PATTERN, self.project) is None:
-            raise ValueError("project для gitlab — group[/subgroup]/name")
-        return self
-
-
-class WorkspaceConfig(BaseModel):
-    """Проект, с которым работает харнесс: репозиторий GitHub или GitLab и команда тестов."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    # id входит в callback_data `ws:<task hex>:<id>` ≤ 64 байт (D-28): до 28 символов, без «:».
-    id: str = Field(min_length=1, max_length=28, pattern=r"^[A-Za-z0-9_-]+$")
-    name: str = Field(min_length=1)
-    voice_aliases: list[str]
-    repo: RepoConfig
-    default_branch: str = "main"
-    test_command: str | None = None
-    agent: str = "claude-code"
-    # Лимит ходов агента на задачу (D-38): ограничивает расход подписки и зацикливание.
-    agent_max_turns: int = Field(default=50, ge=1, le=500)
-
-    @model_validator(mode="before")
-    @classmethod
-    def _reject_legacy_fields(cls, data: Any) -> Any:
-        # Чистый разрыв (D-60): старое поле не переводится молча, иначе ключ одного хоста уйдёт на
-        # другой.
-        if isinstance(data, dict) and "gitlab_project" in data:
-            raise ValueError(
-                "gitlab_project удалён (D-60): задайте repo: provider, project, access_ref"
-            )
-        return data
+_MOVED_GITLAB: str = (
+    "секция gitlab удалена (D-60): адрес, проект и ключ задаются у проекта на сервере "
+    "(repo: provider, project, access_ref)"
+)
 
 
 class SandboxMemoryConfig(BaseModel):
@@ -178,6 +75,11 @@ class SandboxMemoryConfig(BaseModel):
     @classmethod
     def _check_embedding_ref(cls, value: str | None) -> str | None:
         return _check_vault_ref(value, "embedding_ref")
+
+
+# Автор коммитов: без управляющих символов (в том числе перевода строки); адрес без @ и пробелов.
+_GIT_NAME_PATTERN = r"^[^\x00-\x1f\x7f]+$"
+_GIT_EMAIL_PATTERN = r"^[^@\s\x00-\x1f\x7f]+@[^@\s\x00-\x1f\x7f]+$"
 
 
 class GitAuthorConfig(BaseModel):
@@ -224,31 +126,22 @@ class SandboxConfig(BaseModel):
 
 
 class HarnessConfig(BaseModel):
-    """Корень harness.yaml."""
+    """Корень harness.yaml: глобальные настройки сервера и песочницы (D-65)."""
 
     model_config = ConfigDict(extra="forbid")
 
-    workspaces: list[WorkspaceConfig] = Field(min_length=1)
     sandbox: SandboxConfig
 
     @model_validator(mode="before")
     @classmethod
-    def _reject_legacy_gitlab_section(cls, data: Any) -> Any:
-        # Секция gitlab удалена (D-60); без подсказки extra=forbid дал бы безликое «не разрешено».
-        if isinstance(data, dict) and "gitlab" in data:
-            raise ValueError(
-                "секция gitlab удалена (D-60): адрес, проект и ключ задаются в workspaces[].repo"
-            )
+    def _reject_moved_sections(cls, data: Any) -> Any:
+        # Блоки переехали на сервер: без подсказки extra=forbid дал бы безликое «не разрешено».
+        if isinstance(data, dict):
+            if "workspaces" in data:
+                raise ValueError(_MOVED_WORKSPACES)
+            if "gitlab" in data:
+                raise ValueError(_MOVED_GITLAB)
         return data
-
-    @model_validator(mode="after")
-    def _check_unique_workspace_ids(self) -> Self:
-        seen: set[str] = set()
-        for workspace in self.workspaces:
-            if workspace.id in seen:
-                raise ValueError(f"повторяющийся workspace id: {workspace.id}")
-            seen.add(workspace.id)
-        return self
 
 
 def _check_vault_ref(value: str | None, field: str) -> str | None:

@@ -14,23 +14,25 @@ from pathlib import Path
 from urllib.parse import quote
 
 import pytest
-from harness_server.config import RepoConfig
 from harness_server.security.redaction import redact
 from harness_server.services import git_access
+from harness_shared.projects import ProjectRepo
 
 TOKEN = "glpat-ABCDEFGHIJKLMNOPQR"
 
 
-def _github() -> RepoConfig:
-    return RepoConfig(provider="github", base_url="https://github.com", project="w1do/chistotyumen")
+def _github() -> ProjectRepo:
+    return ProjectRepo(
+        provider="github", base_url="https://github.com", project="w1do/chistotyumen"
+    )
 
 
-def _gitlab_subgroup() -> RepoConfig:
-    return RepoConfig(provider="gitlab", base_url="https://gitlab.com", project="group/sub/demo")
+def _gitlab_subgroup() -> ProjectRepo:
+    return ProjectRepo(provider="gitlab", base_url="https://gitlab.com", project="group/sub/demo")
 
 
-def _gitlab_demo() -> RepoConfig:
-    return RepoConfig(provider="gitlab", base_url="https://gitlab.com", project="group/demo")
+def _gitlab_demo() -> ProjectRepo:
+    return ProjectRepo(provider="gitlab", base_url="https://gitlab.com", project="group/demo")
 
 
 def _git_supports_config_env() -> bool:

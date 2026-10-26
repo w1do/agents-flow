@@ -11,10 +11,10 @@ import logging
 from collections.abc import Sequence
 from uuid import UUID
 
+from harness_shared.projects import Workspace
 from sqlalchemy import select
 
 from harness_server.adapters.telegram.types import MessageNotEditable, TelegramError
-from harness_server.config import WorkspaceConfig
 from harness_server.db.models import Task, TelegramMessage
 from harness_server.security.redaction import redact
 from harness_server.services.context import BotContext
@@ -33,12 +33,12 @@ logger = logging.getLogger(__name__)
 
 
 async def send_task_card(
-    ctx: BotContext, task: Task, *, workspaces: Sequence[WorkspaceConfig] | None = None
+    ctx: BotContext, task: Task, *, workspaces: Sequence[Workspace] | None = None
 ) -> None:
     """Отправляет карточку задачи с кнопками выбора проекта. Идемпотентна: вторая карточка не
     уходит.
 
-    workspaces — кнопки маршрутизатора (не больше трёх); None — все workspace из конфига (D-13).
+    workspaces — кнопки маршрутизатора (не больше трёх); None — все активные проекты (D-13).
     TelegramError пробрасывается: вызывающий решает, что делать (процесс досылает карточку позже).
     """
     async with ctx.session_factory() as session:
@@ -47,12 +47,11 @@ async def send_task_card(
     source = _clean_text(ctx, task.text)
     line = stage_line(short_title(source), STAGE_CHOOSING)
     text = redact(render_card(source, [line]), ctx.secret_values)
+    buttons = await ctx.workspaces() if workspaces is None else workspaces
     message_id = await ctx.telegram.send_message(
         ctx.owner_chat_id,
         text,
-        reply_markup=workspace_keyboard(
-            task.id, ctx.workspaces if workspaces is None else workspaces
-        ),
+        reply_markup=workspace_keyboard(task.id, buttons),
     )
     async with ctx.session_factory() as session:
         session.add(

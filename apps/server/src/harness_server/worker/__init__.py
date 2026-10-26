@@ -19,6 +19,7 @@ from harness_server.config import HarnessConfig
 from harness_server.db.session import create_engine, create_session_factory
 from harness_server.services.intake import recover_pending
 from harness_server.services.machine import require_non_root
+from harness_server.services.projects import list_workspaces
 from harness_server.services.sandboxes import ensure_sandbox
 from harness_server.settings import Settings
 from harness_server.wiring import (
@@ -73,7 +74,6 @@ async def start_worker(
     try:
         bot = build_bot_context(
             settings,
-            config,
             factory,
             adapters if adapters is not None else build_adapters(settings, http),
         )
@@ -99,6 +99,14 @@ async def _build_dispatch(
         return None
     async with factory() as session:
         await ensure_sandbox(session, config)
+        workspaces = await list_workspaces(session)
+    # Ключи репозиториев — в vault по repo.access_ref; без ключа задачи уходят в error (D-60).
+    without_key = [ws.id for ws in workspaces if ws.repo.access_ref is None]
+    if without_key:
+        logger.warning(
+            "проект без repo.access_ref, задачи по нему уходят в error: %s",
+            ", ".join(without_key),
+        )
 
     async def step() -> bool:
         return await dispatch_once(ctx)

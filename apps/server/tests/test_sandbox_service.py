@@ -20,7 +20,7 @@ from typing import Any
 import pytest
 from harness_server.adapters.local import LocalSandboxProvider
 from harness_server.adapters.sandbox import ExecResult, FakeSandbox, SandboxUnavailable
-from harness_server.config import GitAuthorConfig, HarnessConfig, RepoConfig, load_config
+from harness_server.config import GitAuthorConfig, HarnessConfig, load_config
 from harness_server.db.models import Task, TaskToken
 from harness_server.security import tokens
 from harness_server.services import git_access, sandboxes
@@ -31,6 +31,7 @@ from harness_server.services.sandboxes import (
     SandboxBusy,
 )
 from harness_server.services.tasks import create_task, get_task
+from harness_shared.projects import ProjectRepo
 from harness_shared.sandboxes import AgentRole, SandboxStatus
 from harness_shared.tasks import TaskKind, TaskSource, TaskStatus
 from pydantic import SecretStr
@@ -51,7 +52,7 @@ OAUTH = "oauth-test-value-0123456789abcdef"
 GITLAB = "glpat-test-token-0123456789abcdef"
 GITHUB = "github_pat_test-token-0123456789abcdef"
 # Репозиторий workspace demo для activate (D-60): провайдер gitlab, адрес как в тестовом конфиге.
-REPO_CONFIG = RepoConfig(
+REPO_CONFIG = ProjectRepo(
     provider="gitlab", base_url="https://gitlab.example.com", project="group/demo"
 )
 PROBE_PREFIX = shlex.quote(sys.executable) + " -c"
@@ -1802,7 +1803,7 @@ async def test_activate_fetch_env_overrides_clone_config() -> None:
 
 async def test_activate_github_fetch_uses_x_access_token_header() -> None:
     fake = _fake()
-    repo = RepoConfig(provider="github", project="w1do/chistotyumen")
+    repo = ProjectRepo(provider="github", project="w1do/chistotyumen")
 
     await sandboxes.activate(
         fake,
