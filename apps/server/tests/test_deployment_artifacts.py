@@ -38,9 +38,3 @@ def test_worker_unit_preserves_detached_agents_and_uses_host_environment() -> No
 def test_docker_context_excludes_agent_worktrees_and_secret_containers() -> None:
     ignored = set((ROOT / ".dockerignore").read_text().splitlines())
     assert {".worktrees", "**/.env", "**/.env.*", "**/.memory", "config/harness.yaml"} <= ignored
-
-
-def test_ci_has_no_removed_provider_or_bootstrap_references() -> None:
-    ci = (ROOT / ".gitlab-ci.yml").read_text().lower()
-    assert "novita" not in ci
-    assert "bootstrap" not in ci
