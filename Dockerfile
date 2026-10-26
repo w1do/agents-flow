@@ -28,6 +28,7 @@ COPY apps ./apps
 COPY shared ./shared
 COPY db ./db
 COPY alembic.ini ./
+COPY config/harness.example.yaml ./config/harness.yaml
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --package harness-server
 
