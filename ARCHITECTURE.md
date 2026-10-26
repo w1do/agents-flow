@@ -14,7 +14,7 @@
         │ webhook (HTTPS, секрет)
         ▼
  ┌──────────────────────── server (FastAPI, async) ────────────────────────┐
- │ api/telegram ──► services ◄── mcp/agents-flow ◄─── агент в песочнице     │
+ │ api/telegram ──► services ◄── mcp/agents-flow ◄─── агент на машине      │
  │                     │  ▲                         (токен задачи, HTTPS)  │
  │                     ▼  │                                                 │
  │              db (SQLAlchemy async) ──► Postgres (отдельный стек)         │
@@ -76,7 +76,7 @@ apps/server/src/harness_server/
 | `task_events` | id, task_id, status, text, source (`telegram`/`agent`/`worker`/`api`), created_at | Лента этапов для Telegram и журнала |
 | `routings` | id, task_id (NULL для status, unknown и ожидающего уточнения), command_class (`work`/`status`/`unknown`), decision (`auto`/`clarify`/`fallback`), options (JSON), chosen_workspace_id, raw_response, confidence, error (причина запасного пути), source_text (до нажатия «Сделать задачу», затем NULL), resolved_at | Решение Polza и выбор пользователя (mvp-05, D-32, миграция `0003`) |
 | `spec_items` | id, workspace_id, plan_task_id, change_id, key, text, status, last_checkpoint_id; UNIQUE (workspace_id, change_id, key) | Зеркало пунктов OpenSpec |
-| `sandboxes` | id, provider_id, agent_type, status (`paused`/`active`/`error`), current_task_id, profile_version, agent_started_at (время запуска агента, NULL — не запускался), agent_pid (pid группы агента, NULL — неизвестен) | Песочница машины агента (`provider_id` из harness.yaml); колонки агента — серверный учёт запуска, файлам песочницы не доверяем (D-41, миграция `0004`) |
+| `sandboxes` | id, provider_id, agent_type, status (`paused`/`active`/`error`), current_task_id, profile_version, agent_started_at (время запуска агента, NULL — не запускался), agent_pid (pid группы агента, NULL — неизвестен) | Локальная машина агента (`provider_id` из harness.yaml), подготовленная через `agent init`; колонки агента — серверный учёт запуска, файлам рабочей копии не доверяем (D-41, D-64, миграция `0004`) |
 | `checkpoints` | id, task_id, summary, files (JSON), diff_redacted, next_step, status, tokens | Чекпоинты (MVP: от сервера после агента) |
 | `telegram_messages` | task_id, chat_id, message_id, lines (JSON) | Одно обновляемое сообщение на задачу |
 | `telegram_updates` | kind (`update`/`callback`) + external_id (составной PK), received_at, processed_at, payload (JSONB NULL) | Идемпотентность входа (A4). `payload` — нормализованный апдейт владельца (текст, голос или нажатие кнопки, без имён и `from`) до обработки; после обработки обнуляется (D-27) |
@@ -169,11 +169,8 @@ implement:  backlog → active → testing → ready (MR создан) → merge
   подпроцессах не видны; значения не попадают в argv.
 - Файлы песочницы: `write_file` атомарный, права 0600 у файлов и 0700 у каталогов; `read_file` при отсутствии файла
   возвращает `None`.
-- **Статус перехода (`local-agent-machine`, D-64).** Реализованы по `tasks.md`: `LocalSandboxProvider` (2.1–2.4),
-  `services/machine.py` — проверки prerequisites, каталоги, клон, память (4.1–4.4), команда `agent init` (4.6),
-  выбор рантайма и маркер проекта в worker и wiring (5.1–5.4). Группы 3–5 не приняты: повторный `agent init` не
-  подтверждён (4.5), удаление `adapters/novita`, зависимости `novita-sandbox`, `deploy/sandbox` и live-тестов Novita
-  (5.5–5.6) открыто. Описание в этом разделе — целевое состояние, его приёмка за владельцем.
+- **История перехода (D-64 заменило Novita и bootstrap локальной машиной агента).** Приёмка пунктов `local-agent-machine`
+  остаётся за владельцем; статус выполнения и незавершённые проверки ведутся в `openspec/changes/local-agent-machine/tasks.md`.
 - Подготовка машины — команда `agent init <project>` (`agent_cli.py`, `services/machine.py`, D-64). Запускается от
   непривилегированного пользователя, без `sudo`:
   1. Проверка prerequisites (`check_prerequisites`): `git`, `node` ≥ 22.13, `npm`, клиент агента (`AGENT_CLIENT_COMMAND`,
@@ -185,8 +182,8 @@ implement:  backlog → active → testing → ready (MR создан) → merge
   4. Память, если задан `sandbox.memory`: `.memory/` добавляется в `.git/info/exclude`, `memory init` получает
      `EMBEDDING_API_KEY` только в env команды, маркер `memory/<id>.ready`. Без блока `sandbox.memory` шаг пропускается.
   5. Маркер `projects/<id>.ready` ставится в конце и снимается в начале повторного запуска (задача 4.5, не принята).
-- Убраны: `deploy/sandbox/bootstrap.sh`, команда `sandbox bootstrap`, версии CLI в конфиге, `ensure-docker.sh`,
-  установка memory-agent по sha из GitHub (D-44, D-47, D-51, D-63 заменены D-64).
+- Инструменты и зависимости проекта устанавливает оператор на машине агента; `agent init` проверяет prerequisites и
+  подключает проект. `ensure-docker.sh` и установка memory-agent харнессом не используются (D-44, D-47, D-51, D-63 заменены D-64).
 - Ключ репозитория workspace уходит git заголовком `Authorization: Basic` только на префикс адреса его репозитория
   `<base_url>/<project>.git/` (`GIT_CONFIG_*` в env клона и fetch, D-52, D-60). Пользователь Basic: `oauth2` для GitLab,
   `x-access-token` для GitHub. Редиректы выключены. Клон и fetch делает `agent init` (`sync_clone`) отдельной
@@ -275,7 +272,7 @@ Dokploy, два Compose-стека:
 
 - `deploy/db/docker-compose.yml` — Postgres отдельно; редеплой харнесса не трогает данные.
 - `docker-compose.yml` — `migrate` (одноразовый, `alembic upgrade head`) → `server`; `console` — `mvp-10` (D-39).
-- Принятые артефакты деплоя (задача 6 `local-agent-machine`) убирают worker из Compose и добавляют systemd user unit для worker на хосте. Compose БД публикует порт 5432 только на loopback хоста (`127.0.0.1`), сохраняя внешнюю сеть и volume; контейнерный server подключается через Docker-сеть, worker на хосте — через loopback. См. [инструкцию деплоя](docs/deployment.md) и [настройку worker](deploy/worker/README.md). Проверка артефактов не подтверждает установку или запуск сервиса, деплой БД и приёмку незавершённой миграции runtime (задачи 3–5).
+- Worker работает на хосте как systemd user unit рядом с локальной машиной агента; Compose БД публикует порт 5432 только на loopback хоста (`127.0.0.1`), сохраняя внешнюю сеть и volume. Контейнерный server подключается через Docker-сеть, worker — через loopback. См. [инструкцию деплоя](docs/deployment.md) и [настройку worker](deploy/worker/README.md).
 
 Compose-сервисы используют внешнюю сеть `dokploy-network`; Postgres additionally binds only to host loopback. Домен и HTTPS — в Dokploy.
 CI: `.gitlab-ci.yml`, стадии `check → build → deploy`; образы в GitLab Registry с тегами

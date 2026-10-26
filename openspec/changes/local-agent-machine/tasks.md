@@ -17,7 +17,7 @@
 - [x] 2.2 Очищенное окружение: белый список `PATH`/`HOME`/`USER`/`LOGNAME`/`LANG`/`LC_*`/`TERM` плюс `envs`, проверка имён и NUL в значениях — файлы: `adapters/local/provider.py` — проверка: тест «секреты worker не видны»: `DATABASE_URL`, `TELEGRAM_BOT_TOKEN` отсутствуют, `AGENTS_FLOW_TOKEN` есть; значение секрета не в argv
 - [x] 2.3 `write_file`/`read_file`: права 0600 файлов и 0700 каталогов, атомарная запись, нет файла → `None` — файлы: `adapters/local/provider.py` — проверка: тесты прав и отсутствия файла
 - [x] 2.4 Отказ работать от root (uid 0) в `connect` и общий хелпер для `agent init` — файлы: `adapters/local/provider.py`, `services/machine.py` — проверка: тест с подменой uid
-- [ ] 2.5 Документация: ARCHITECTURE.md §7 «Песочница» (локальная машина вместо Novita), раздел адаптеров, `apps/server/README.md` — файлы: `ARCHITECTURE.md`, `apps/server/README.md` — проверка: ревью диффа
+- [x] 2.5 Документация: ARCHITECTURE.md §7 «Песочница» (локальная машина вместо Novita), раздел адаптеров, `apps/server/README.md` — файлы: `ARCHITECTURE.md`, `apps/server/README.md` — проверка: ревью диффа
 
 ## 3. Конфиг и ENV
 
@@ -34,7 +34,7 @@
 - [x] 4.4 Память: `.memory/` в `.git/info/exclude`, `memory init` с `EMBEDDING_API_KEY` в env команды, маркер `memory/<id>.ready`; без блока `sandbox.memory` шаг пропускается — файлы: `services/machine.py` — проверка: тесты вкл/выкл, ключ не на диске
 - [x] 4.5 `services/machine.init_project`: порядок шагов, vault (ошибка → код 1 `vault` до изменений), маркер `projects/<id>.ready` ставится в конце и снимается в начале повторного запуска, вывод через redaction — файлы: `services/machine.py` — проверка: тесты полного прохода, сбоя посреди, повтора
 - [x] 4.6 `agent_cli.py` (typer, `init <project>`, коды 0/1/2/3, справка с именем харнесса) и `[project.scripts]` `agent`, `harness-agent` — файлы: `apps/server/src/harness_server/agent_cli.py`, `apps/server/pyproject.toml` — проверка: `test_agent_cli.py` (неизвестный проект → 2, без `DATABASE_URL`, справка)
-- [ ] 4.7 Документация: ARCHITECTURE.md (слои: `services/machine.py`, `agent_cli.py`), `apps/server/README.md` (`agent init`), `docs/development.md`, `docs/operating-without-ui.md`, `docs/glossary.md` («машина агента», «проект», маркер) — файлы: перечисленные — проверка: ревью
+- [x] 4.7 Документация: ARCHITECTURE.md (слои: `services/machine.py`, `agent_cli.py`), `apps/server/README.md` (`agent init`), `docs/development.md`, `docs/operating-without-ui.md`, `docs/glossary.md` («машина агента», «проект», маркер) — файлы: перечисленные — проверка: ревью
 
 ## 5. Рантайм: удаление Novita и bootstrap
 
@@ -44,7 +44,7 @@
 - [x] 5.4 `worker/dispatcher.py`: проверка маркера `projects/<id>.ready` перед `activate`, причина `project_not_initialized: выполните agent init <id>`, освобождение стандартным путём — файлы: `worker/dispatcher.py` — проверка: `test_dispatcher.py` (нет маркера, есть маркер, песочница освобождена)
 - [ ] 5.5 Удалить `adapters/novita/`, `docs/novita.md`, `tools/spikes/novita_check.py`, `deploy/sandbox/`, зависимость `novita-sandbox` из `apps/server/pyproject.toml` и `pyproject.toml`, `uv lock` — файлы: перечисленные, `uv.lock` — проверка: `grep -ri novita apps shared deploy docker-compose.yml .env.example config` пуст, `uv sync --frozen`
 - [ ] 5.6 Удалить тесты `test_novita_client.py`, `test_novita_live.py`, `test_sandbox_bootstrap.py`; `conftest.py` и остальные тесты без `NOVITA_*`; live-тесты `test_agent_runtime_live.py`, `test_sandbox_profile_live.py` перевести на локальную машину и `agent init` — файлы: `apps/server/tests/` — проверка: `./tools/harness check`; live — прогон владельцем `-m live`
-- [ ] 5.7 Документация: ARCHITECTURE.md (§1 компоненты без bootstrap, §3 `sandboxes`, §7 песочница, §10), `docs/deployment.md` (раздел «Подготовка машины», «Изоляция» вместо Novita), `docs/open-questions.md`, `docs/README.md` — файлы: перечисленные — проверка: ревью
+- [x] 5.7 Документация: ARCHITECTURE.md (§1 компоненты без bootstrap, §3 `sandboxes`, §7 песочница, §10), `docs/deployment.md` (раздел «Подготовка машины», «Изоляция» вместо Novita), `docs/open-questions.md`, `docs/README.md` — файлы: перечисленные — проверка: ревью
 
 ## 6. Деплой: worker на хосте
 
