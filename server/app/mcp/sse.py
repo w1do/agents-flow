@@ -35,13 +35,31 @@ def sanitize_sse_event(event, sanitize_json):
 
 
 def next_sse_event(pending):
-    separators = (b"\r\n\r\n", b"\n\n")
-    matches = [(pending.find(separator), separator) for separator in separators]
-    matches = [(index, separator) for index, separator in matches if index >= 0]
-    if not matches:
-        return None
-    index, separator = min(matches, key=lambda match: match[0])
-    end = index + len(separator)
-    event = bytes(pending[:end])
-    del pending[:end]
-    return event
+    index = 0
+    while index < len(pending):
+        if pending[index] == 13:
+            if index + 1 == len(pending):
+                return None
+            first_end = index + (2 if pending[index + 1] == 10 else 1)
+        elif pending[index] == 10:
+            first_end = index + 1
+        else:
+            index += 1
+            continue
+
+        if first_end == len(pending):
+            return None
+        if pending[first_end] == 13:
+            if first_end + 1 == len(pending):
+                return None
+            end = first_end + (2 if pending[first_end + 1] == 10 else 1)
+        elif pending[first_end] == 10:
+            end = first_end + 1
+        else:
+            index = first_end
+            continue
+
+        event = bytes(pending[:end])
+        del pending[:end]
+        return event
+    return None
