@@ -1,2 +1,14 @@
 .memory/*
 !.memory/annotations.json
+.env
+.env.*
+!.env.example
+workflow/.agent-token
+__pycache__/
+*.pyc
+node_modules/
+dist/
+*.db
+.venv/
+.pytest_cache/
+*.egg-info/

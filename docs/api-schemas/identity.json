@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "LoginRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["email", "password"],
+      "properties": {"email": {"type": "string", "format": "email"}, "password": {"type": "string", "minLength": 1, "writeOnly": true}}
+    },
+    "LoginResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["access_token", "token_type", "expires_in"],
+      "properties": {"access_token": {"type": "string"}, "token_type": {"const": "bearer"}, "expires_in": {"type": "integer", "minimum": 1}}
+    },
+    "ProjectCreate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 200},
+        "description": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+        "telegram_chat_id": {"anyOf": [{"type": "string"}, {"type": "null"}]}
+      }
+    },
+    "ProjectResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "description", "telegram_chat_id", "created_at", "updated_at", "active_task_count", "agents", "init_code_expires_at"],
+      "properties": {
+        "id": {"type": "string", "format": "uuid"},
+        "name": {"type": "string", "maxLength": 200},
+        "description": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+        "telegram_chat_id": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+        "created_at": {"type": "string", "format": "date-time"},
+        "updated_at": {"type": "string", "format": "date-time"},
+        "active_task_count": {"type": "integer", "minimum": 0},
+        "agents": {"type": "array", "items": {"$ref": "identity.json#/$defs/AgentResponse"}},
+        "init_code_expires_at": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}]}
+      }
+    },
+    "AgentResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "project_id", "name", "repository_path_hint", "git_remote", "status", "last_heartbeat_at", "created_at", "updated_at"],
+      "properties": {
+        "id": {"type": "string", "format": "uuid"},
+        "project_id": {"type": "string", "format": "uuid"},
+        "name": {"type": "string"},
+        "repository_path_hint": {"type": "string"},
+        "git_remote": {"type": "string"},
+        "status": {"type": "string", "enum": ["online", "busy", "offline"]},
+        "last_heartbeat_at": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}]},
+        "created_at": {"type": "string", "format": "date-time"},
+        "updated_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "InitTokenResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "expires_at"],
+      "properties": {"code": {"type": "string"}, "expires_at": {"type": "string", "format": "date-time"}}
+    }
+  }
+}

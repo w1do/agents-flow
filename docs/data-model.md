@@ -84,7 +84,8 @@ idempotency_keys
 
 ## agent_skills
 
-`agent_id`, `skill_id`, `enabled`, `assigned_at`. Уникальность `agent_id + skill_id`.
+`id` UUID PK, `agent_id`, `skill_id`, `enabled`, `assigned_at`.
+Уникальность `agent_id + skill_id`.
 
 ## tasks
 
@@ -111,14 +112,17 @@ idempotency_keys
 
 ## task_skill_snapshots
 
-`task_id`, `skill_id`, `skill_name`, `skill_version`, `content_hash`.
+`id` UUID PK, `task_id`, `skill_id`, `skill_name`, `skill_version`, `content_hash`.
+Уникальность `task_id + skill_id`.
 Фиксируется при аренде задачи — гарантирует, что правка skill не меняет
 текущую задачу.
 
 ## task_events
 
 `id` UUID, `task_id`, `agent_id` nullable, `event_type`, `message`,
-`payload` jsonb, `created_at`. Только добавление, без обновлений.
+`payload` jsonb nullable, `created_at`, `event_id` text nullable.
+Уникальность `(task_id, event_id)`; несколько NULL разрешены.
+Только добавление на уровне сервисов (этап 5.8); базовый репозиторий пока имеет CRUD.
 
 ## idempotency_keys
 
@@ -131,3 +135,16 @@ idempotency_keys
 - `tasks (status, created_at)` — очередь аренды.
 - `task_events (task_id, created_at)` — лента событий.
 - `agent_skills (agent_id)` — синхронизация skills.
+
+## Решения фундамента (группы 1–2)
+
+Все PK — UUID, генерируются приложением; FK без каскадного удаления.
+`created_at` / `updated_at` имеют серверный default `now()`;
+`updated_at` обновляется SQLAlchemy при UPDATE, триггеров БД нет.
+Enum-подобные поля — TEXT + CHECK. Defaults: agent.status=offline,
+task.status=new, plan_decision=pending, plan_revision=0, skill.version=1,
+is_active=true, enabled=true, sort_order=0; assigned_at имеет default now().
+last_heartbeat_at, completed_at, result_data и checkpoint допускают NULL до появления данных.
+Остальные не помеченные nullable поля обязательны, включая описания skills/категорий.
+JSON-поля: JSONB на PostgreSQL, JSON на SQLite. Тесты SQLite включают FK;
+конкурентная аренда с SKIP LOCKED реализуется и проверяется отдельно на этапе 5.3.

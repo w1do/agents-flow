@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "PlanRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lease_id", "event_id", "plan_text"],
+      "properties": {
+        "lease_id": {"type": "string", "format": "uuid"},
+        "event_id": {"type": "string", "minLength": 1},
+        "plan_text": {"type": "string", "minLength": 1}
+      }
+    },
+    "EventRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lease_id", "event_id", "event_type", "message"],
+      "properties": {
+        "lease_id": {"type": "string", "format": "uuid"},
+        "event_id": {"type": "string", "minLength": 1},
+        "event_type": {"type": "string"},
+        "message": {"type": "string"},
+        "payload": {"anyOf": [{"type": "object", "additionalProperties": true}, {"type": "null"}]},
+        "checkpoint": {"anyOf": [{"type": "object", "additionalProperties": true}, {"type": "null"}]}
+      }
+    },
+    "ResultRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lease_id", "event_id", "result_summary", "result_data"],
+      "properties": {
+        "lease_id": {"type": "string", "format": "uuid"},
+        "event_id": {"type": "string", "minLength": 1},
+        "result_summary": {"type": "string"},
+        "result_data": {"type": "object", "additionalProperties": true}
+      }
+    },
+    "PublicationResultRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lease_id", "event_id", "success", "message"],
+      "properties": {
+        "lease_id": {"type": "string", "format": "uuid"},
+        "event_id": {"type": "string", "minLength": 1},
+        "success": {"type": "boolean"},
+        "message": {"type": "string"},
+        "payload": {"anyOf": [{"type": "object", "additionalProperties": true}, {"type": "null"}]}
+      }
+    },
+    "FailRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lease_id", "event_id", "message"],
+      "properties": {
+        "lease_id": {"type": "string", "format": "uuid"},
+        "event_id": {"type": "string", "minLength": 1},
+        "message": {"type": "string"},
+        "payload": {"anyOf": [{"type": "object", "additionalProperties": true}, {"type": "null"}]}
+      }
+    },
+    "ReportResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_id", "status", "event_id"],
+      "properties": {
+        "task_id": {"type": "string", "format": "uuid"},
+        "status": {"$ref": "common.json#/$defs/TaskStatus"},
+        "event_id": {"type": "string"}
+      }
+    }
+  }
+}

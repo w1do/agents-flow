@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "SkillFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["skill_id", "filename", "version", "content_hash", "content"],
+      "properties": {
+        "skill_id": {"type": "string", "format": "uuid"},
+        "filename": {"type": "string"},
+        "version": {"type": "integer", "minimum": 1},
+        "content_hash": {"type": "string"},
+        "content": {"type": "string"}
+      }
+    },
+    "SkillSyncResponse": {"type": "object", "additionalProperties": false, "required": ["skills"], "properties": {"skills": {"type": "array", "items": {"$ref": "harness.json#/$defs/SkillFile"}}}},
+    "HarnessInitRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project_id", "init_code", "agent_name"],
+      "properties": {
+        "project_id": {"type": "string", "format": "uuid"},
+        "init_code": {"type": "string", "minLength": 1},
+        "agent_name": {"type": "string", "minLength": 1, "maxLength": 200},
+        "repository_path_hint": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+        "git_remote": {"anyOf": [{"type": "string"}, {"type": "null"}]}
+      }
+    },
+    "HarnessInitResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent_id", "agent_token", "server_url", "poll_interval_seconds", "lease_ttl_seconds", "skills"],
+      "properties": {
+        "agent_id": {"type": "string", "format": "uuid"},
+        "agent_token": {"type": "string"},
+        "server_url": {"type": "string", "format": "uri"},
+        "poll_interval_seconds": {"const": 5},
+        "lease_ttl_seconds": {"const": 60},
+        "skills": {"type": "array", "items": {"$ref": "harness.json#/$defs/SkillFile"}}
+      }
+    },
+    "HeartbeatRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [{"properties": {"task_id": {"type": "null"}, "lease_id": {"type": "null"}}}, {"properties": {"task_id": {"type": "string"}, "lease_id": {"type": "string"}}}],
+      "required": ["task_id", "lease_id"],
+      "properties": {"task_id": {"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}]}, "lease_id": {"anyOf": [{"type": "string", "format": "uuid"}, {"type": "null"}]}}
+    },
+    "HeartbeatResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "lease_expires_at"],
+      "properties": {"status": {"type": "string", "enum": ["online", "busy"]}, "lease_expires_at": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}]}}
+    },
+    "ClaimRequest": {"type": "object", "additionalProperties": false, "required": [], "properties": {}},
+    "ClaimResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task", "skills"],
+      "properties": {"task": {"anyOf": [{"$ref": "tasks.json#/$defs/TaskResponse"}, {"type": "null"}]}, "skills": {"type": "array", "items": {"$ref": "harness.json#/$defs/SkillFile"}}}
+    }
+  }
+}
