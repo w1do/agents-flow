@@ -5,6 +5,7 @@ from app.repositories.task_history import TaskHistory
 from app.schemas.tasks import TaskEventResponse, TaskResponse, TaskSkillSnapshotResponse
 from app.services.projects import get_project
 from app.services.task_status import transition
+from app.services.skill_content import redact
 
 
 def get_task(session, task_id, *, lock=False):
@@ -33,7 +34,9 @@ def card(session, task):
 
 def create(session, project_id, body):
     get_project(session, project_id)
-    task = TaskRepository(session).create(project_id=project_id, **body.model_dump())
+    values = {key: redact(value) if isinstance(value, str) else value
+              for key, value in body.model_dump().items()}
+    task = TaskRepository(session).create(project_id=project_id, **values)
     TaskHistory(session).append(task.id, "created", "Задача создана")
     return card(session, task)
 

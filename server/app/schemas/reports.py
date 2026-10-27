@@ -1,4 +1,3 @@
-import re
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -6,6 +5,7 @@ from pydantic import BaseModel, StringConstraints, field_validator, model_valida
 
 from app.schemas.common import Input, Text
 from app.schemas.tasks import TaskStatus
+from app.services.skill_content import contains_secret
 
 
 class Report(Input):
@@ -18,7 +18,7 @@ class Report(Input):
     @field_validator("event_id")
     @classmethod
     def reject_secret_ids(cls, value):
-        if re.search(r"(?i)(?:gh[pousr]_|github_pat_|sk-)[A-Za-z0-9_-]{16,}", value):
+        if contains_secret(value):
             raise ValueError("event_id must not contain a secret")
         return value
 

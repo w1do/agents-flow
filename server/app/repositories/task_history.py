@@ -5,6 +5,7 @@ from sqlalchemy import select
 from app.models import TaskEvent, TaskSkillSnapshot
 from app.repositories.task_event import TaskEventRepository
 from app.repositories.task_skill_snapshot import TaskSkillSnapshotRepository
+from app.services.skill_content import content_values, redact
 
 
 class TaskHistory:
@@ -46,16 +47,14 @@ class TaskHistory:
 
     def snapshot(self, task_id, files):
         existing = {row.skill_id for row in self.snapshots(task_id)}
-        claimed = self.session.scalar(select(TaskEvent.id).where(
-            TaskEvent.task_id == task_id, TaskEvent.event_type == "claimed",
-        ).limit(1))
-        if existing or claimed:
+        if existing or self.was_claimed(task_id):
             return
         for skill in files:
             if skill.skill_id not in existing:
+                safe_content = content_values(redact(skill.content))
                 TaskSkillSnapshotRepository(self.session).create(
                     task_id=task_id, skill_id=skill.skill_id, skill_name=skill.name,
                     category=skill.category, skill_version=skill.version,
-                    content_hash=skill.content_hash, content=skill.content, content_missing=False,
+                    content_hash=safe_content["content_hash"], content=safe_content["content"], content_missing=False,
                     filename=skill.filename,
                 )

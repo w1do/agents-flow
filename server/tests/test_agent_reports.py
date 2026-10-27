@@ -67,7 +67,7 @@ async def test_fail_preserves_prior_events_checkpoint_and_result(flow):
 
 async def test_invalid_status_and_attempt_to_self_approve(flow):
     task = flow.task("backlog", leased=True)
-    invalid = await flow.report(task, "events", dict(event_type="status", message="Skip", payload={"status": "merged"}))
+    invalid = await flow.report(task, "events", dict(event_type="progress", message="Skip", payload={"status": "merged"}))
     assert invalid.status_code == 409 and task.status == "backlog"
     invalid = await flow.report(task, "events", dict(event_type="testing", message="Skip"))
     assert invalid.status_code == 409

@@ -4,9 +4,11 @@ from app.repositories.task_history import TaskHistory
 from app.services import tasks
 from app.services.leases import release
 from app.services.task_status import transition
+from app.services.skill_content import redact
 
 
 def decide(session, task_id, kind, body):
+    body = body.model_copy(update={"feedback": redact(body.feedback) if body.feedback else None})
     task = tasks.get_task(session, task_id, lock=True)
     required = "backlog" if kind == "plan" else "ready"
     if task.status != required:

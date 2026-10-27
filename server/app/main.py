@@ -35,7 +35,7 @@ def create_app() -> FastAPI:
     @application.exception_handler(RequestValidationError)
     async def validation_error(_request, exception: RequestValidationError):
         # Validation errors must not echo credentials or the original request body.
-        errors = [{key: error[key] for key in ("loc", "msg", "type")}
+        errors = [{key: error[key] for key in ("msg", "type")}
                   for error in exception.errors()]
         return JSONResponse(status_code=422, content={"detail": errors})
 

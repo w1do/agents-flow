@@ -12,7 +12,7 @@ from app.repositories.task_history import TaskHistory
 from app.schemas.leases import ClaimResponse, HeartbeatResponse
 from app.services import skills, tasks
 from app.services.task_status import transition
-from app.services.skill_content import slug
+from app.services.skill_content import content_values, redact, unique_filename
 
 
 def validate_lease(task, agent, lease_id):
@@ -55,23 +55,22 @@ def claim(session, agent):
     if snapshots or history.was_claimed(task.id):
         files = _snapshot_files(snapshots)
     else:
-        files = skills.sync(session, agent.id)["skills"]
+        files = _safe_skill_files(skills.sync(session, agent.id)["skills"])
         history.snapshot(task.id, files)
     TaskHistory(session).append(task.id, "claimed", "Задача арендована", agent_id=agent.id)
     return ClaimResponse(task=tasks.card(session, task), skills=files, lease_id=task.lease_id,
                          lease_expires_at=task.lease_expires_at)
 
 
+def _safe_skill_files(files):
+    return [skill.model_copy(update=content_values(redact(skill.content))) for skill in files]
+
+
 def _snapshot_files(snapshots):
     files, used = [], set()
     ordered = sorted(snapshots, key=lambda item: str(item.skill_id))
     for snapshot in ordered:
-        base = f"{slug(snapshot.category)}--{slug(snapshot.skill_name)}"
-        filename = snapshot.filename
-        if not filename:
-            filename, suffix = f"{base}.md", 2
-            while filename in used:
-                filename, suffix = f"{base}-{suffix}.md", suffix + 1
+        filename = snapshot.filename or unique_filename(snapshot.category, snapshot.skill_name, used)
         used.add(filename)
         files.append({"skill_id": snapshot.skill_id, "category": snapshot.category,
                       "name": snapshot.skill_name, "filename": filename,

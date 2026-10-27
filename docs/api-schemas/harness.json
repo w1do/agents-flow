@@ -4,7 +4,7 @@
     "SkillFile": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["skill_id", "category", "name", "filename", "version", "content_hash", "content"],
+      "required": ["skill_id", "category", "name", "filename", "version", "content_hash", "content", "snapshot_content_missing"],
       "properties": {
         "skill_id": {"type": "string", "format": "uuid"},
         "category": {"type": "string"},
@@ -12,7 +12,8 @@
         "filename": {"type": "string"},
         "version": {"type": "integer", "minimum": 1},
         "content_hash": {"type": "string"},
-        "content": {"type": "string"}
+        "content": {"type": "string"},
+        "snapshot_content_missing": {"type": "boolean"}
       }
     },
     "SkillSyncResponse": {"type": "object", "additionalProperties": false, "required": ["skills"], "properties": {"skills": {"type": "array", "items": {"$ref": "harness.json#/$defs/SkillFile"}}}},

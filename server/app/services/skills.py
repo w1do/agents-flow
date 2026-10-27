@@ -9,7 +9,7 @@ from app.repositories.skill_catalog import SkillCatalog
 from app.repositories.skill_category import SkillCategoryRepository
 from app.schemas.harness import SkillFile
 from app.schemas.skills import CategoryResponse, SkillResponse
-from app.services.skill_content import content_values, slug, warn
+from app.services.skill_content import content_values, unique_filename, warn
 
 
 def get_category(session, category_id):
@@ -105,11 +105,7 @@ def replace(session, agent_id, body):
 def sync(session, agent_id: UUID):
     files, used = [], set()
     for _, skill, category in SkillCatalog(session).assignments(agent_id, active_only=True):
-        base = f"{slug(category.name)}--{slug(skill.name)}"
-        filename, suffix = f"{base}.md", 2
-        while filename in used:
-            filename, suffix = f"{base}-{suffix}.md", suffix + 1
-        used.add(filename)
+        filename = unique_filename(category.name, skill.name, used)
         files.append(SkillFile(skill_id=skill.id, name=skill.name, filename=filename,
                                category=category.name,
                                version=skill.version, content_hash=skill.content_hash,

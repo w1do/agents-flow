@@ -22,6 +22,7 @@ class SkillFile(BaseModel):
     version: int
     content_hash: str
     content: str
+    snapshot_content_missing: bool = False
 
 
 class HarnessInitResponse(BaseModel):

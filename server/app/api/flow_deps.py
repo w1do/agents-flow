@@ -1,6 +1,8 @@
 from typing import Annotated
 
-from fastapi import Depends, Header, Request
+import re
+
+from fastapi import Depends, Header, HTTPException, Request
 
 from app.api.deps import Credentials, Database
 from app.core.errors import forbidden, not_found, unauthorized
@@ -9,6 +11,7 @@ from app.services.agent_auth import authenticate_agent
 from app.services.auth import authenticate_admin
 from app.services.idempotency import execute
 from app.services.lease_expiry import expire_due
+from app.services.skill_content import contains_secret
 
 
 def principal(credentials: Credentials, session: Database):
@@ -56,7 +59,10 @@ class Mutation:
 
 
 def mutation(request: Request, session: Database, actor: Actor,
-             key: Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=200)]):
+             key: Annotated[str, Header(alias="Idempotency-Key")]):
+    key = key.strip()
+    if not 1 <= len(key) <= 200 or not re.fullmatch(r"[A-Za-z0-9._:-]+", key) or contains_secret(key):
+        raise HTTPException(422, "Invalid Idempotency-Key")
     scope = f"{actor.__tablename__}:{actor.id}:{request.method}:{request.url.path}"
     return Mutation(session, scope, key)
 

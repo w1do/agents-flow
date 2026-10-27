@@ -8,6 +8,8 @@ from app.services.leases import agent_task, release
 from app.services.task_status import transition
 from app.services.skill_content import redact
 
+AGENT_EVENT_TYPES = frozenset({"progress", "planning", "testing"})
+
 
 def _apply(task, kind, body):
     if kind == "plan":
@@ -24,7 +26,7 @@ def _apply(task, kind, body):
         task.completed_at = time.now()
     elif kind == "events":
         target = (body.payload or {}).get("status")
-        if target is None and body.event_type in {"planning", "testing", "merged", "active"}:
+        if target is None and body.event_type in {"planning", "testing"}:
             target = body.event_type
         if target is not None:
             transition(task, target, "agent")
@@ -72,9 +74,7 @@ def execution_state(session, task_id, agent, lease_id):
 
 
 def _reserved_event(event_type):
-    return (event_type in {"publication-result", "decision"}
-            or event_type.startswith(("lease-", "lease_", "status-", "status_"))
-            or event_type.endswith("_decision"))
+    return event_type not in AGENT_EVENT_TYPES
 
 
 def _sanitize(value):
