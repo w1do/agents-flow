@@ -28,7 +28,9 @@ class PlanRequest(Report):
 
 
 class EventRequest(Report):
-    event_type: Text
+    event_type: Annotated[str, StringConstraints(
+        max_length=64, pattern=r"^[a-z][a-z0-9-]{0,63}$",
+    )]
     message: str
     payload: dict[str, Any] | None = None
     checkpoint: dict[str, Any] | None = None

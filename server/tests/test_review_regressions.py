@@ -13,7 +13,6 @@ from app.services.lease_expiry import expire_due
 from app.services import lease_expiry
 from app.core import time
 
-
 @pytest.mark.parametrize("source,target,status", [
     ("backlog", "planning", 403), ("backlog", "merged", 409),
     ("ready", "active", 403), ("ready", "merged", 403),
@@ -32,7 +31,8 @@ async def test_agent_status_matrix_through_events_api(flow, source, target, stat
 
 
 @pytest.mark.parametrize("event_type", [
-    "publication-result", "decision", "lease-expired", "status-changed", "result_decision",
+    "publication-result", "claimed", "created", "status", "decision", "lease-claimed",
+    "lease-expired", "lease-extended", "stalled", "merged", "paused", "trash", "error",
 ])
 async def test_agent_cannot_submit_server_event_types(flow, event_type):
     task = flow.task("active", leased=True)
