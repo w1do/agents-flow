@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "HealthResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": {"const": "ok"}
+      }
+    },
+    "ErrorResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["detail"],
+      "properties": {
+        "detail": {"type": "string"}
+      }
+    },
+    "ValidationIssue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["loc", "msg", "type"],
+      "properties": {
+        "loc": {"type": "array", "items": {"type": ["string", "integer"]}},
+        "msg": {"type": "string"},
+        "type": {"type": "string"},
+        "input": {},
+        "ctx": {"type": "object", "additionalProperties": true}
+      }
+    },
+    "ValidationErrorResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["detail"],
+      "properties": {
+        "detail": {"type": "array", "items": {"$ref": "common.json#/$defs/ValidationIssue"}}
+      }
+    },
+    "TaskStatus": {
+      "type": "string",
+      "enum": ["new", "choosing", "planning", "backlog", "active", "testing", "ready", "merged", "error", "stalled", "paused", "trash"]
+    },
+    "SourceType": {
+      "type": "string",
+      "enum": ["web", "telegram_text", "telegram_voice", "api"]
+    },
+    "PlanDecision": {
+      "type": "string",
+      "enum": ["pending", "approved", "rejected"]
+    }
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "CategoryCreate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "description"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "description": {"type": "string"},
+        "sort_order": {"type": "integer", "minimum": 0}
+      }
+    },
+    "CategoryPatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "description": {"type": "string"},
+        "sort_order": {"type": "integer", "minimum": 0}
+      },
+      "minProperties": 1
+    },
+    "CategoryResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "description", "sort_order"],
+      "properties": {
+        "id": {"type": "string", "format": "uuid"},
+        "name": {"type": "string", "minLength": 1},
+        "description": {"type": "string"},
+        "sort_order": {"type": "integer", "minimum": 0}
+      }
+    },
+    "SkillCreate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category_id", "name", "description", "content"],
+      "properties": {
+        "category_id": {"type": "string", "format": "uuid"},
+        "name": {"type": "string", "minLength": 1},
+        "description": {"type": "string"},
+        "content": {"type": "string", "minLength": 1}
+      }
+    },
+    "SkillPatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "category_id": {"type": "string", "format": "uuid"},
+        "name": {"type": "string", "minLength": 1},
+        "description": {"type": "string"},
+        "content": {"type": "string", "minLength": 1}
+      },
+      "minProperties": 1
+    },
+    "SkillResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "category_id", "name", "description", "content", "version", "content_hash", "is_active", "created_at", "updated_at", "warnings"],
+      "properties": {
+        "id": {"type": "string", "format": "uuid"},
+        "category_id": {"type": "string", "format": "uuid"},
+        "name": {"type": "string", "minLength": 1},
+        "description": {"type": "string"},
+        "content": {"type": "string", "minLength": 1},
+        "version": {"type": "integer", "minimum": 1},
+        "content_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "is_active": {"type": "boolean"},
+        "created_at": {"type": "string", "format": "date-time"},
+        "updated_at": {"type": "string", "format": "date-time"},
+        "warnings": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "AgentSkillsReplace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["skill_ids"],
+      "properties": {
+        "skill_ids": {"type": "array", "items": {"type": "string", "format": "uuid"}, "uniqueItems": true}
+      }
+    }
+  }
+}
