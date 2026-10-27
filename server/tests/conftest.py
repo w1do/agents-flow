@@ -8,7 +8,6 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from app.core.config import get_settings
 from app.models import Base
@@ -41,9 +40,9 @@ async def sandbox_asyncio_wakeup():
 
 
 @pytest.fixture
-def engine():
-    url = os.getenv("TEST_DATABASE_URL", "sqlite+pysqlite:///:memory:")
-    options = {"poolclass": StaticPool, "connect_args": {"check_same_thread": False}}
+def engine(tmp_path):
+    url = os.getenv("TEST_DATABASE_URL", f"sqlite+pysqlite:///{tmp_path / 'test.db'}")
+    options = {"connect_args": {"check_same_thread": False}}
     database = create_engine(url, hide_parameters=True,
                              **(options if url.startswith("sqlite") else {}))
     if database.dialect.name == "sqlite":
@@ -84,7 +83,7 @@ def app(session, monkeypatch):
 
 @pytest.fixture
 async def client(app):
-    async with app.router.lifespan_context(app):
+    async with background_context(app.router.lifespan_context(app)):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as test_client:
             yield test_client
 
@@ -116,3 +115,4 @@ def project(session):
 
 
 from flow_helpers import clock, flow  # noqa: F401, E402
+from mcp_helpers import background_context, mcp, mcp_factory  # noqa: F401, E402

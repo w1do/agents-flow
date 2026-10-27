@@ -32,6 +32,18 @@ def redact(content: str) -> str:
     return content
 
 
+def sanitize(value):
+    """Recursively redact text fields and keys without exposing their original values."""
+    if isinstance(value, str):
+        return redact(value)
+    if isinstance(value, list):
+        return [sanitize(item) for item in value]
+    if isinstance(value, dict):
+        return {redact(key) if isinstance(key, str) else key: sanitize(item)
+                for key, item in value.items()}
+    return value
+
+
 def content_values(content: str) -> dict:
     return {"content": content, "content_hash": sha256(content.encode()).hexdigest()}
 

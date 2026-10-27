@@ -5,7 +5,7 @@ SERVER_EVENT_TYPES = frozenset({
     "result_decision", "lease_expired", "status_changed", "status-changed",
     "status-updated",
 })
-SERVER_EVENT_PREFIXES = ("status-", "status_", "lease-", "lease_")
+SERVER_EVENT_PREFIXES = ("status-", "status_", "lease-", "lease_", "mcp_")
 
 
 def is_reserved_event(event_type):
