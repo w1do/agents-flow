@@ -46,10 +46,9 @@ async def test_sse_line_endings_sanitize_error_and_keep_structure(
     secret = b"SECRET"
     error = (b'data: {"jsonrpc":"2.0","id":7,"error":{"code":-32001,'
              b'"message":"SECRET","data":"SECRET"}}' + ending)
-    task, _sent, allow_eof, messages = await run_stream(monkeypatch, [error], status)
+    task, sent, allow_eof, messages = await run_stream(monkeypatch, [error], status)
     try:
-        allow_eof.set()
-        await task
+        await asyncio.wait_for(sent.wait(), timeout=1)
         body = b"".join(message.get("body", b"") for message in messages)
         assert secret not in body
         assert event_payloads(body) == [{
@@ -59,6 +58,48 @@ async def test_sse_line_endings_sanitize_error_and_keep_structure(
         }]
     finally:
         allow_eof.set()
+        await task
+
+
+@pytest.mark.parametrize("status", [200, 201])
+async def test_sse_crcr_events_are_delivered_separately_before_eof(monkeypatch, status):
+    first = (b'data: {"jsonrpc":"2.0","id":7,"error":{"message":"SECRET"}}'
+             b'\r\r')
+    second = b'data: {"jsonrpc":"2.0","id":8,"result":{}}\r\r'
+    task, sent, allow_eof, messages = await run_stream(
+        monkeypatch, [first + second], status
+    )
+    try:
+        await asyncio.wait_for(sent.wait(), timeout=1)
+        body = b"".join(message.get("body", b"") for message in messages)
+        assert b"SECRET" not in body
+        assert event_payloads(body) == [
+            {"jsonrpc": "2.0", "id": 7,
+             "error": {"message": "MCP request failed"}},
+            {"jsonrpc": "2.0", "id": 8, "result": {}},
+        ]
+    finally:
+        allow_eof.set()
+        await task
+
+
+async def test_sse_crcr_then_lf_does_not_create_event_or_lose_next_data(monkeypatch):
+    first = b'data: {"jsonrpc":"2.0","id":7,"result":{"first":true}}\r\r'
+    second = b'data: {"jsonrpc":"2.0","id":8,"result":{"second":true}}\r\r'
+    task, sent, allow_eof, messages = await run_stream(
+        monkeypatch, [first, b"\n", second], 200
+    )
+    try:
+        await asyncio.wait_for(sent.wait(), timeout=1)
+        body = b"".join(message.get("body", b"") for message in messages)
+        assert body == first + b"\n" + second
+        assert event_payloads(body) == [
+            {"jsonrpc": "2.0", "id": 7, "result": {"first": True}},
+            {"jsonrpc": "2.0", "id": 8, "result": {"second": True}},
+        ]
+    finally:
+        allow_eof.set()
+        await task
 
 
 async def test_sse_lf_crlf_boundary_keeps_following_result_as_separate_event(monkeypatch):

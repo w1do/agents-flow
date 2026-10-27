@@ -51,7 +51,10 @@ def next_sse_event(pending):
             return None
         if pending[first_end] == 13:
             if first_end + 1 == len(pending):
-                return None
+                end = first_end + 1
+                event = bytes(pending[:end])
+                del pending[:end]
+                return event
             end = first_end + (2 if pending[first_end + 1] == 10 else 1)
         elif pending[first_end] == 10:
             end = first_end + 1
