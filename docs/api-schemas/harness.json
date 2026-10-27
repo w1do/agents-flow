@@ -4,13 +4,16 @@
     "SkillFile": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["skill_id", "filename", "version", "content_hash", "content"],
+      "required": ["skill_id", "category", "name", "filename", "version", "content_hash", "content", "snapshot_content_missing"],
       "properties": {
         "skill_id": {"type": "string", "format": "uuid"},
+        "category": {"type": "string"},
+        "name": {"type": "string"},
         "filename": {"type": "string"},
         "version": {"type": "integer", "minimum": 1},
         "content_hash": {"type": "string"},
-        "content": {"type": "string"}
+        "content": {"type": "string"},
+        "snapshot_content_missing": {"type": "boolean"}
       }
     },
     "SkillSyncResponse": {"type": "object", "additionalProperties": false, "required": ["skills"], "properties": {"skills": {"type": "array", "items": {"$ref": "harness.json#/$defs/SkillFile"}}}},
@@ -56,8 +59,8 @@
     "ClaimResponse": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["task", "skills"],
-      "properties": {"task": {"anyOf": [{"$ref": "tasks.json#/$defs/TaskResponse"}, {"type": "null"}]}, "skills": {"type": "array", "items": {"$ref": "harness.json#/$defs/SkillFile"}}}
+      "required": ["task", "skills", "lease_id", "lease_expires_at"],
+      "properties": {"task": {"$ref": "tasks.json#/$defs/TaskResponse"}, "skills": {"type": "array", "items": {"$ref": "harness.json#/$defs/SkillFile"}}, "lease_id": {"type": "string", "format": "uuid"}, "lease_expires_at": {"type": "string", "format": "date-time"}}
     }
   }
 }

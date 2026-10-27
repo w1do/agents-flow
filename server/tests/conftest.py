@@ -16,8 +16,6 @@ from app.models import Base
 
 @pytest.fixture(autouse=True)
 async def sandbox_asyncio_wakeup():
-    # Restricted runners can forbid socketpair.send(), breaking thread notifications.
-    # Keep the loop awake there so real FastAPI worker threads can finish normally.
     sender, receiver = socket.socketpair()
     with sender, receiver:
         try:
@@ -115,3 +113,6 @@ def project(session):
     from app.repositories.project import ProjectRepository
 
     return ProjectRepository(session).create(name="Demo")
+
+
+from flow_helpers import clock, flow  # noqa: F401, E402

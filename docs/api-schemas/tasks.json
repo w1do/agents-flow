@@ -12,6 +12,7 @@
         "source_text": {"type": "string"}
       }
     },
+    "TaskPatch": {"type": "object", "additionalProperties": false, "required": ["status"], "properties": {"status": {"type": "string", "enum": ["new", "paused", "trash"]}}},
     "TaskResponse": {
       "type": "object",
       "additionalProperties": false,
@@ -59,14 +60,16 @@
     "TaskSkillSnapshotResponse": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "task_id", "skill_id", "skill_name", "skill_version", "content_hash"],
+      "required": ["id", "task_id", "skill_id", "skill_name", "category", "skill_version", "content_hash", "content"],
       "properties": {
         "id": {"type": "string", "format": "uuid"},
         "task_id": {"type": "string", "format": "uuid"},
         "skill_id": {"type": "string", "format": "uuid"},
         "skill_name": {"type": "string"},
+        "category": {"type": "string"},
         "skill_version": {"type": "integer", "minimum": 1},
-        "content_hash": {"type": "string"}
+        "content_hash": {"type": "string"},
+        "content": {"type": "string"}
       }
     },
     "PlanDecisionRequest": {
@@ -75,7 +78,7 @@
       "allOf": [{"if": {"properties": {"decision": {"const": "rejected"}}}, "then": {"required": ["feedback"], "properties": {"feedback": {"type": "string", "minLength": 1}}}}],
       "required": ["decision"],
       "properties": {
-        "decision": {"type": "string", "enum": ["approved", "rejected"]},
+        "decision": {"type": "string", "enum": ["approved", "rejected", "trash"]},
         "feedback": {"anyOf": [{"type": "string"}, {"type": "null"}]}
       }
     },
@@ -94,6 +97,7 @@
       "additionalProperties": false,
       "required": ["task_id", "status", "plan_decision", "plan_revision", "plan_feedback", "result_feedback", "publication_requested", "lease_id", "lease_expires_at"],
       "properties": {
+        "checkpoint": {"anyOf": [{"type": "object", "additionalProperties": true}, {"type": "null"}]},
         "task_id": {"type": "string", "format": "uuid"},
         "status": {"$ref": "common.json#/$defs/TaskStatus"},
         "plan_decision": {"$ref": "common.json#/$defs/PlanDecision"},

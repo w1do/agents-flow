@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -18,7 +19,13 @@ async def lifespan(application: FastAPI):
     application.state.settings = settings
     with SessionLocal.begin() as session:
         ensure_initial_admin(session, settings)
-    yield
+    from app.services.lease_expiry import monitor, stop_monitor
+
+    expiry_task = asyncio.create_task(monitor())
+    try:
+        yield
+    finally:
+        await stop_monitor(expiry_task)
 
 
 def create_app() -> FastAPI:
@@ -28,7 +35,7 @@ def create_app() -> FastAPI:
     @application.exception_handler(RequestValidationError)
     async def validation_error(_request, exception: RequestValidationError):
         # Validation errors must not echo credentials or the original request body.
-        errors = [{key: error[key] for key in ("loc", "msg", "type")}
+        errors = [{key: error[key] for key in ("msg", "type")}
                   for error in exception.errors()]
         return JSONResponse(status_code=422, content={"detail": errors})
 

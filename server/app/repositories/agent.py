@@ -28,6 +28,10 @@ class AgentRepository(Repository[Agent]):
             Agent.project_id == project_id,
         ).order_by(Agent.created_at, Agent.id).offset(offset).limit(limit)))
 
+    def lock(self, agent_id: UUID) -> Agent | None:
+        return self.session.scalar(select(Agent).where(Agent.id == agent_id).with_for_update()
+                                   .execution_options(populate_existing=True))
+
 
 def get_for_project(session: Session, agent_id: UUID, project_id: UUID) -> Agent | None:
     return AgentRepository(session).get_for_project(agent_id, project_id)

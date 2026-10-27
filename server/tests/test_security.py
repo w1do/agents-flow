@@ -55,4 +55,4 @@ async def test_validation_errors_do_not_echo_secrets(client, path, body, caplog)
     assert response.status_code == 422
     assert "hidden-password" not in response.text + caplog.text
     assert "hidden-init-code" not in response.text + caplog.text
-    assert all(set(error) == {"loc", "msg", "type"} for error in response.json()["detail"])
+    assert all(set(error) == {"msg", "type"} for error in response.json()["detail"])

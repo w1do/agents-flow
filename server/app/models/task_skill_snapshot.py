@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import ForeignKey, Integer, Text, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Integer, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.base import Base, UUIDPrimaryKey
@@ -13,5 +13,9 @@ class TaskSkillSnapshot(UUIDPrimaryKey, Base):
     task_id: Mapped[UUID] = mapped_column(ForeignKey("tasks.id"))
     skill_id: Mapped[UUID] = mapped_column(ForeignKey("skills.id"))
     skill_name: Mapped[str] = mapped_column(Text)
+    category: Mapped[str] = mapped_column(Text)
     skill_version: Mapped[int] = mapped_column(Integer)
     content_hash: Mapped[str] = mapped_column(Text)
+    content: Mapped[str] = mapped_column(Text)
+    content_missing: Mapped[bool] = mapped_column(Boolean, default=False)
+    filename: Mapped[str | None] = mapped_column(Text, nullable=True)

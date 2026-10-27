@@ -1,12 +1,12 @@
 from collections import deque
 import hashlib
 import ipaddress
-from math import ceil
 from threading import Lock
 from time import monotonic
 
 from fastapi import HTTPException, Request
 
+from app.api.rate_window import RateWindow
 from app.schemas.auth import LoginRequest
 
 
@@ -23,19 +23,18 @@ class LoginRateLimiter:
         self.ip_attempts = ip_attempts
         self._lock = Lock()
         self._calls = 0
+        self._window = RateWindow(window_seconds)
 
     def _prune(self, now: float) -> None:
         for key, attempts in list(self._failures.items()):
-            while attempts and now - attempts[0] >= self.window_seconds:
-                attempts.popleft()
+            self._window.prune(attempts, now)
             if not attempts:
                 self._failures.pop(key, None)
         while len(self._failures) > self.MAX_KEYS:
             oldest = min(self._failures, key=lambda key: self._failures[key][-1])
             self._failures.pop(oldest, None)
         for ip, attempts in list(self._ip_failures.items()):
-            while attempts and now - attempts[0] >= self.window_seconds:
-                attempts.popleft()
+            self._window.prune(attempts, now)
             if not attempts:
                 self._ip_failures.pop(ip, None)
         while len(self._ip_failures) > self.MAX_KEYS:
@@ -74,20 +73,17 @@ class LoginRateLimiter:
             if self._calls % self.CLEANUP_EVERY == 0:
                 self._prune(now)
             ip_failures = self._ip_failures.setdefault(ip_key, deque())
-            while ip_failures and now - ip_failures[0] >= self.window_seconds:
-                ip_failures.popleft()
-            if len(ip_failures) >= self.ip_attempts:
+            if self._window.limited(ip_failures, self.ip_attempts, now):
                 return False
             failures = self._failures.setdefault(key, deque())
-            while failures and now - failures[0] >= self.window_seconds:
-                failures.popleft()
+            self._window.prune(failures, now)
             if not failures:
                 self._failures.pop(key, None)
                 failures = self._failures.setdefault(key, deque())
-            if len(failures) >= self.attempts:
+            if self._window.limited(failures, self.attempts, now):
                 return False
-            failures.append(now)
-            ip_failures.append(now)
+            self._window.record(failures, now)
+            self._window.record(ip_failures, now)
             if len(self._failures) > self.MAX_KEYS:
                 oldest = min(self._failures, key=lambda item: self._failures[item][-1])
                 self._failures.pop(oldest, None)
@@ -106,8 +102,7 @@ class LoginRateLimiter:
             if len(ip_attempts) >= self.ip_attempts:
                 buckets.append(ip_attempts)
             oldest = [bucket[0] for bucket in buckets if bucket]
-            remaining = self.window_seconds - (monotonic() - min(oldest)) if oldest else 1
-            return max(1, ceil(remaining))
+            return self._window.retry_after(oldest, monotonic())
 
     def reset(self, email: str, ip: str) -> None:
         with self._lock:
