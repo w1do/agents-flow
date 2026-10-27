@@ -6,25 +6,25 @@
 
 ## 1. Каркас и контракт
 
-- [ ] 1.1 Создать структуру `server/app/{core,models,schemas,repositories,services,api/v1,mcp,integrations}`, `server/web`, `server/migrations`, `server/tests`, `server/pyproject.toml` с зависимостями (fastapi, uvicorn, sqlalchemy 2, alembic, psycopg, pydantic 2, pydantic-settings, pyjwt, bcrypt, httpx, mcp, pytest, pytest-asyncio). Проверка: `cd server && python -m pip install -e .` завершается без ошибок, `python -c "import app" ` работает.
-- [ ] 1.2 Реализовать `app/core/config.py` (pydantic-settings, все переменные из `deploy`-спеки) и `app/main.py` с `/healthz`, подключением роутеров и lifespan-хуком создания администратора. Проверка: `pytest server/tests/test_health.py` — 200 на `/healthz`.
-- [ ] 1.3 Зафиксировать контракт: обновить `docs/api.md` фактическими схемами запросов/ответов и добавить `docs/api-examples.md` с примерами claim → plan → decision → result. Проверка: `openspec validate agents-flow-mvp` остаётся валидным, примеры совпадают с реализуемыми роутами по путям.
-- [ ] 1.4 Создать `.gitignore` (`.env`, `workflow/.agent-token`, `__pycache__`, `node_modules`, `*.db`, `dist`) и `README.md` в корне с командами запуска. Проверка: `git status --porcelain` не показывает `.env` после его создания.
+- [x] 1.1 Создать структуру `server/app/{core,models,schemas,repositories,services,api/v1,mcp,integrations}`, `server/web`, `server/migrations`, `server/tests`, `server/pyproject.toml` с зависимостями (fastapi, uvicorn, sqlalchemy 2, alembic, psycopg, pydantic 2, pydantic-settings, pyjwt, bcrypt, httpx, mcp, pytest, pytest-asyncio). Проверка: `cd server && python -m pip install -e .` завершается без ошибок, `python -c "import app" ` работает.
+- [x] 1.2 Реализовать `app/core/config.py` (pydantic-settings, все переменные из `deploy`-спеки) и `app/main.py` с `/healthz`, подключением роутеров и lifespan-хуком создания администратора. Проверка: `pytest server/tests/test_health.py` — 200 на `/healthz`.
+- [x] 1.3 Зафиксировать контракт: обновить `docs/api.md` фактическими схемами запросов/ответов и добавить `docs/api-examples.md` с примерами claim → plan → decision → result. Проверка: `openspec validate agents-flow-mvp` остаётся валидным, примеры совпадают с реализуемыми роутами по путям.
+- [x] 1.4 Создать `.gitignore` (`.env`, `workflow/.agent-token`, `__pycache__`, `node_modules`, `*.db`, `dist`) и `README.md` в корне с командами запуска. Проверка: `git status --porcelain` не показывает `.env` после его создания.
 
 ## 2. Модели, миграции, доступ к данным
 
-- [ ] 2.1 Описать SQLAlchemy-модели всех таблиц ТЗ (`users`, `projects`, `project_init_tokens`, `agents`, `skill_categories`, `skills`, `agent_skills`, `tasks`, `task_skill_snapshots`, `task_events`, `idempotency_keys`) с UUID PK и нужными уникальными индексами. Проверка: `python -c "from app.models import Base; print(len(Base.metadata.tables))"` → 11.
-- [ ] 2.2 Сгенерировать и отредактировать одну Alembic-миграцию полной схемы. Проверка: `alembic upgrade head` на пустой базе проходит, `alembic downgrade base` возвращает пустую схему.
-- [ ] 2.3 Реализовать `app/core/db.py` (engine, session factory, `get_db`) и `app/repositories/` с базовыми операциями по сущностям. Проверка: `pytest server/tests/test_repositories.py` на SQLite in-memory или тестовой PostgreSQL — CRUD каждой сущности проходит.
+- [x] 2.1 Описать SQLAlchemy-модели всех таблиц ТЗ (`users`, `projects`, `project_init_tokens`, `agents`, `skill_categories`, `skills`, `agent_skills`, `tasks`, `task_skill_snapshots`, `task_events`, `idempotency_keys`) с UUID PK и нужными уникальными индексами. Проверка: `python -c "from app.models import Base; print(len(Base.metadata.tables))"` → 11.
+- [x] 2.2 Сгенерировать и отредактировать одну Alembic-миграцию полной схемы. Проверка: `alembic upgrade head` на пустой базе проходит, `alembic downgrade base` возвращает пустую схему.
+- [x] 2.3 Реализовать `app/core/db.py` (engine, session factory, `get_db`) и `app/repositories/` с базовыми операциями по сущностям. Проверка: `pytest server/tests/test_repositories.py` на SQLite in-memory или тестовой PostgreSQL — CRUD каждой сущности проходит.
 
 ## 3. Аутентификация и проекты
 
-- [ ] 3.1 Реализовать хеширование паролей, выпуск и проверку JWT, зависимость `require_admin`. Проверка: `pytest server/tests/test_auth.py` — верный/неверный пароль, отсутствие токена.
-- [ ] 3.2 Реализовать `POST /auth/login`, экран-независимые схемы и создание первого администратора из окружения без дубликата при рестарте. Проверка: тест двойного вызова lifespan даёт одного пользователя.
-- [ ] 3.3 Реализовать `server/services/auth.py`: выдача init-кода (10 минут), проверку одноразовости и привязки к проекту, выдачу agent-токена только хешем. Проверка: `pytest server/tests/test_init_tokens.py` — успех, повтор, истечение, чужой проект.
-- [ ] 3.4 Реализовать REST `/projects` (GET/POST), `/projects/{id}` (GET), `/projects/{id}/agents` (GET), `/projects/{id}/init-tokens` (POST) по тонкому слою маршрут → сервис → репозиторий. Проверка: `pytest server/tests/test_projects_api.py` — создание, список, карточка, код выдаётся без значения в карточке.
-- [ ] 3.5 Реализовать `POST /harness/init` с проверкой init-кода и созданием агента. Проверка: `pytest server/tests/test_harness_init.py` — ответ содержит `agent_id`, `agent_token`, `skills`; повтор кода — 401.
-- [ ] 3.6 Реализовать зависимость `require_agent` и проверку принадлежности объекта проекту агента (403/404). Проверка: тест чужого проекта отвечает 403/404 без раскрытия деталей.
+- [x] 3.1 Реализовать хеширование паролей, выпуск и проверку JWT, зависимость `require_admin`. Проверка: `pytest server/tests/test_auth.py` — верный/неверный пароль, отсутствие токена.
+- [x] 3.2 Реализовать `POST /auth/login`, экран-независимые схемы и создание первого администратора из окружения без дубликата при рестарте. Проверка: тест двойного вызова lifespan даёт одного пользователя.
+- [x] 3.3 Реализовать `server/services/auth.py`: выдача init-кода (10 минут), проверку одноразовости и привязки к проекту, выдачу agent-токена только хешем. Проверка: `pytest server/tests/test_init_tokens.py` — успех, повтор, истечение, чужой проект.
+- [x] 3.4 Реализовать REST `/projects` (GET/POST), `/projects/{id}` (GET), `/projects/{id}/agents` (GET), `/projects/{id}/init-tokens` (POST) по тонкому слою маршрут → сервис → репозиторий. Проверка: `pytest server/tests/test_projects_api.py` — создание, список, карточка, код выдаётся без значения в карточке.
+- [x] 3.5 Реализовать `POST /harness/init` с проверкой init-кода и созданием агента. Проверка: `pytest server/tests/test_harness_init.py` — ответ содержит `agent_id`, `agent_token`, `skills`; повтор кода — 401.
+- [x] 3.6 Реализовать зависимость `require_agent` и проверку принадлежности объекта проекту агента (403/404). Проверка: тест чужого проекта отвечает 403/404 без раскрытия деталей.
 
 ## 4. Skills
 
