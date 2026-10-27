@@ -7,6 +7,7 @@ from starlette.responses import JSONResponse
 
 from app.services.agent_auth import authenticate_agent
 from app.services.mcp_calls import error
+from app.mcp.sse import next_sse_event as _next_sse_event, sanitize_sse_event
 
 
 def _safe_rpc(value):
@@ -34,30 +35,7 @@ def _safe_json(data):
 
 
 def _safe_sse(event):
-    lines = event.splitlines(keepends=True)
-    result = []
-    for line in lines:
-        content = line.rstrip(b"\r\n")
-        if content.startswith(b"data:"):
-            prefix, payload = content[:5], content[5:].lstrip()
-            content = prefix + b" " + _safe_json(payload) if payload else content
-            ending = line[len(line.rstrip(b"\r\n")):]
-            line = content + ending
-        result.append(line)
-    return b"".join(result)
-
-
-def _next_sse_event(pending):
-    separators = (b"\r\n\r\n", b"\n\n")
-    matches = [(pending.find(separator), separator) for separator in separators]
-    matches = [(index, separator) for index, separator in matches if index >= 0]
-    if not matches:
-        return None
-    index, separator = min(matches, key=lambda match: match[0])
-    end = index + len(separator)
-    event = bytes(pending[:end])
-    del pending[:end]
-    return event
+    return sanitize_sse_event(event, _safe_json)
 
 
 def agent_identity(token):

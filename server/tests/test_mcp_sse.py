@@ -46,7 +46,7 @@ async def test_get_mcp_delivers_heartbeat_before_eof(monkeypatch, separator):
         await task
 
 
-@pytest.mark.parametrize("status", [201, 202, 307, 399])
+@pytest.mark.parametrize("status", [201, 202, 301, 302, 307, 399])
 @pytest.mark.parametrize("content_type", ["application/json", "text/event-stream"])
 async def test_nonstandard_status_sanitizes_jsonrpc_errors(
     monkeypatch, status, content_type
@@ -98,3 +98,50 @@ async def test_get_mcp_delivers_crlf_split_between_chunks_before_eof(monkeypatch
     finally:
         allow_eof.set()
         await task
+
+
+@pytest.mark.parametrize("status", [201, 202, 301, 302, 307, 399])
+async def test_multiline_sse_sanitizes_combined_jsonrpc_error(monkeypatch, status):
+    import json
+
+    secret = "upstream-secret"
+    original_message = f"private upstream message: {secret}"
+    original_data = f"private upstream data: {secret}"
+    event = (
+        b'data: {"jsonrpc":"2.0","id":7,\r\n'
+        + f'data: "error":{{"code":-32001,"message":"{original_message}",'.encode()
+        + f'"data":"{original_data}"}}}}\r\n\r\n'.encode()
+    )
+    task, _event_sent, allow_eof, messages = await run_stream(
+        monkeypatch, [event[:23], event[23:]], status=status
+    )
+    try:
+        allow_eof.set()
+        await task
+        body = b"".join(message.get("body", b"") for message in messages)
+        assert secret.encode() not in body
+        assert original_message.encode() not in body
+        assert original_data.encode() not in body
+        data = b"\n".join(
+            line[5:].removeprefix(b" ")
+            for line in body.splitlines() if line.startswith(b"data:")
+        )
+        assert json.loads(data) == {
+            "jsonrpc": "2.0", "id": 7,
+            "error": {"code": -32001, "message": "MCP request failed",
+                      "data": "MCP request failed"},
+        }
+    finally:
+        allow_eof.set()
+
+
+async def test_successful_sse_preserves_data_field_bytes(monkeypatch):
+    event = b'data:{"jsonrpc":"2.0","id":7,"result":{}}\n\n'
+    task, _event_sent, allow_eof, messages = await run_stream(monkeypatch, [event])
+    try:
+        allow_eof.set()
+        await task
+        body = b"".join(message.get("body", b"") for message in messages)
+        assert body == event
+    finally:
+        allow_eof.set()
