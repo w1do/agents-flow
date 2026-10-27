@@ -1,9 +1,9 @@
 from collections import deque
-from math import ceil
 from threading import Lock
 from time import monotonic
 
 from fastapi import HTTPException
+from app.api.rate_window import RateWindow
 
 
 class AgentClaimLimiter:
@@ -11,23 +11,17 @@ class AgentClaimLimiter:
         self.attempts, self.window_seconds = attempts, window_seconds
         self._attempts: dict[str, deque[float]] = {}
         self._lock = Lock()
+        self._window = RateWindow(window_seconds)
 
     def acquire(self, agent_id):
         with self._lock:
-            now = monotonic()
             entries = self._attempts.setdefault(str(agent_id), deque())
-            while entries and now - entries[0] >= self.window_seconds:
-                entries.popleft()
-            if len(entries) >= self.attempts:
-                return False
-            entries.append(now)
-            return True
+            return self._window.acquire(entries, self.attempts, monotonic())
 
     def retry_after(self, agent_id):
         with self._lock:
             entries = self._attempts.get(str(agent_id), ())
-            remaining = self.window_seconds - (monotonic() - entries[0]) if entries else 1
-            return max(1, ceil(remaining))
+            return self._window.retry_after(entries, monotonic())
 
 
 claim_limiter = AgentClaimLimiter()

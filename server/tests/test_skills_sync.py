@@ -66,6 +66,25 @@ async def test_snapshots_survive_edits_archive_and_resume(flow, clock):
     assert (await flow.send("GET", f"/tasks/{task.id}")).json()["skill_snapshots"] == original
 
 
+async def test_snapshot_filenames_remain_stable_for_duplicate_slugs(flow, clock):
+    skills = [flow.skill(name="Shared", category="Common") for _ in range(5)]
+    for skill in skills:
+        AgentSkillRepository(flow.session).create(agent_id=flow.agent.id, skill_id=skill.id)
+    flow.session.commit()
+    task = flow.task()
+    first = await flow.claim()
+    original = first.json()["skills"]
+    assert len({item["filename"] for item in original}) == 5
+
+    clock[0] += timedelta(seconds=61)
+    await flow.send("PATCH", f"/tasks/{task.id}", {"status": "new"})
+    resumed = await flow.claim()
+
+    restored = {item["skill_id"]: item["filename"] for item in resumed.json()["skills"]}
+    expected = {item["skill_id"]: item["filename"] for item in original}
+    assert restored == expected
+
+
 async def test_empty_first_claim_remains_empty_after_resume(flow, clock):
     task = flow.task()
     assert (await flow.claim()).json()["skills"] == []

@@ -57,4 +57,5 @@ class TaskHistory:
                     task_id=task_id, skill_id=skill.skill_id, skill_name=skill.name,
                     category=skill.category, skill_version=skill.version,
                     content_hash=skill.content_hash, content=skill.content, content_missing=False,
+                    filename=skill.filename,
                 )

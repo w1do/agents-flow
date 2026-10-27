@@ -64,11 +64,14 @@ def claim(session, agent):
 
 def _snapshot_files(snapshots):
     files, used = [], set()
-    for snapshot in snapshots:
+    ordered = sorted(snapshots, key=lambda item: str(item.skill_id))
+    for snapshot in ordered:
         base = f"{slug(snapshot.category)}--{slug(snapshot.skill_name)}"
-        filename, suffix = f"{base}.md", 2
-        while filename in used:
-            filename, suffix = f"{base}-{suffix}.md", suffix + 1
+        filename = snapshot.filename
+        if not filename:
+            filename, suffix = f"{base}.md", 2
+            while filename in used:
+                filename, suffix = f"{base}-{suffix}.md", suffix + 1
         used.add(filename)
         files.append({"skill_id": snapshot.skill_id, "category": snapshot.category,
                       "name": snapshot.skill_name, "filename": filename,

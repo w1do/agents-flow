@@ -18,3 +18,4 @@ class TaskSkillSnapshot(UUIDPrimaryKey, Base):
     content_hash: Mapped[str] = mapped_column(Text)
     content: Mapped[str] = mapped_column(Text)
     content_missing: Mapped[bool] = mapped_column(Boolean, default=False)
+    filename: Mapped[str | None] = mapped_column(Text, nullable=True)
