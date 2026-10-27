@@ -109,17 +109,17 @@ class AgentTokenMiddleware:
                                         headers=headers)
                 await response(scope, receive, send)
             elif not rejected:
-                if (message["type"] == "http.response.start" and response_status == 200
+                if (message["type"] == "http.response.start"
                         and content_type.startswith(b"application/json")):
                     headers = [(key, value) for key, value in message["headers"]
                                if key.lower() != b"content-length"]
                     await send({**message, "headers": headers})
-                elif (message["type"] == "http.response.start" and response_status == 200
+                elif (message["type"] == "http.response.start"
                       and content_type.startswith(b"text/event-stream")):
                     headers = [(key, value) for key, value in message["headers"]
                                if key.lower() != b"content-length"]
                     await send({**message, "headers": headers})
-                elif message["type"] == "http.response.body" and response_status == 200:
+                elif message["type"] == "http.response.body":
                     body = message.get("body", b"")
                     if content_type.startswith(b"application/json"):
                         pending.extend(body)

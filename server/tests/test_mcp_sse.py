@@ -3,7 +3,8 @@ import asyncio
 import pytest
 
 
-async def run_stream(monkeypatch, chunks):
+async def run_stream(monkeypatch, chunks, status=200,
+                     content_type="text/event-stream; charset=utf-8"):
     from app.mcp import transport
 
     monkeypatch.setattr(transport, "agent_identity", lambda _token: "agent")
@@ -12,8 +13,8 @@ async def run_stream(monkeypatch, chunks):
     messages = []
 
     async def sdk_app(scope, receive, send):
-        await send({"type": "http.response.start", "status": 200, "headers": [
-            (b"content-type", b"text/event-stream; charset=utf-8"),
+        await send({"type": "http.response.start", "status": status, "headers": [
+            (b"content-type", content_type.encode()),
         ]})
         for chunk in chunks:
             await send({"type": "http.response.body", "body": chunk, "more_body": True})
@@ -43,6 +44,48 @@ async def test_get_mcp_delivers_heartbeat_before_eof(monkeypatch, separator):
     finally:
         allow_eof.set()
         await task
+
+
+@pytest.mark.parametrize("status", [201, 202, 307, 399])
+@pytest.mark.parametrize("content_type", ["application/json", "text/event-stream"])
+async def test_nonstandard_status_sanitizes_jsonrpc_errors(
+    monkeypatch, status, content_type
+):
+    import json
+
+    secret = "upstream-secret"
+    original_message = f"private upstream message: {secret}"
+    original_data = f"private upstream data: {secret}"
+    rpc_error = {
+        "jsonrpc": "2.0", "id": 7,
+        "error": {"code": -32001, "message": original_message, "data": original_data},
+    }
+    payload = json.dumps(rpc_error).encode()
+    if content_type == "text/event-stream":
+        payload = b"data: " + payload + b"\r\n\r\n"
+    chunks = [payload[:17], payload[17:]]
+    task, _event_sent, allow_eof, messages = await run_stream(
+        monkeypatch, chunks, status=status, content_type=content_type
+    )
+    try:
+        allow_eof.set()
+        await task
+        body = b"".join(message.get("body", b"") for message in messages)
+        assert secret not in body.decode()
+        assert original_message.encode() not in body
+        assert original_data.encode() not in body
+        if content_type == "text/event-stream":
+            data = next(line[6:] for line in body.splitlines() if line.startswith(b"data: "))
+            result = json.loads(data)
+        else:
+            result = json.loads(body)
+        assert result == {
+            "jsonrpc": "2.0", "id": 7,
+            "error": {"code": -32001, "message": "MCP request failed",
+                      "data": "MCP request failed"},
+        }
+    finally:
+        allow_eof.set()
 
 
 async def test_get_mcp_delivers_crlf_split_between_chunks_before_eof(monkeypatch):
