@@ -1,10 +1,12 @@
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
+from fastapi import HTTPException
 from pydantic import BaseModel, StringConstraints, field_validator, model_validator
 
 from app.schemas.common import Input, Text
 from app.schemas.tasks import TaskStatus
+from app.services.report_event_types import is_reserved_event
 from app.services.skill_content import contains_secret
 
 
@@ -29,11 +31,25 @@ class PlanRequest(Report):
 
 class EventRequest(Report):
     event_type: Annotated[str, StringConstraints(
-        max_length=64, pattern=r"^[a-z][a-z0-9-]{0,63}$",
+        max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
     )]
     message: str
     payload: dict[str, Any] | None = None
     checkpoint: dict[str, Any] | None = None
+
+    @field_validator("event_type", mode="before")
+    @classmethod
+    def reject_reserved_event_types(cls, value):
+        if isinstance(value, str) and is_reserved_event(value):
+            raise HTTPException(403, "Reserved event type")
+        return value
+
+    @field_validator("event_type")
+    @classmethod
+    def reject_secret_event_types(cls, value):
+        if contains_secret(value):
+            raise ValueError("event_type must not contain a secret")
+        return value
 
     @model_validator(mode="after")
     def validate_status_type(self):

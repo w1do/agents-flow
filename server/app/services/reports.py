@@ -7,12 +7,7 @@ from app.schemas.tasks import ExecutionStateResponse
 from app.services.leases import agent_task, release
 from app.services.task_status import transition
 from app.services.skill_content import redact
-
-SERVER_EVENT_TYPES = frozenset({
-    "publication-result", "claimed", "created", "status", "decision",
-    "lease-claimed", "lease-expired", "lease-extended", "stalled", "merged",
-    "paused", "trash", "error",
-})
+from app.services.report_event_types import is_reserved_event
 
 
 def _apply(task, kind, body):
@@ -78,7 +73,7 @@ def execution_state(session, task_id, agent, lease_id):
 
 
 def _reserved_event(event_type):
-    return event_type in SERVER_EVENT_TYPES
+    return is_reserved_event(event_type)
 
 
 def _sanitize(value):

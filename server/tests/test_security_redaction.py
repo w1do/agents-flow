@@ -105,15 +105,19 @@ async def test_validation_error_does_not_return_secret_in_extra_field_name(flow)
 
 async def test_server_event_types_are_forbidden(flow):
     for event_type in ("publication-result", "claimed", "created", "status", "decision",
-                       "lease-claimed", "lease-expired", "lease-extended", "stalled",
-                       "merged", "paused", "trash", "error"):
+                       "lease-claimed", "lease-expired", "lease-extended", "lease-renewed",
+                       "stalled", "merged", "paused", "trash", "error", "plan_decision",
+                       "result_decision", "lease_expired", "status_changed", "status-changed",
+                       "status-updated", "status-", "status_", "lease-", "lease_",
+                       "status-progress", "status_custom", "lease-custom", "lease_custom"):
         task = flow.task("active", leased=True)
         response = await flow.report(task, "events", {"event_type": event_type, "message": "Fake"})
         assert response.status_code == 403, event_type
 
 
 async def test_user_event_types_are_accepted(flow):
-    for event_type in ("tests", "checkpoint", "result", "progress", "planning", "testing"):
+    for event_type in ("tests", "test_results", "checkpoint", "result", "progress", "planning",
+                       "testing", "build.started", "Tests"):
         status = "choosing" if event_type == "planning" else "active"
         task = flow.task(status, leased=True)
         response = await flow.report(task, "events", {"event_type": event_type, "message": "Update"})
@@ -121,7 +125,13 @@ async def test_user_event_types_are_accepted(flow):
 
 
 async def test_event_type_format_is_validated(flow):
-    for event_type in ("", "Uppercase", "with_underscore", "a" * 65):
+    for event_type in ("", "a" * 129, "contains-ghp_" + "A" * 36):
         task = flow.task("active", leased=True)
         response = await flow.report(task, "events", {"event_type": event_type, "message": "Update"})
         assert response.status_code == 422, event_type
+
+
+async def test_long_user_event_type_is_accepted(flow):
+    task = flow.task("active", leased=True)
+    response = await flow.report(task, "events", {"event_type": "a" * 65, "message": "Update"})
+    assert response.status_code == 200
