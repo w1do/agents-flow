@@ -34,6 +34,8 @@ async def sandbox_asyncio_wakeup():
     try:
         yield
     finally:
+        # Executor completion also needs wakeups in the restricted sandbox.
+        await asyncio.get_running_loop().shutdown_default_executor()
         task.cancel()
         with suppress(asyncio.CancelledError):
             await task
@@ -116,3 +118,4 @@ def project(session):
 
 from flow_helpers import clock, flow  # noqa: F401, E402
 from mcp_helpers import background_context, mcp, mcp_factory  # noqa: F401, E402
+from telegram_helpers import telegram, telegram_config, telegram_disabled_by_default  # noqa: F401, E402

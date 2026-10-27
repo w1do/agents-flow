@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     telegram_webhook_secret: SecretStr | None = None
     transcription_provider: str = "stub"
     transcription_api_key: SecretStr | None = None
+    transcription_model: str = "whisper-1"
     public_base_url: str = "http://localhost:8000"
     trusted_proxy_ips: list[str] = Field(default_factory=list)
     openai_api_key: SecretStr | None = None

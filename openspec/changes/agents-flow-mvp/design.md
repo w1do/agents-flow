@@ -81,14 +81,32 @@ MCP: обязательный `event_id`, уникальный индекс `(ta
 `TRANSCRIPTION_PROVIDER` (`openai`, `stub`). `stub` возвращает заранее
 заданный текст и нужен, чтобы прогнать голосовой сценарий без ключа.
 Провайдер `openai` — OpenAI-совместимый `/audio/transcriptions`
-с `OPENAI_BASE_URL` и `OPENAI_API_KEY`.
+с `OPENAI_BASE_URL` (обязательно `https`), ключом `TRANSCRIPTION_API_KEY`
+и резервом `OPENAI_API_KEY`, моделью `TRANSCRIPTION_MODEL` (по умолчанию
+`whisper-1`). Ответ ограничен 1 МиБ; ошибка настройки отклоняет только
+голосовой ввод, сервер продолжает работать.
 
 ### 6. Telegram
 
-`python-telegram-bot` в режиме webhook-обработчика внутри FastAPI: приём
-update, маршрутизация по `project.telegram_chat_id`, отправка сообщений через
-Bot API напрямую. Решения — callback-кнопки, вызывающие тот же сервис, что
-панель. Если `TELEGRAM_BOT_TOKEN` пуст, модуль не подключается и REST работает.
+Bot API вызывается напрямую через `httpx`, без `python-telegram-bot` и других
+SDK: приём update по webhook `POST /api/v1/telegram/webhook` с проверкой
+`TELEGRAM_WEBHOOK_SECRET`, маршрутизация по `project.telegram_chat_id`,
+отправка сообщений — `sendMessage`, `answerCallbackQuery`, `getFile`.
+Решения — callback-кнопки, вызывающие тот же сервис, что панель. Если
+`TELEGRAM_BOT_TOKEN` пуст, маршрут не подключается и REST работает.
+
+Почему не `python-telegram-bot`: не нужна новая тяжёлая зависимость в образе
+сервера; вызовы проверяются без сети через `httpx.MockTransport`, а тесты не
+зависят от релизов и API SDK; нам нужны три метода и собственный дедуп,
+остальное SDK не используется.
+
+Последствия: update разбираются своими строгими Pydantic-схемами
+(`app/schemas/telegram.py`), валидация тела и коды отказа (401, 413, 422, 503)
+делаются на нашей стороне; нет типизированных хэндлеров и встроенных
+middleware SDK, поэтому новые типы update добавляются вручную в схему и в
+`updates.handle`. Логика интеграции живёт в
+`server/app/integrations/telegram/`, доставка уведомлений — в
+`server/app/services/telegram_delivery.py`.
 
 ### 7. Запуск агента: отдельный runner, а не код в Harness
 

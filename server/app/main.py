@@ -1,5 +1,5 @@
 import asyncio
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
@@ -31,7 +31,12 @@ async def lifespan(application: FastAPI):
         stateless_http=True, json_response=True, host="0.0.0.0",
     )
     try:
-        async with transport.app.router.lifespan_context(transport.app):
+        async with AsyncExitStack() as stack:
+            await stack.enter_async_context(transport.app.router.lifespan_context(transport.app))
+            if hasattr(application.state, "telegram"):
+                from app.services.notification_events import running
+
+                await stack.enter_async_context(running(application.state.telegram, SessionLocal.kw["bind"]))
             yield
     finally:
         await stop_monitor(expiry_task)
@@ -40,6 +45,13 @@ async def lifespan(application: FastAPI):
 def create_app() -> FastAPI:
     application = FastAPI(title="Agents Flow", version="0.1.0", lifespan=lifespan)
     application.include_router(router, prefix="/api/v1")
+    settings = get_settings()
+    if settings.telegram_bot_token.get_secret_value():
+        from app.api.v1.telegram import router as telegram_router
+        from app.integrations.telegram.runtime import Runtime
+
+        application.state.telegram = Runtime(settings)
+        application.include_router(telegram_router, prefix="/api/v1")
 
     @application.exception_handler(RequestValidationError)
     async def validation_error(_request, exception: RequestValidationError):
