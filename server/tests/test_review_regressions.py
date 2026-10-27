@@ -67,16 +67,48 @@ async def test_report_secrets_are_removed_from_database_and_task_card(flow):
     assert token not in str(task.checkpoint)
 
 
-async def test_expired_merged_lease_is_released_and_task_stays_merged(flow, clock):
-    task = flow.task("merged", leased=True)
+async def test_secret_event_id_is_rejected_and_never_stored(flow):
+    token = "ghp_" + "A" * 36
+    task = flow.task("active", leased=True)
+    response = await flow.report(task, "events", {
+        "event_type": "progress", "message": "Safe message",
+    }, event_id=token)
+    assert response.status_code == 422
+    assert flow.session.scalar(select(TaskEvent).where(
+        TaskEvent.task_id == task.id, TaskEvent.event_id == token,
+    )) is None
+    card = await flow.send("GET", f"/tasks/{task.id}")
+    assert token not in card.text
+
+
+async def test_events_reject_non_string_status(flow):
+    task = flow.task("active", leased=True)
+    response = await flow.report(task, "events", {
+        "event_type": "progress", "message": "Status", "payload": {"status": []},
+    })
+    assert response.status_code == 422
+
+
+async def test_expired_publication_lease_completes_task(flow, clock):
+    task = flow.task("ready", leased=True)
+    old_lease = task.lease_id
+    decision = await flow.send("POST", f"/tasks/{task.id}/result/decision",
+                               {"decision": "publish"})
+    assert decision.status_code == 200 and decision.json()["status"] == "merged"
     task.lease_expires_at = clock[0] + timedelta(seconds=1)
     flow.session.commit()
     clock[0] += timedelta(seconds=2)
     expire_due(flow.session)
-    flow.task()
-    assert (await flow.claim()).status_code == 200
+    card = await flow.send("GET", f"/tasks/{task.id}")
     flow.session.refresh(task)
-    assert task.status == "merged" and task.lease_id is None
+    assert task.status == "merged" and task.lease_id is None and task.completed_at is not None
+    assert card.json()["completed_at"] is not None
+    assert (await flow.report(task, "publication-result", {
+        "success": True, "message": "Late", "lease_id": str(old_lease),
+    })).status_code == 409
+    assert (await flow.send("POST", f"/tasks/{task.id}/result/decision",
+                            {"decision": "publish"})).status_code == 409
+    assert (await flow.send("PATCH", f"/tasks/{task.id}", {"status": "new"})).status_code == 409
 
 
 async def test_claim_rate_limit_returns_retry_after(flow, monkeypatch):
@@ -102,13 +134,17 @@ async def test_expiry_monitor_does_not_block_event_loop(monkeypatch):
 
     def blocking_expiry():
         worker_started.set()
-        wall_time.sleep(0.05)
+        wall_time.sleep(0.2)
 
     monkeypatch.setattr(lease_expiry, "_expire_once", blocking_expiry)
-    task = asyncio.create_task(lease_expiry.run_expiry_in_thread())
+    loop = asyncio.get_running_loop()
+    timer_fired = asyncio.Event()
     timer_start = wall_time.monotonic()
-    await asyncio.sleep(0.02)
+    timer = loop.call_later(0.03, timer_fired.set)
+    task = asyncio.create_task(lease_expiry.run_expiry_in_thread())
+    await asyncio.wait_for(timer_fired.wait(), timeout=0.1)
     assert wall_time.monotonic() - timer_start < 0.1
     assert worker_started.is_set()
     await task
+    timer.cancel()
     await asyncio.get_running_loop().shutdown_default_executor()

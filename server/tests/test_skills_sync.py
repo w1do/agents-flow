@@ -1,3 +1,4 @@
+from datetime import timedelta
 from uuid import uuid4
 
 from app.repositories import AgentSkillRepository
@@ -54,7 +55,6 @@ async def test_snapshots_survive_edits_archive_and_resume(flow, clock):
     await flow.send("PATCH", f"/skills/{skill.id}", {"content": "New instructions"})
     card = (await flow.send("GET", f"/tasks/{task.id}")).json()
     assert card["skill_snapshots"] == original
-    from datetime import timedelta
     clock[0] += timedelta(seconds=61)
     await flow.send("PATCH", f"/tasks/{task.id}", {"status": "new"})
     resumed = (await flow.claim()).json()
@@ -64,6 +64,20 @@ async def test_snapshots_survive_edits_archive_and_resume(flow, clock):
     assert resumed["skills"][0]["category"] == original[0]["category"]
     await flow.send("POST", f"/skills/{skill.id}/archive")
     assert (await flow.send("GET", f"/tasks/{task.id}")).json()["skill_snapshots"] == original
+
+
+async def test_empty_first_claim_remains_empty_after_resume(flow, clock):
+    task = flow.task()
+    assert (await flow.claim()).json()["skills"] == []
+    clock[0] += timedelta(seconds=61)
+    await flow.send("PATCH", f"/tasks/{task.id}", {"status": "new"})
+    skill = flow.skill()
+    AgentSkillRepository(flow.session).create(agent_id=flow.agent.id, skill_id=skill.id)
+    flow.session.commit()
+    resumed = await flow.claim()
+    assert resumed.status_code == 200
+    assert resumed.json()["skills"] == []
+    assert resumed.json()["task"]["skill_snapshots"] == []
 
 
 async def test_sync_and_assignment_errors_are_atomic(flow):

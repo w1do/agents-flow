@@ -16,6 +16,8 @@ def expire_due(session, project_id=None):
         agent = AgentRepository(session).lock(task.assigned_agent_id)
         if task.status != "merged":
             transition(task, "stalled")
+        else:
+            task.completed_at = time.now()
         release(session, task, clear=True)
         if agent:
             agent.status = "offline"

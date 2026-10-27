@@ -52,7 +52,7 @@ def claim(session, agent):
     agent.status, agent.last_heartbeat_at = "busy", time.now()
     history = TaskHistory(session)
     snapshots = history.snapshots(task.id)
-    if snapshots:
+    if snapshots or history.was_claimed(task.id):
         files = _snapshot_files(snapshots)
     else:
         files = skills.sync(session, agent.id)["skills"]
@@ -73,7 +73,8 @@ def _snapshot_files(snapshots):
         files.append({"skill_id": snapshot.skill_id, "category": snapshot.category,
                       "name": snapshot.skill_name, "filename": filename,
                       "version": snapshot.skill_version, "content_hash": snapshot.content_hash,
-                      "content": snapshot.content})
+                      "content": snapshot.content,
+                      "snapshot_content_missing": snapshot.content_missing})
     return files
 
 

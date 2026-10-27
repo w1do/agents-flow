@@ -20,6 +20,11 @@ class TaskHistory:
             TaskSkillSnapshot.task_id == task_id,
         ).order_by(TaskSkillSnapshot.id)))
 
+    def was_claimed(self, task_id):
+        return self.session.scalar(select(TaskEvent.id).where(
+            TaskEvent.task_id == task_id, TaskEvent.event_type == "claimed",
+        ).limit(1)) is not None
+
     def event(self, task_id, event_id):
         return self.session.scalar(select(TaskEvent).where(
             TaskEvent.task_id == task_id, TaskEvent.event_id == event_id,
@@ -51,5 +56,5 @@ class TaskHistory:
                 TaskSkillSnapshotRepository(self.session).create(
                     task_id=task_id, skill_id=skill.skill_id, skill_name=skill.name,
                     category=skill.category, skill_version=skill.version,
-                    content_hash=skill.content_hash, content=skill.content,
+                    content_hash=skill.content_hash, content=skill.content, content_missing=False,
                 )

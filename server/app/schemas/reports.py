@@ -1,7 +1,8 @@
-from typing import Any, Literal
+import re
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, StringConstraints, field_validator, model_validator
 
 from app.schemas.common import Input, Text
 from app.schemas.tasks import TaskStatus
@@ -9,7 +10,17 @@ from app.schemas.tasks import TaskStatus
 
 class Report(Input):
     lease_id: UUID
-    event_id: Text
+    event_id: Annotated[str, StringConstraints(
+        strip_whitespace=True, min_length=1, max_length=128,
+        pattern=r"^[A-Za-z0-9._:-]{1,128}$",
+    )]
+
+    @field_validator("event_id")
+    @classmethod
+    def reject_secret_ids(cls, value):
+        if re.search(r"(?i)(?:gh[pousr]_|github_pat_|sk-)[A-Za-z0-9_-]{16,}", value):
+            raise ValueError("event_id must not contain a secret")
+        return value
 
 
 class PlanRequest(Report):
@@ -21,6 +32,13 @@ class EventRequest(Report):
     message: str
     payload: dict[str, Any] | None = None
     checkpoint: dict[str, Any] | None = None
+
+    @model_validator(mode="after")
+    def validate_status_type(self):
+        status = (self.payload or {}).get("status")
+        if status is not None and not isinstance(status, str):
+            raise ValueError("payload.status must be a string")
+        return self
 
 
 class ResultRequest(Report):

@@ -43,6 +43,7 @@ class TaskSkillSnapshotResponse(BaseModel):
     skill_version: int
     content_hash: str
     content: str
+    content_missing: bool = False
 
 
 class TaskResponse(BaseModel):
