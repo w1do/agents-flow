@@ -8,6 +8,7 @@ PostgreSQL, что у REST. Отдельных статусов нет.
 ```
 https://flow.example.com/mcp
 transport: Streamable HTTP over HTTPS
+Authorization: Bearer <agent_token>
 ```
 
 ## Инструменты MVP
@@ -28,9 +29,28 @@ transport: Streamable HTTP over HTTPS
 
 ## Правила
 
-- Каждый отчёт несёт `event_id`; повтор не создаёт дубликат.
+- Каждый вызов несёт `event_id`; повтор отчёта не создаёт дубликат отчёта.
 - Инструмент работает только со своей арендованной задачей и своим проектом.
 - Обязателен актуальный `lease_id`; иначе `409`.
+
+## Аргументы и ответы
+
+- Каждый инструмент принимает `task_id`, `lease_id`, `event_id`.
+  Только `agent_get_assigned_task` может опустить `task_id`: сервер находит
+  текущую задачу, затем проверяет переданный lease. Новую задачу он не арендует.
+- Поля отчётов совпадают с REST. `agent_report_progress` принимает `event_type`,
+  `message`, необязательные `payload` и `checkpoint`.
+- `agent_save_checkpoint` принимает объект `checkpoint` и необязательный `message`;
+  вызывает сервис событий с `event_type=checkpoint`.
+- `agent_report_test_result` принимает `message` и необязательный `payload`;
+  вызывает сервис событий с `event_type=test_result` без смены статуса.
+- `agent_get_assigned_task` возвращает `task` (включая снимки skills) и
+  `execution_state`; оба инструмента чтения решений возвращают `execution_state`.
+- Ошибки инструментов: `isError=true`, JSON `error` с `code` и `message`.
+  HTTP-коды отказов REST передаются в `error.code`; отсутствие токена даёт HTTP 401.
+- Вызов с доступной своей задачей оставляет отдельное событие `mcp_*`, в том числе
+  при ошибке или повторе отчёта. В аудите только код исхода; тела запроса нет.
+  Если своей задачи нет, событие не создаётся: `task_events` требует `task_id`.
 
 ## Что агенту нельзя
 

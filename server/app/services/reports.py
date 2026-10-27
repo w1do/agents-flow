@@ -6,7 +6,7 @@ from app.schemas.reports import ReportResponse
 from app.schemas.tasks import ExecutionStateResponse
 from app.services.leases import agent_task, release
 from app.services.task_status import transition
-from app.services.skill_content import redact
+from app.services.skill_content import sanitize as _sanitize
 from app.services.report_event_types import is_reserved_event
 
 
@@ -74,14 +74,3 @@ def execution_state(session, task_id, agent, lease_id):
 
 def _reserved_event(event_type):
     return is_reserved_event(event_type)
-
-
-def _sanitize(value):
-    if isinstance(value, str):
-        return redact(value)
-    if isinstance(value, list):
-        return [_sanitize(item) for item in value]
-    if isinstance(value, dict):
-        return {redact(key) if isinstance(key, str) else key: _sanitize(item)
-                for key, item in value.items()}
-    return value
