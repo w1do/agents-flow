@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -18,7 +19,13 @@ async def lifespan(application: FastAPI):
     application.state.settings = settings
     with SessionLocal.begin() as session:
         ensure_initial_admin(session, settings)
-    yield
+    from app.services.lease_expiry import monitor, stop_monitor
+
+    expiry_task = asyncio.create_task(monitor())
+    try:
+        yield
+    finally:
+        await stop_monitor(expiry_task)
 
 
 def create_app() -> FastAPI:

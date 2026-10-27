@@ -1,12 +1,17 @@
 from collections.abc import Generator
 
 from sqlalchemy import create_engine
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import get_settings
 from app.models import Base
 
-engine = create_engine(get_settings().database_url, pool_pre_ping=True, hide_parameters=True)
+url = make_url(get_settings().database_url)
+connect_args = {}
+if url.get_backend_name() == "postgresql":
+    connect_args = {"connect_timeout": 5, "options": "-c statement_timeout=5000"}
+engine = create_engine(url, pool_pre_ping=True, hide_parameters=True, connect_args=connect_args)
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 

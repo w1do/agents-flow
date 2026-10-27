@@ -16,6 +16,8 @@ class HarnessInitRequest(BaseModel):
 
 class SkillFile(BaseModel):
     skill_id: UUID
+    category: str
+    name: str
     filename: str
     version: int
     content_hash: str

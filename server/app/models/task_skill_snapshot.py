@@ -13,5 +13,7 @@ class TaskSkillSnapshot(UUIDPrimaryKey, Base):
     task_id: Mapped[UUID] = mapped_column(ForeignKey("tasks.id"))
     skill_id: Mapped[UUID] = mapped_column(ForeignKey("skills.id"))
     skill_name: Mapped[str] = mapped_column(Text)
+    category: Mapped[str] = mapped_column(Text)
     skill_version: Mapped[int] = mapped_column(Integer)
     content_hash: Mapped[str] = mapped_column(Text)
+    content: Mapped[str] = mapped_column(Text)

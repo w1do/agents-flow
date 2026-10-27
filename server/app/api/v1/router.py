@@ -1,8 +1,11 @@
 from fastapi import APIRouter
 
-from app.api.v1 import auth, harness, projects
+from app.api.v1 import (
+    agent_skills, auth, harness, leases, projects, skill_categories, skills,
+    task_decisions, task_reports, tasks,
+)
 
 router = APIRouter()
-router.include_router(auth.router)
-router.include_router(projects.router)
-router.include_router(harness.router)
+for module in (auth, projects, harness, skill_categories, skills, agent_skills, tasks,
+               leases, task_reports, task_decisions):
+    router.include_router(module.router)

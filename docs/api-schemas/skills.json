@@ -52,7 +52,8 @@
         "category_id": {"type": "string", "format": "uuid"},
         "name": {"type": "string", "minLength": 1},
         "description": {"type": "string"},
-        "content": {"type": "string", "minLength": 1}
+        "content": {"type": "string", "minLength": 1},
+        "is_active": {"type": "boolean"}
       },
       "minProperties": 1
     },
@@ -71,7 +72,10 @@
         "is_active": {"type": "boolean"},
         "created_at": {"type": "string", "format": "date-time"},
         "updated_at": {"type": "string", "format": "date-time"},
-        "warnings": {"type": "array", "items": {"type": "string"}}
+        "warnings": {"type": "array", "items": {"type": "string"}},
+        "assigned_agents": {"type": "array", "items": {"type": "string", "format": "uuid"}},
+        "enabled": {"type": ["boolean", "null"]},
+        "assigned_at": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}]}
       }
     },
     "AgentSkillsReplace": {
@@ -79,7 +83,8 @@
       "additionalProperties": false,
       "required": ["skill_ids"],
       "properties": {
-        "skill_ids": {"type": "array", "items": {"type": "string", "format": "uuid"}, "uniqueItems": true}
+        "skill_ids": {"type": "array", "items": {"type": "string", "format": "uuid"}, "uniqueItems": true},
+        "disabled_skill_ids": {"type": "array", "items": {"type": "string", "format": "uuid"}}
       }
     }
   }

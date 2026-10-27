@@ -40,7 +40,8 @@ def entity_values(session, name):
                 "source_type": "api", "source_text": "Fix bug"}, {"checkpoint": {"step": 1}, "status": "planning"}
     if name == "TaskSkillSnapshot":
         return {"task_id": create("Task").id, "skill_id": create("Skill").id, "skill_name": "Build",
-                "skill_version": 1, "content_hash": digest}, {"skill_name": "Recorded"}
+                "category": "Development", "skill_version": 1, "content_hash": digest,
+                "content": "Run build"}, {"skill_name": "Recorded"}
     if name == "TaskEvent":
         return {"task_id": create("Task").id, "event_type": "progress", "message": "Started",
                 "event_id": "event-1", "payload": {"step": 1}}, {"payload": {"step": 2}}

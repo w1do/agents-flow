@@ -5,5 +5,9 @@ POLL_INTERVAL_SECONDS = 5
 
 
 def as_utc(value: datetime) -> datetime:
-    # SQLite returns naive values even for DateTime(timezone=True).
+    # SQLite возвращает время без часового пояса.
     return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+
+def now() -> datetime:
+    return datetime.now(timezone.utc)
