@@ -47,6 +47,19 @@ def _safe_sse(event):
     return b"".join(result)
 
 
+def _next_sse_event(pending):
+    separators = (b"\r\n\r\n", b"\n\n")
+    matches = [(pending.find(separator), separator) for separator in separators]
+    matches = [(index, separator) for index, separator in matches if index >= 0]
+    if not matches:
+        return None
+    index, separator = min(matches, key=lambda match: match[0])
+    end = index + len(separator)
+    event = bytes(pending[:end])
+    del pending[:end]
+    return event
+
+
 def agent_identity(token):
     from app.core.db import SessionLocal
 
@@ -114,11 +127,11 @@ class AgentTokenMiddleware:
                             await send({**message, "body": _safe_json(bytes(pending))})
                     elif content_type.startswith(b"text/event-stream"):
                         pending.extend(body)
-                        while b"\n\n" in pending:
-                            event, _, rest = pending.partition(b"\n\n")
-                            pending[:] = rest
-                            await send({**message, "body": _safe_sse(event + b"\n\n"),
+                        event = _next_sse_event(pending)
+                        while event is not None:
+                            await send({**message, "body": _safe_sse(event),
                                         "more_body": True})
+                            event = _next_sse_event(pending)
                         if not message.get("more_body", False):
                             if pending:
                                 await send({**message, "body": _safe_sse(bytes(pending))})
