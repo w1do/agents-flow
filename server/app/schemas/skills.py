@@ -1,9 +1,18 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.schemas.common import Input, Patch, Text
+
+
+MAX_SKILL_CONTENT_BYTES = 256 * 1024
+
+
+def validate_skill_content_size(content: str) -> str:
+    if len(content.encode("utf-8")) > MAX_SKILL_CONTENT_BYTES:
+        raise ValueError("Markdown не должен превышать 256 КиБ в UTF-8")
+    return content
 
 
 class CategoryCreate(Input):
@@ -29,6 +38,11 @@ class SkillCreate(Input):
     description: str
     content: str = Field(min_length=1, repr=False)
 
+    @field_validator("content")
+    @classmethod
+    def content_size(cls, content: str) -> str:
+        return validate_skill_content_size(content)
+
 
 class SkillPatch(Patch):
     category_id: UUID | None = None
@@ -36,6 +50,11 @@ class SkillPatch(Patch):
     description: str | None = None
     content: str | None = Field(None, min_length=1, repr=False)
     is_active: bool | None = None
+
+    @field_validator("content")
+    @classmethod
+    def content_size(cls, content: str | None) -> str | None:
+        return None if content is None else validate_skill_content_size(content)
 
 
 class SkillResponse(BaseModel):

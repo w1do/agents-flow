@@ -52,7 +52,8 @@ Login, создание проектов, init-токенов и `/harness/init`
 
 | Метод и полный путь | Доступ | Запрос | Успешный ответ | Ошибки |
 |---|---|---|---|---|
-| POST `/api/v1/auth/login` | Public | LoginRequest | 200 LoginResponse | 401, 422, 429 |
+| POST `/api/v1/auth/login` | Public | LoginRequest | 204, HttpOnly cookie `session` | 401, 422, 429 |
+| POST `/api/v1/auth/token` | Public | LoginRequest | 200 TokenResponse (`access_token`) | 401, 422, 429 |
 | GET `/api/v1/projects` | Admin | — | 200 ProjectResponse[] | 401, 422 |
 | POST `/api/v1/projects` | Admin | ProjectCreate | 201 ProjectResponse | 401, 422 |
 | GET `/api/v1/projects/{id}` | Admin | — | 200 ProjectResponse | 401, 404, 422 |

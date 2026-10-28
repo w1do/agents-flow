@@ -13,7 +13,7 @@ read -rs -p 'Admin password: ' ADMIN_PASSWORD; printf '\n'
 export ADMIN_EMAIL ADMIN_PASSWORD
 
 JWT=$(jq -n '{email:env.ADMIN_EMAIL,password:env.ADMIN_PASSWORD}' |
-  curl --fail-with-body -sS "$BASE_URL/api/v1/auth/login" \
+  curl --fail-with-body -sS "$BASE_URL/api/v1/auth/token" \
     -H 'Content-Type: application/json' --data-binary @- | jq -er '.access_token')
 unset ADMIN_PASSWORD
 
@@ -35,7 +35,9 @@ AGENT_TOKEN=$(printf '%s' "$HARNESS" | jq -er '.agent_token')
 unset HARNESS INIT_CODE
 ```
 
-Login отвечает 200 с `access_token`, `token_type: "bearer"`, `expires_in: 43200`.
+`POST /auth/token` для CLI отвечает 200 с `access_token`, `token_type: "bearer"`,
+`expires_in: 43200`. Браузерный `POST /auth/login` возвращает 204 без тела и
+устанавливает HttpOnly-cookie `session`.
 Создание проекта, init-кода и Harness отвечает 201. Init-код из ответа
 `init-tokens` передаётся полем `init_code` в JSON тела `/harness/init`.
 Новый агент получает `skills: []`; skills администратор назначает отдельно.

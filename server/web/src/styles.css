@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body { @apply m-0 bg-slate-50 font-sans text-slate-800 antialiased; }
+  h1 { @apply text-2xl font-bold tracking-tight text-slate-950; }
+  h2 { @apply text-lg font-semibold text-slate-900; }
+  h3 { @apply font-semibold text-slate-900; }
+  a { @apply text-indigo-700 hover:underline; }
+  nav a { @apply text-slate-300; }
+  nav a.active { @apply text-white underline underline-offset-8; }
+  button { @apply rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-50; }
+  button.secondary { @apply border border-slate-300 bg-white text-slate-700 hover:bg-slate-100; }
+  button.danger { @apply bg-rose-700 hover:bg-rose-800; }
+  input:not([type=checkbox]), textarea, select { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900; }
+  textarea { @apply min-h-24; }
+  label { @apply block space-y-1 text-sm font-medium text-slate-700; }
+  input[type=checkbox] { @apply h-4 w-4 accent-indigo-600; }
+  :focus-visible { @apply outline outline-2 outline-offset-2 outline-indigo-500; }
+  fieldset { @apply min-w-0 space-y-3 disabled:opacity-60; }
+  pre { @apply overflow-auto whitespace-pre-wrap break-words rounded-lg bg-slate-950 p-4 text-xs leading-6 text-slate-100; }
+}
+
+@layer components {
+  .card { @apply min-w-0 space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm; }
+  .muted { @apply text-sm text-slate-500; }
+  .toolbar { @apply flex flex-wrap items-center justify-between gap-3; }
+  .badge { @apply inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700; }
+  .actions { @apply flex flex-wrap gap-2; }
+}

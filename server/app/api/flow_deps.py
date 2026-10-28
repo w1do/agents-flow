@@ -2,7 +2,7 @@ from typing import Annotated
 
 import re
 
-from fastapi import Depends, Header, HTTPException, Request
+from fastapi import Cookie, Depends, Header, HTTPException, Request
 
 from app.api.deps import Credentials, Database
 from app.core.errors import forbidden, not_found, unauthorized
@@ -14,10 +14,15 @@ from app.services.lease_expiry import expire_due
 from app.services.skill_content import contains_secret
 
 
-def principal(credentials: Credentials, session: Database):
-    if credentials is None:
+def principal(credentials: Credentials, session: Database, request: Request,
+             session_cookie: Annotated[str | None, Cookie(alias="session")] = None,
+             requested_with: Annotated[str | None, Header(alias="X-Requested-With")] = None):
+    if credentials is None and not session_cookie:
         raise unauthorized()
-    token = credentials.credentials
+    token = credentials.credentials if credentials else session_cookie
+    if credentials is None and request.method not in {"GET", "HEAD", "OPTIONS"} \
+            and requested_with != "XMLHttpRequest":
+        raise HTTPException(403, "CSRF validation failed")
     actor = authenticate_agent(token, session) or authenticate_admin(session, token)
     if actor is None:
         raise unauthorized()

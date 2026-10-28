@@ -64,6 +64,18 @@ async def test_patch_validation(flow, body):
     assert response.status_code == 422
 
 
+async def test_skill_markdown_is_limited_to_256_kib(flow):
+    skill = flow.skill()
+    path = f"/skills/{skill.id}"
+    accepted = "x" * (256 * 1024)
+    response = await flow.send("PATCH", path, {"content": accepted})
+    assert response.status_code == 200
+    assert len(response.json()["content"].encode("utf-8")) == 256 * 1024
+    too_large = "я" * 200_000
+    response = await flow.send("PATCH", path, {"content": too_large})
+    assert response.status_code == 422
+
+
 async def test_skill_permissions_and_missing_category(flow):
     assert (await flow.send("GET", "/skills", headers={})).status_code == 401
     assert (await flow.send("GET", "/skills", headers=flow.headers)).status_code == 403
