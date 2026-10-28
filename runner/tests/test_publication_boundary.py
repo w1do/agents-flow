@@ -20,7 +20,7 @@ def test_fifo_causes_terminal_stage_failure_without_host_changes(tmp_path, task_
     assert code == 1 and events[-1]["type"] == "failure"
     assert events[-1]["message"] == "Unsafe artifact type"
     assert not any(event["type"] == "result" for event in events)
-    assert list(tmp_path.iterdir()) == [before]
+    assert set(tmp_path.iterdir()) == {before, tmp_path / ".git"}
     assert before.stat().st_ino == inode and before.read_text() == "unchanged"
 
 

@@ -30,6 +30,30 @@ Runner читает один JSON-объект из stdin и пишет NDJSON �
 отдельным полем. Вход реализации и проверок содержит plan_text, при доработке —
 feedback. `result_data` передаёт накопленный результат предыдущего этапа.
 
+Testing и publication требуют настоящий Git worktree в ветке `task/<task_id>`.
+Testing возвращает `result_data.base_sha`, фактические `changed_paths` и
+`verification`: `base_sha`, `head_sha`, `commits` (строки `sha subject`),
+`status_porcelain` (строка с переводами строк), `diff_name_only` (массив путей),
+`worktree_clean`. `diff_name_only` — tracked diff от base до текущего worktree;
+untracked-файлы отражены в status и changed_paths. Base берётся из предыдущего
+result_data, при первом testing — из HEAD до команд. Harness сохраняет эти
+данные для publication. Сервер хранит их в существующем JSON result_data;
+старый result без verification разрешён с событием `verification_missing`.
+
+После успешных publication-команд trusted runner вне sandbox выполняет
+`git add -A -- <пути>` и `git commit -m "task(<task_id>): <title>"`.
+Разрешения задаются в тексте publication skill строкой
+`allowed_paths: ["src/", "README.md"]` либо полем skill.allowed_paths.
+Файл разрешается точно, каталог — префиксом с `/`, `.` разрешает дерево.
+Без декларации изменённые пути запрещены. `.env*`, `.git`, `.secrets`, token
+и recovery/временные артефакты запрещены всегда; symlink/hardlink тоже запрещены.
+Git hooks и fsmonitor при host-операциях отключены. Git-диагностика не логируется.
+Результат содержит `commit_sha`, `commit_subject`, реальные `changed_paths`,
+`base_sha` и свежую verification. При отсутствии изменений: success=true,
+commit_sha=null, commit_subject=null, changed_paths=[], no_changes=true.
+Ошибка Git даёт success=false и result_data.code=`git_<reason>`.
+Publication payload обновляет result_data задачи, включая коммит и verification.
+
 В planning runner обязан соблюдать read_only и не менять файлы. Это контракт
 runner, а не файловая песочница. Harness не выполняет команды проекта сам.
 Для planning/implementation передаются непубликационные skills, для testing —

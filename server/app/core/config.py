@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     openai_base_url: str | None = None
     agent_provider: str = "stub"
     agent_model: str | None = None
+    lease_ttl_seconds: int = Field(default=60, gt=0)
+    poll_interval_seconds: int = Field(default=5, gt=0)
 
     @field_validator("jwt_secret")
     @classmethod

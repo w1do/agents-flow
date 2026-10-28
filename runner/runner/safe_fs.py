@@ -6,6 +6,7 @@ import stat
 from contextlib import contextmanager
 
 from .errors import RunnerError
+from .mounts import reject_fd_mount
 
 MAX_FILE = 16 * 1024 * 1024
 MAX_TREE = 64 * 1024 * 1024
@@ -13,7 +14,24 @@ MAX_ENTRIES = 10000
 
 
 def sensitive(name):
-    return name.startswith(".env") or name in {".agent-token", ".git"}
+    name = name.casefold()
+    return (name.startswith((".env", "id_rsa", ".secrets")) or name.endswith((".pem", ".key", ".env"))
+            or name in {".agent-token", ".git", ".secrets", ".npmrc", ".pypirc"})
+
+
+def same_device(info, device):
+    if info.st_dev != device:
+        raise RunnerError("mount_crossing")
+
+
+def checked_fd(fd, device):
+    try:
+        same_device(os.fstat(fd), device)
+        reject_fd_mount(fd)
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
 
 
 @contextmanager
@@ -21,9 +39,11 @@ def opened(parent, name):
     # Inspect a pinned inode without opening a device or blocking on a FIFO.
     pinned = os.open(name, os.O_PATH | os.O_NOFOLLOW, dir_fd=parent)
     try:
+        reject_fd_mount(pinned, parent)
         info = os.fstat(pinned)
         if not (stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode)):
             raise RunnerError("Unsafe artifact type")
+        same_device(info, os.fstat(parent).st_dev)
         if stat.S_ISREG(info.st_mode) and info.st_nlink != 1:
             raise RunnerError("Hard-linked artifacts are forbidden")
         # This is a trusted proc-fd reference, never the mutable input pathname.

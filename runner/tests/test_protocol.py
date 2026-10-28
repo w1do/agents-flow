@@ -131,7 +131,8 @@ def test_stage_skill_isolation(task_input, invoke, stage, skill):
 @pytest.mark.usefixtures("requires_bwrap")
 def test_publication_result_requires_success_and_message(task_input, invoke):
     task_input.update(stage="publication", read_only=False, skills=[
-        {"category": "git", "content": "```sh\nprintf published > published.txt\n```"}])
+        {"category": "git", "allowed_paths": ["published.txt"],
+         "content": "```sh\nprintf published > published.txt\n```"}])
     code, events = invoke(task_input)
     assert code == 0
     terminal = events[-1]

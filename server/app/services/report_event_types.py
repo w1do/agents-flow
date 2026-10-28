@@ -3,7 +3,7 @@ SERVER_EVENT_TYPES = frozenset({
     "lease-claimed", "lease-expired", "lease-extended", "lease-renewed",
     "stalled", "merged", "paused", "trash", "error", "plan_decision",
     "result_decision", "lease_expired", "status_changed", "status-changed",
-    "status-updated",
+    "status-updated", "verification_missing",
 })
 SERVER_EVENT_PREFIXES = ("status-", "status_", "lease-", "lease_", "mcp_")
 

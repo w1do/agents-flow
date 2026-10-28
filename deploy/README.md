@@ -109,3 +109,12 @@ UID/GID 70, so the image entrypoint can initialize the volume and run without ro
 For a host Python install from `server/`, use `pip install '.[dev]'` to include test dependencies;
 the Docker runtime installs only project dependencies. `python -m app.console
 --help` can run before database configuration.
+
+## Runner worktree mount policy
+
+The worktree must contain **no nested mount points**, including bind mounts on the
+same filesystem. Mount deployment secrets outside the worktree. Run the runner
+without privileges to create or change mounts, and keep `/proc/self/mountinfo`
+readable in its mount namespace. The runner checks both `st_dev` and known nested
+mount points; a matching path is rejected with `mount_crossing`. These checks do
+not protect against a privileged process changing mounts concurrently.

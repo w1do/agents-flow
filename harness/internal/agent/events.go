@@ -101,6 +101,7 @@ func (e *Engine) finish(ctx context.Context, event runnerEvent) error {
 			data[key] = value
 		}
 		data["tests"] = e.state.Tests
+		e.state.ResultData = data
 		if e.state.TestsTruncated {
 			data["tests_truncated"] = true
 		}

@@ -1,5 +1,23 @@
 # Граница секретов runner (MVP)
 
+Host Git: все команды используют очищенное окружение, без system/global config,
+prompts, внешнего pager, hooks, fsmonitor, GPG и внешнего diff.
+Перед каждой командой перечисляются все config scopes и includes, включая worktree.
+Clean/smudge заменены на cat, process отключён; log/show — без подписей.
+Lazy fetch и transport-программы отключены; external excludes не скрывают untracked.
+Status использует `-c diff.external=`; diff дополнительно `--no-ext-diff`.
+Весь staging, проверка и commit выполняются с одним приватным `GIT_INDEX_FILE`.
+После успеха реальный индекс синхронизируется атомарным rename под index.lock,
+только если он совпадает с исходным. Конфликт сохраняет чужой индекс и даёт
+verification.index_conflict=true, stale_index=true; worktree_clean проверяет реальный индекс.
+При core.filemode=false сохраняется индексный 100755; конфликты file/directory
+удаляются через update-index --force-remove до добавления новых записей.
+Защищённые пути сравниваются через casefold и маскируются также в свободном тексте.
+Открытые компоненты проверяются по st_dev закреплённого корня: иначе `mount_crossing`.
+Внутри worktree не должно быть mount-point'ов, включая bind-mount на том же устройстве.
+Известные mounts проверяются через /proc/self/mountinfo и дают mount_crossing.
+Лимиты отчётов и эксплуатационные требования: [../SECURITY.md](../SECURITY.md).
+
 1. Доверяем процессу runner, harness, ядру Linux, bwrap и системным `/usr`, `/lib*`, `/bin`, `/sbin`.
 2. Модель, ответы SDK, skill-программы и файлы worktree считаются недоверенными.
 3. Config одним чтением env-file объединяет его с env; тот же набор создаёт immutable-снимок секретов.

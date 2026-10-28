@@ -47,7 +47,7 @@ def claim(session, agent):
     if task is None:
         return None
     task.assigned_agent_id, task.lease_id = agent.id, uuid4()
-    task.lease_expires_at = time.now() + timedelta(seconds=time.LEASE_TTL_SECONDS)
+    task.lease_expires_at = time.now() + timedelta(seconds=time.lease_ttl_seconds())
     transition(task, "choosing")
     agent.status, agent.last_heartbeat_at = "busy", time.now()
     history = TaskHistory(session)
@@ -85,7 +85,7 @@ def heartbeat(session, agent, body):
         task = agent_task(session, body.task_id, agent, body.lease_id)
         if task.status not in WORKING | {"merged"} or task.completed_at:
             raise HTTPException(409, "Task is finished")
-        task.lease_expires_at = time.now() + timedelta(seconds=time.LEASE_TTL_SECONDS)
+        task.lease_expires_at = time.now() + timedelta(seconds=time.lease_ttl_seconds())
         agent.status = "busy"
         expires = task.lease_expires_at
     else:

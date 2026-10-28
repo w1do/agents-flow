@@ -3,14 +3,19 @@ package gitrepo
 import (
 	"context"
 	"errors"
-	"os/exec"
 	"strings"
 )
 
 // Run only exposes stdout on success; Git diagnostics may include remote secrets.
 func Run(ctx context.Context, dir string, args ...string) (string, error) {
-	command := exec.CommandContext(ctx, "git", append([]string{"-C", dir}, args...)...)
-	data, err := command.Output()
+	options, err := filterOptions(ctx, dir)
+	if err != nil {
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+		return "", errors.New("git config failed")
+	}
+	data, err := command(ctx, dir, options, args...).Output()
 	if err != nil {
 		if ctx.Err() != nil {
 			return "", ctx.Err()

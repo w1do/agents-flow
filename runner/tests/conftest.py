@@ -2,6 +2,7 @@ import io
 import json
 import socket
 import shutil
+import subprocess
 
 import pytest
 
@@ -21,6 +22,10 @@ def offline(monkeypatch):
 
 @pytest.fixture
 def task_input(tmp_path):
+    for args in (("init", "-b", "task/task-9"), ("config", "user.name", "Runner Test"),
+                 ("config", "user.email", "runner@example.invalid"),
+                 ("commit", "--allow-empty", "-m", "base")):
+        subprocess.run(["git", "-C", str(tmp_path), *args], check=True, capture_output=True)
     return {
         "task": {"id": "task-9", "title": "Implement task", "description": "Do the work"},
         "stage": "planning", "path": str(tmp_path), "worktree": str(tmp_path),

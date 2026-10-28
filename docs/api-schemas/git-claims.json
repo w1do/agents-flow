@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "Sha": {"type": "string", "pattern": "^[0-9a-fA-F]{40}$"},
+    "Path": {
+      "type": "string", "minLength": 1, "maxLength": 4096,
+      "description": "Relative POSIX path; traversal, casefolded protected names, backslashes, colon and NUL are rejected"
+    },
+    "CommitClaim": {
+      "type": "object", "required": ["sha"],
+      "description": "Unknown properties are discarded",
+      "properties": {
+        "sha": {"$ref": "#/$defs/Sha"},
+        "subject": {"type": ["string", "null"], "maxLength": 200}
+      }
+    },
+    "StatusClaim": {
+      "type": "object", "required": ["code", "path"],
+      "description": "Unknown properties are discarded",
+      "properties": {
+        "code": {"type": "string", "pattern": "^[ MADRCUT?!]{1,2}$"},
+        "path": {"$ref": "#/$defs/Path"},
+        "ignored": {"type": "boolean", "default": false}
+      }
+    },
+    "GitClaims": {
+      "type": "object",
+      "description": "Unverified assertions; unknown properties discarded; source always agent_reported",
+      "properties": {
+        "source": {"const": "agent_reported"},
+        "base_sha": {"anyOf": [{"$ref": "#/$defs/Sha"}, {"type": "null"}]},
+        "head_sha": {"anyOf": [{"$ref": "#/$defs/Sha"}, {"type": "null"}]},
+        "commits": {"type": "array", "maxItems": 100, "items": {
+          "anyOf": [{"$ref": "#/$defs/Sha"}, {"$ref": "#/$defs/CommitClaim"}]
+        }},
+        "status": {"type": "array", "maxItems": 10000, "items": {"$ref": "#/$defs/StatusClaim"}},
+        "diff_name_only": {"type": "array", "maxItems": 10000, "items": {"$ref": "#/$defs/Path"}},
+        "worktree_clean": {"type": ["boolean", "null"]},
+        "index_conflict": {"type": ["boolean", "null"]},
+        "stale_index": {"type": ["boolean", "null"]}
+      }
+    },
+    "GitReportData": {
+      "type": "object", "additionalProperties": true,
+      "description": "At most 256 KiB compact UTF-8 JSON; protected paths in free text are redacted",
+      "x-maxSerializedBytes": 262144,
+      "x-maxNestingDepth": 32,
+      "properties": {
+        "commit_sha": {"anyOf": [{"$ref": "#/$defs/Sha"}, {"type": "null"}]},
+        "commit_subject": {"type": ["string", "null"], "maxLength": 200},
+        "changed_paths": {"type": "array", "maxItems": 1000, "items": {"$ref": "#/$defs/Path"}},
+        "verification": {"anyOf": [{"$ref": "#/$defs/GitClaims"}, {"type": "null"}],
+          "description": "Input compatibility alias: persisted only as claims"},
+        "claims": {"anyOf": [{"$ref": "#/$defs/GitClaims"}, {"type": "null"}]}
+      }
+    }
+  }
+}

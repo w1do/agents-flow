@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"agentsflow/harness/internal/api"
+	"agentsflow/harness/internal/config"
 	"agentsflow/harness/internal/leases"
 )
 
@@ -21,6 +22,10 @@ func sleep(ctx context.Context, delay time.Duration) error {
 }
 
 func retryable(err error) bool {
+	var changed *config.ChangedError
+	if errors.As(err, &changed) {
+		return false
+	}
 	var serverErr *api.Error
 	return !errors.As(err, &serverErr) || serverErr.StatusCode >= 500 || serverErr.StatusCode == 429
 }

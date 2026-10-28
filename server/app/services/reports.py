@@ -4,6 +4,7 @@ from app.core import time
 from app.repositories.task_history import TaskHistory
 from app.schemas.reports import ReportResponse
 from app.schemas.tasks import ExecutionStateResponse
+from app.schemas.payload_limits import bounded_payload
 from app.services.leases import agent_task, release
 from app.services.task_status import transition
 from app.services.skill_content import sanitize as _sanitize
@@ -44,8 +45,24 @@ def report(session, task_id, agent, kind, body):
     if kind == "events" and _reserved_event(body.event_type):
         raise HTTPException(403, "Reserved event type")
     values = _sanitize(values)
+    try:
+        if kind == "result":
+            bounded_payload(values["result_data"])
+        if kind in {"events", "fail"} and values.get("payload") is not None:
+            bounded_payload(values["payload"])
+        if kind == "events" and values.get("checkpoint") is not None:
+            bounded_payload(values["checkpoint"])
+        if kind == "publication-result" and values.get("payload") is not None:
+            bounded_payload(dict(task.result_data or {}) | values["payload"])
+    except ValueError:
+        raise HTTPException(422, "Report payload exceeds 256 KiB") from None
     safe_body = body.model_copy(update=values)
     _apply(task, kind, safe_body)
+    if kind == "result" and not isinstance(safe_body.result_data.get("claims"), dict):
+        history.append(task.id, "verification_missing", "Result has no agent-reported Git claims",
+                       agent_id=agent.id, payload={"result_event_id": body.event_id})
+    if kind == "publication-result" and safe_body.payload is not None:
+        task.result_data = dict(task.result_data or {}) | safe_body.payload
     message = values.get("message", values.get("plan_text", values.get("result_summary", kind)))
     history.append(task.id, safe_body.event_type if kind == "events" else kind, message,
                    agent_id=agent.id, event_id=body.event_id, payload=values)

@@ -1,7 +1,7 @@
 """A bounded agent loop; the model can only request checked filesystem actions."""
 
 from .adapter import OpenAIAdapter
-from .checks import finish_checks
+from .check_results import finish_checks
 from .errors import RunnerError
 from .model_paths import ModelPaths
 from .protocol import parse_json

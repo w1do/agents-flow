@@ -1,14 +1,12 @@
 # API
 
-`GET /healthz`, login, проекты, init-токены, `/harness/init`, skills, задачи,
-аренды, отчёты и решения реализованы.
+`GET /healthz`, login, проекты, init-токены, `/harness/init`, skills, задачи, аренды, отчёты и решения реализованы.
 FastAPI публикует `/docs`, `/redoc`, `/openapi.json`; примеры: [api-examples.md](api-examples.md).
 
 ## Формат и схемы
 
 Все тела — `application/json`, UUID — строки UUID, время — RFC 3339 с часовым поясом.
-Login принимает email с `@` и доменной точкой. `ProjectCreate.name` и
-`HarnessInitRequest.agent_name` обрезаются по краям и должны содержать 1–200 символов.
+Login принимает email с `@` и доменной точкой. `ProjectCreate.name` и `HarnessInitRequest.agent_name` обрезаются по краям и должны содержать 1–200 символов.
 Полные JSON Schema Draft 2020-12 находятся в `$defs` следующих файлов:
 
 - [common.json](api-schemas/common.json): health, ошибки, статусы, источники.
@@ -20,9 +18,8 @@ Login принимает email с `@` и доменной точкой. `Project
 
 Имя в таблице означает `$defs.<Имя>`; `[]` означает массив объектов этой схемы.
 `—` означает отсутствие тела запроса. Пустая очередь claim возвращает 204 без тела.
-Схемы указывают поля, null, enum и вложенные структуры; неизвестные поля запрещены,
-кроме свободных JSON-полей.
-`payload`, `checkpoint`, `result_data` — JSON-объекты с произвольными ключами.
+Схемы указывают поля, null, enum и вложенные структуры; неизвестные поля запрещены, кроме свободных JSON-полей.
+`payload`, `checkpoint`, `result_data` — JSON-объекты; Git-поля отчётов валидируются отдельно.
 Пропущенные необязательные `description`, `telegram_chat_id`, `feedback` дают `null`;
 `sort_order` при создании категории — 0. PATCH меняет только переданные поля.
 `warnings` в SkillResponse — массив предупреждений, пустой при их отсутствии.
@@ -40,8 +37,7 @@ Login принимает email с `@` и доменной точкой. `Project
 Login, создание проектов, init-токенов и `/harness/init` сохраняют прежний контракт без ключа.
 Область ключа — субъект авторизации, метод и путь; повтор с тем же телом возвращает
 сохранённый код и ответ, с другим телом — 409. Неуспешные операции ключ не занимают.
-Отчёты агента дополнительно требуют `event_id` и актуальный `lease_id`:
-повтор `(task_id, event_id)` не добавляет событие. Init-код действует 10 минут,
+Отчёты агента дополнительно требуют `event_id` и актуальный `lease_id`: повтор `(task_id, event_id)` не добавляет событие. Init-код действует 10 минут,
 привязан к проекту и используется один раз; agent_token возвращается при init.
 Коды и токены не включаются в карточки, списки, ошибки и логи.
 Реализованные GET-списки проектов и агентов принимают `offset` (по умолчанию 0)
@@ -67,9 +63,7 @@ Login, создание проектов, init-токенов и `/harness/init`
 | POST `/api/v1/tasks/{id}/result/decision` | Admin | ResultDecisionRequest | 200 TaskResponse | 401, 403, 404, 409, 422 |
 
 `active_task_count` считает choosing/planning/active/testing.
-ProjectResponse для списка, карточки и создания содержит `active_task_count`, массив текущих `agents`,
-`init_code_expires_at` (nullable, дата и время истечения активного init-кода),
-`telegram_chat_id`, `created_at` и `updated_at`. AgentResponse содержит `project_id`,
+ProjectResponse для списка, карточки и создания содержит `active_task_count`, массив текущих `agents`, `init_code_expires_at` (nullable, дата и время истечения активного init-кода), `telegram_chat_id`, `created_at` и `updated_at`. AgentResponse содержит `project_id`,
 `repository_path_hint`, `created_at` и `updated_at`. LoginResponse содержит `expires_in`
 в секундах. TaskResponse — события по времени
 создания и снимки skills. В списке задач допустим фильтр `status` из TaskStatus.
@@ -78,8 +72,7 @@ ProjectResponse для списка, карточки и создания сод
 PATCH возвращает stalled в new; остальные переходы проверяются по матрице.
 `publish` разрешает публикацию, `rework` возвращает в active и требует feedback,
 `keep_ready` оставляет ready. `merged` выставляет только сервер по решению Admin.
-Решение о публикации и замечания к результату сохраняются через события;
-`result_feedback` и `publication_requested` в execution-state вычисляются из них.
+Решение о публикации и замечания к результату сохраняются через события; `result_feedback` и `publication_requested` в execution-state вычисляются из них.
 
 ## Skills
 
@@ -119,8 +112,7 @@ SkillPatch также принимает `is_active`. Подозрительно
 | POST `/api/v1/tasks/{id}/publication-result` | Agent | PublicationResultRequest | 200 ReportResponse | 401, 403, 404, 409, 422 |
 | POST `/api/v1/tasks/{id}/fail` | Agent | FailRequest | 200 ReportResponse | 401, 403, 404, 409, 422 |
 
-Claim без задач → 204 без тела. При успехе lease находится в task и в полях
-`lease_id`, `lease_expires_at` ответа.
+Claim без задач → 204 без тела. При успехе lease находится в task и в полях `lease_id`, `lease_expires_at` ответа.
 `/harness/init` принимает `init_code` в JSON теле и возвращает `skills: []` для нового
 агента. Назначения выполняются администратором явно. URL `git_remote` с credentials
 отклоняется с 422 в формате `ValidationErrorResponse`. `server_url` в ответе Harness
@@ -130,11 +122,18 @@ Heartbeat без задачи → `{"task_id":null,"lease_id":null}`; оба п�
 либо UUID, смешанная пара — 422. TTL аренды — 60 секунд, poll — 5 секунд.
 Skills sync возвращает полный текущий набор включённых активных файлов с `name`;
 отсутствующие удаляются. Истечение аренды проверяется при обращении и каждые 5 секунд.
-Execution-state требует query `lease_id: UUID`, проверяемый как в отчётах.
-Execution-state также возвращает `checkpoint`. Events с `event_type=planning|testing`
+Execution-state требует query `lease_id: UUID`, проверяемый как в отчётах, и возвращает `checkpoint`. Events с `event_type=planning|testing`
 двигают этап; серверные типы событий и смена статуса через payload запрещены.
 Publication-result записывает событие после publish, сохраняя merged даже при ошибке.
 Fail и publication-result освобождают агента; ожидание решений сохраняет аренду.
+В отчётах verification преобразуется в `claims` с `source:"agent_reported"`;
+это утверждения агента, сервер не проверяет Git и не использует claims для статуса/приёмки.
+В claims разрешены base_sha/head_sha (40 hex/null), commits (≤100 SHA либо `{sha,subject}`,
+subject ≤200 символов), status (`{code,path,ignored}`), diff_name_only, worktree_clean.
+Пути относительные, без `..`, абсолютных путей, `.env*`, `.secrets` и других защищённых файлов.
+Неизвестные поля claims отбрасываются; некорректные SHA/пути/лимиты дают 422.
+commit_sha (40 hex/null) сохраняется независимо от наличия verification/claims.
+Схема полей: [git-claims.json](api-schemas/git-claims.json).
 
 ## Ошибки
 

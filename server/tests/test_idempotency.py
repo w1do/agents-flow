@@ -53,7 +53,10 @@ async def test_event_id_deduplicates_all_reports(flow, kind, status, fields):
     assert first.status_code == repeated.status_code == 200
     assert first.json() == repeated.json()
     card = (await flow.send("GET", f"/tasks/{task.id}")).json()
-    assert len(card["events"]) == 1 and card["events"][0]["event_id"] == "event-1"
+    reports = [event for event in card["events"] if event["event_id"] == "event-1"]
+    assert len(reports) == 1
+    assert [event["event_type"] for event in card["events"]] == (
+        ["verification_missing", "result"] if kind == "result" else [kind if kind != "events" else "progress"])
 
 
 async def test_decision_replay_does_not_increment_twice_and_scope_is_per_endpoint(flow):

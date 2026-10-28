@@ -49,8 +49,12 @@ def test_testing_runs_real_skill_command_and_preserves_previous_result(task_inpu
     assert (tmp_path / "proof.txt").read_text() == "checked"
     report = events[0]
     assert report == {"type": "test_result", "command": command, "exit_code": 0, "summary": "passed"}
-    assert events[-1]["result_data"] == {
-        "changed_paths": [STUB_FILE], "implementation": "kept", "checks_run": 1, "checks_passed": True}
+    data = events[-1]["result_data"]
+    assert data["changed_paths"] == ["proof.txt", STUB_FILE]
+    assert data["implementation"] == "kept"
+    assert data["checks_run"] == 1 and data["checks_passed"] is True
+    assert data["verification"]["head_sha"] == data["base_sha"]
+    assert data["verification"]["worktree_clean"] is False
 
 
 @pytest.mark.usefixtures("requires_bwrap")

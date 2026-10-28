@@ -9,6 +9,9 @@ import (
 )
 
 func (e *Engine) Run(ctx context.Context) error {
+	if err := e.cfg.CheckUnchanged(); err != nil {
+		return err
+	}
 	j, err := openJournal(ctx, e.cfg.WorkspacePath)
 	if err != nil {
 		return err
@@ -59,6 +62,9 @@ func (e *Engine) Run(ctx context.Context) error {
 }
 
 func (e *Engine) acquire(ctx context.Context) (bool, error) {
+	if err := e.cfg.CheckUnchanged(); err != nil {
+		return false, err
+	}
 	if e.state.ClaimKey == "" {
 		if err := e.retry(ctx, func() error { return e.skills.Sync(ctx) }); err != nil {
 			return false, err

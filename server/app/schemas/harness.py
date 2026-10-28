@@ -1,4 +1,4 @@
-from typing import Annotated, Literal
+from typing import Annotated
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, StringConstraints, field_validator
@@ -29,8 +29,8 @@ class HarnessInitResponse(BaseModel):
     agent_id: UUID
     agent_token: str = Field(repr=False)
     server_url: str
-    poll_interval_seconds: Literal[5] = 5
-    lease_ttl_seconds: Literal[60] = 60
+    poll_interval_seconds: int = Field(default=5, gt=0)
+    lease_ttl_seconds: int = Field(default=60, gt=0)
     skills: list[SkillFile]
 
     @field_validator("server_url")

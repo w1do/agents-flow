@@ -37,8 +37,8 @@
         "agent_id": {"type": "string", "format": "uuid"},
         "agent_token": {"type": "string"},
         "server_url": {"type": "string", "format": "uri"},
-        "poll_interval_seconds": {"const": 5},
-        "lease_ttl_seconds": {"const": 60},
+        "poll_interval_seconds": {"type": "integer", "minimum": 1, "default": 5},
+        "lease_ttl_seconds": {"type": "integer", "minimum": 1, "default": 60},
         "skills": {"type": "array", "items": {"$ref": "harness.json#/$defs/SkillFile"}}
       }
     },

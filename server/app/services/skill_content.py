@@ -3,6 +3,8 @@ import re
 import unicodedata
 from hashlib import sha256
 
+from app.services.protected_paths import redact_paths
+
 _PATTERNS = {
     "private_key": r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z0-9 ]*PRIVATE KEY-----|$)",
     "github_token": r"(?<!\w)(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})(?!\w)",
@@ -27,6 +29,7 @@ def contains_secret(value: str) -> bool:
 
 
 def redact(content: str) -> str:
+    content = redact_paths(content)
     for pattern in _PATTERNS.values():
         content = re.sub(pattern, "[REDACTED]", content)
     return content
