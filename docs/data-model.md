@@ -26,7 +26,10 @@ idempotency_keys
 | password_hash | text | bcrypt/argon2 |
 | created_at | timestamptz | |
 
-Первый администратор создаётся из `ADMIN_EMAIL` / `ADMIN_PASSWORD` при старте.
+Администратор создаётся вручную командой `python -m app.console create-admin`
+(пароль ≥12 символов и ≤72 байт UTF-8, email из `--email` или `ADMIN_EMAIL`).
+Автоматического создания при старте сервера нет; пароль приходит из файла
+`.secrets/admin_password` или из скрытого ввода терминала.
 
 ## projects
 
@@ -122,7 +125,9 @@ idempotency_keys
 `id` UUID, `task_id`, `agent_id` nullable, `event_type`, `message`,
 `payload` jsonb nullable, `created_at`, `event_id` text nullable.
 Уникальность `(task_id, event_id)`; несколько NULL разрешены.
-Только добавление на уровне сервисов (этап 5.8); базовый репозиторий пока имеет CRUD.
+События только добавляются: запись идёт через `TaskHistory.append`
+(`server/app/repositories/task_history.py`), время следующего события не
+раньше предыдущего. Обновления и удаления событий в коде нет.
 
 ## idempotency_keys
 
@@ -146,5 +151,11 @@ task.status=new, plan_decision=pending, plan_revision=0, skill.version=1,
 is_active=true, enabled=true, sort_order=0; assigned_at имеет default now().
 last_heartbeat_at, completed_at, result_data и checkpoint допускают NULL до появления данных.
 Остальные не помеченные nullable поля обязательны, включая описания skills/категорий.
-JSON-поля: JSONB на PostgreSQL, JSON на SQLite. Тесты SQLite включают FK;
-конкурентная аренда с SKIP LOCKED реализуется и проверяется отдельно на этапе 5.3.
+JSON-поля: JSONB на PostgreSQL, JSON на SQLite. Тесты SQLite включают FK.
+
+Аренда задач реализована: выборка идёт с `FOR UPDATE SKIP LOCKED`
+(`server/app/repositories/task.py`). На SQLite параллельная аренда проверяется
+последовательно — две последовательные попытки дают одну задачу; на
+PostgreSQL два параллельных claim проверяются тестом
+`test_two_parallel_claims_postgresql`, который включается при `TEST_DATABASE_URL`
+с `postgresql`. Аренда живёт TTL 60 с и продлевается heartbeat.

@@ -1,8 +1,8 @@
 # Telegram и транскрибация: группа 7 change `agents-flow-mvp`
 
 Дата: 2026-10-27. Worktree: `/home/dev/agents-server-g7`, ветка
-`feature/mvp-group-7` (в `main` не слита, коммитов нет — весь объём
-в рабочем дереве).
+`feature/mvp-group-7` (влита в `main` merge-коммитом `fc5dcef` после коммита
+реализации `2076a80`).
 
 ## Запрос
 
