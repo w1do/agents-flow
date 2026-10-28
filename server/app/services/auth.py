@@ -16,6 +16,12 @@ from app.repositories.user import UserRepository
 _bootstrap_lock = Lock()
 
 
+def validate_admin_password(password: str) -> str:
+    if len(password) < 12 or not password.strip() or len(password.encode("utf-8")) > 72:
+        raise ValueError("Administrator password must contain at least 12 characters and at most 72 UTF-8 bytes.")
+    return password
+
+
 def ensure_initial_admin(session: Session, settings: Settings | None = None) -> None:
     settings = settings or get_settings()
     with _bootstrap_lock:
@@ -28,13 +34,13 @@ def ensure_initial_admin(session: Session, settings: Settings | None = None) -> 
         elif dialect == "postgresql":
             session.execute(text("SELECT pg_advisory_xact_lock(7319042281)"))
         users = UserRepository(session)
-        if users.has_users() or not (settings.admin_email and settings.admin_password):
+        password = settings.admin_password.get_secret_value() if settings.admin_password else ""
+        if users.has_users() or not settings.admin_email or not password:
             return
+        validate_admin_password(password)
         try:
             with session.begin_nested():
-                users.create(email=settings.admin_email, password_hash=hash_password(
-                    settings.admin_password.get_secret_value(),
-                ))
+                users.create(email=settings.admin_email, password_hash=hash_password(password))
         except IntegrityError:
             session.expire_all()
             if not UserRepository(session).has_users():

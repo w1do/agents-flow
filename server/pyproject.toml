@@ -9,8 +9,10 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi", "uvicorn", "sqlalchemy>=2,<3", "alembic", "psycopg[binary]",
     "pydantic>=2,<3", "pydantic-settings", "pyjwt", "bcrypt", "httpx", "mcp==2.3.0",
-    "pytest", "pytest-asyncio",
 ]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio"]
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parents[2] / ".env",
         env_file_encoding="utf-8",
+        secrets_dir="/run/secrets" if Path("/run/secrets").is_dir() else None,
         extra="ignore",
         hide_input_in_errors=True,
     )
@@ -48,6 +49,19 @@ class Settings(BaseSettings):
             except ValueError as error:
                 raise ValueError("TRUSTED_PROXY_IPS must contain only valid IPs or CIDRs") from error
         return values
+
+
+class DatabaseSettings(BaseSettings):
+    """Migration database configuration, independent of application JWT settings."""
+
+    model_config = SettingsConfigDict(
+        env_file=Path(__file__).resolve().parents[2] / ".env",
+        env_file_encoding="utf-8",
+        secrets_dir="/run/secrets" if Path("/run/secrets").is_dir() else None,
+        extra="ignore",
+    )
+
+    database_url: str = Field(min_length=1, repr=False)
 
 
 @lru_cache

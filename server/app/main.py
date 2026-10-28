@@ -13,16 +13,11 @@ from app.mcp.tools import create_server
 from app.mcp.transport import AgentTokenMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.schemas.health import HealthResponse
-from app.services.auth import ensure_initial_admin
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
-    from app.core.db import SessionLocal
-
     settings = get_settings()
     application.state.settings = settings
-    with SessionLocal.begin() as session:
-        ensure_initial_admin(session, settings)
     from app.services.lease_expiry import monitor, stop_monitor
 
     expiry_task = asyncio.create_task(monitor())
@@ -35,6 +30,7 @@ async def lifespan(application: FastAPI):
         async with AsyncExitStack() as stack:
             await stack.enter_async_context(transport.app.router.lifespan_context(transport.app))
             if hasattr(application.state, "telegram"):
+                from app.core.db import SessionLocal
                 from app.services.notification_events import running
 
                 await stack.enter_async_context(running(application.state.telegram, SessionLocal.kw["bind"]))
