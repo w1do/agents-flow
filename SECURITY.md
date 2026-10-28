@@ -42,3 +42,20 @@ transport-программы из конфигурации репозитори�
   Git-утверждения сохраняются только как `agent_reported`, включая флаги конфликта индекса.
 
 Подробности sandbox, redaction и остаточных рисков: [runner/SECURITY.md](runner/SECURITY.md).
+
+## Известные ограничения группы 12
+
+- **Гонка HEAD.** Враждебный внешний писатель между чтением `head_sha` и `log`
+  может дать несогласованную `verification` при `success: true`
+  (`runner/runner/git_facts.py`). Нужен эксклюзивный worktree, см.
+  [runner/SECURITY.md](runner/SECURITY.md).
+- **Управляющее исключение.** Резервный 500 в
+  `server/app/middleware/security_headers.py` теряет тип
+  `SystemExit`/`KeyboardInterrupt`; утечки секрета нет.
+- **Подавление диагностики.** После коммита часть ошибок не поднимается
+  намеренно: `success: true` не доказывает исправность индекса, сбой виден по
+  флагам `cleanup_failed` / `stale_index` / `index_conflict`.
+- **Go не проверен запуском.** Тулчейна нет в системе; правки `harness/`
+  проверены только чтением кода и статически.
+
+Решение и проверки: [docs/decisions/2026-10-28-agents-flow-mvp-group-12.md](docs/decisions/2026-10-28-agents-flow-mvp-group-12.md).

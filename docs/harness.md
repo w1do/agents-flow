@@ -135,13 +135,11 @@ O_NOFOLLOW и атомарной замене относительно откр�
   его с `git diff` или `git status`**. Это известное ограничение MVP:
   достоверность списка держится на дисциплине skills, а не на проверке.
 
-Ограничение реализации: отдельного шага `git commit` в коде runner нет —
-git-команды приходят только из skills публикации, а команды skills выполняются
-в изолированной копии worktree, где `.git` исключён
-(`runner/runner/safe_fs.py`, `sandbox_paths.py`). Поэтому для реального
-коммита нужен runner, который коммитит до отчёта, либо skill, выполняющий
-git вне такой копии; сквозной прогон 12.1 шёл с внешним stub-runner, который
-коммитил сам. Вопрос открыт до отдельного решения.
+Раннер создаёт коммит сам в приватном индексе (`GIT_INDEX_FILE`) и отдаёт
+`result_data.verification`: base/head sha, commits, status, changed_paths,
+worktree_clean. Сервер принимает эти сведения только как claims с
+`source: "agent_reported"`. Решение и проверки:
+[2026-10-28-agents-flow-mvp-group-12.md](decisions/2026-10-28-agents-flow-mvp-group-12.md).
 
 ## Восстановление и ошибки
 

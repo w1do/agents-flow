@@ -37,3 +37,4 @@
 - [2026-10-27 — Telegram и транскрибация: группа 7](2026-10-27-agents-flow-mvp-group-7.md)
 - [2026-10-27 — Harness: группа 8](2026-10-27-agents-flow-mvp-group-8.md)
 - [2026-10-28 — Runner, панель, деплой, приёмка: группы 9–12](2026-10-28-agents-flow-mvp-groups-9-12.md)
+- [2026-10-28 — Коммит runner и проверяемые claims: группа 12](2026-10-28-agents-flow-mvp-group-12.md)
