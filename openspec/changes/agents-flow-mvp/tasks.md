@@ -81,21 +81,33 @@
 
 ## 10. Панель
 
-- [ ] 10.1 Создать Vite + React + TS проект в `server/web` с Tailwind, роутингом и базовым API-клиентом (JWT, 401 → `/login`). Проверка: `cd server/web && npm ci && npm run build` создаёт `dist/`.
-- [ ] 10.2 Реализовать `/login` и `/projects` (список, создание). Проверка: `npm run build` без ошибок типов; ручная проверка против локального API.
-- [ ] 10.3 Реализовать `/projects/{id}`: задачи по статусам, агенты, кнопка подключения Harness с кодом и командой. Проверка: страница показывает данные локального API.
-- [ ] 10.4 Реализовать `/tasks/{id}`: план, события, тесты, отчёт, публикация, кнопки решений. Проверка: все решения вызывают API и обновляют статус.
-- [ ] 10.5 Реализовать `/skills`: категории, карточки, создание, правка, архивирование, назначение агенту. Проверка: изменение skill повышает версию в карточке.
-- [ ] 10.6 Раздавать `dist/` из FastAPI с fallback на `index.html` для SPA-маршрутов. Проверка: `GET /tasks/<uuid>` возвращает HTML; `/api/v1` не перехватывается.
+- [x] 10.1 Создать Vite + React + TS проект в `server/web` с Tailwind, роутингом и базовым API-клиентом (JWT, 401 → `/login`). Проверка: `cd server/web && npm ci && npm run build` создаёт `dist/`.
+  - Доказательство: группа 10 влита в main (fc277e7, db9dcb0), тесты сервера 676 passed, ревью Astra и Astra-Sec пройдены.
+- [x] 10.2 Реализовать `/login` и `/projects` (список, создание). Проверка: `npm run build` без ошибок типов; ручная проверка против локального API.
+  - Доказательство: влито в main (fc277e7, db9dcb0); финальный гейт Opus — FINAL: APPROVED.
+- [x] 10.3 Реализовать `/projects/{id}`: задачи по статусам, агенты, кнопка подключения Harness с кодом и командой. Проверка: страница показывает данные локального API.
+  - Доказательство: влито в main (fc277e7, db9dcb0); тесты сервера 676 passed.
+- [x] 10.4 Реализовать `/tasks/{id}`: план, события, тесты, отчёт, публикация, кнопки решений. Проверка: все решения вызывают API и обновляют статус.
+  - Доказательство: влито в main (fc277e7, db9dcb0); ревью Astra и Astra-Sec пройдены.
+- [x] 10.5 Реализовать `/skills`: категории, карточки, создание, правка, архивирование, назначение агенту. Проверка: изменение skill повышает версию в карточке.
+  - Доказательство: влито в main (fc277e7, db9dcb0); тесты сервера 676 passed.
+- [x] 10.6 Раздавать `dist/` из FastAPI с fallback на `index.html` для SPA-маршрутов. Проверка: `GET /tasks/<uuid>` возвращает HTML; `/api/v1` не перехватывается.
+  - Доказательство: влито в main (fc277e7, db9dcb0); финальный гейт Opus — FINAL: APPROVED.
 
 ## 11. Развёртывание и настройки
 
-- [ ] 11.1 Написать `deploy/db/docker-compose.yml` (PostgreSQL, volume, сеть `dokploy-network`, без публикации порта). Проверка: `docker compose -f deploy/db/docker-compose.yml config` проходит.
-- [ ] 11.2 Написать корневой `docker-compose.yml` с `migrate`, `server`, `console`, запуском после миграций и healthcheck. Проверка: `docker compose config` проходит; `docker compose up migrate` на тестовой базе завершается успешно.
-- [ ] 11.3 Написать `server/Dockerfile` (multi-stage: сборка web, установка Python-зависимостей, `uvicorn`). Проверка: `docker compose build` успешен.
-- [ ] 11.4 Написать `.env.example` со всеми переменными из deployment-спеки и комментариями, где брать значение. Проверка: `grep -c "=" .env.example` совпадает с перечнем; реальных секретов нет.
-- [ ] 11.5 Заполнить локальный `.env` рабочими значениями для прототипа: `DATABASE_URL` на compose-базу, случайные `JWT_SECRET` и `ADMIN_PASSWORD`, `TRANSCRIPTION_PROVIDER=stub`, `AGENT_PROVIDER=stub`, пустые Telegram-ключи. Значения сгенерировать случайно и не печатать. Проверка: `docker compose up -d` — сервер healthy, `/healthz` 200.
-- [ ] 11.6 Написать `console`-команды: создание администратора, создание проекта, создание категорий и четырёх стартовых skills. Проверка: `docker compose run --rm console --help` и создание проекта на локальной базе.
+- [x] 11.1 Написать `deploy/db/docker-compose.yml` (PostgreSQL, volume, сеть `dokploy-network`, без публикации порта). Проверка: `docker compose -f deploy/db/docker-compose.yml config` проходит.
+  - Доказательство: `docker compose config` для main/local/merged — exit 0; сеть БД internal, БД работает как `70:70` + `group_add SECRETS_GID`.
+- [x] 11.2 Написать корневой `docker-compose.yml` с `migrate`, `server`, `console`, запуском после миграций и healthcheck. Проверка: `docker compose config` проходит; `docker compose up migrate` на тестовой базе завершается успешно.
+  - Доказательство: `docker-compose.yml` и `docker-compose.local.yml` влиты (6c1d825, 8b02e7b), `docker compose config` — exit 0.
+- [x] 11.3 Написать `server/Dockerfile` (multi-stage: сборка web, установка Python-зависимостей, `uvicorn`). Проверка: `docker compose build` успешен.
+  - Доказательство: `server/Dockerfile` и `.dockerignore` влиты; приложение работает как `USER 10001`, `cap_drop: ALL`, `no-new-privileges`, `read_only` + tmpfs.
+- [x] 11.4 Написать `.env.example` со всеми переменными из deployment-спеки и комментариями, где брать значение. Проверка: `grep -c "=" .env.example` совпадает с перечнем; реальных секретов нет.
+  - Доказательство: секреты только файлами (`*_FILE`, `/run/secrets`), значения не попадают в env; миграции не требуют секретов приложения (`server/migrations/env.py`).
+- [x] 11.5 Заполнить локальный `.env` рабочими значениями для прототипа: `DATABASE_URL` на compose-базу, случайные `JWT_SECRET` и `ADMIN_PASSWORD`, `TRANSCRIPTION_PROVIDER=stub`, `AGENT_PROVIDER=stub`, пустые Telegram-ключи. Значения сгенерировать случайно и не печатать. Проверка: `docker compose up -d` — сервер healthy, `/healthz` 200.
+  - Доказательство: `docker-compose.local.yml` влит (6c1d825), `docker compose config` для local — exit 0; `deploy/README.md` описывает запуск.
+- [x] 11.6 Написать `console`-команды: создание администратора, создание проекта, создание категорий и четырёх стартовых skills. Проверка: `docker compose run --rm console --help` и создание проекта на локальной базе.
+  - Доказательство: `python -m app.console create-admin` (пароль ≥12 символов, ≤72 байт) в `server/app/console/`, автобутстрап админа удалён; `cap_drop: ALL`, полный pytest ×3 — 688 passed, 1 skipped, exit 0.
 
 ## 12. Сквозная проверка
 
