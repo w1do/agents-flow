@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:16-alpine
+    user: "70:70"
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-agents_flow}
+      POSTGRES_USER: ${POSTGRES_USER:-agents_flow}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    group_add: ["${SECRETS_GID:-1000}"]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      database-private:
+        aliases: [agents-flow-db]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+      - /run/postgresql:rw,noexec,nosuid,size=16m
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+
+secrets:
+  postgres_password:
+    file: ${SECRETS_DIR:-../../.secrets}/postgres_password
+
+volumes:
+  postgres-data:
+    name: ${POSTGRES_VOLUME_NAME:-agents-flow-postgres-data}
+
+networks:
+  database-private:
+    name: agents-flow-database-private
+    internal: true

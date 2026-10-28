@@ -1,0 +1,65 @@
+# Local overlay for docker-compose.yml. Combine both files to start the app;
+# this file also defines image/build for standalone `docker compose config`.
+services:
+  db:
+    image: postgres:16-alpine
+    user: "70:70"
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-agents_flow}
+      POSTGRES_USER: ${POSTGRES_USER:-agents_flow}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    group_add: ["${SECRETS_GID:-1000}"]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [database-private]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+      - /run/postgresql:rw,noexec,nosuid,size=16m
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+
+  migrate:
+    image: ${SERVER_IMAGE:-agents-flow-server:local}
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [database-private]
+
+  console:
+    image: ${SERVER_IMAGE:-agents-flow-server:local}
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    networks: [database-private]
+
+secrets:
+  postgres_password:
+    file: ${SECRETS_DIR:-./.secrets}/postgres_password
+
+volumes:
+  postgres-data:
+    name: ${POSTGRES_VOLUME_NAME:-agents-flow-postgres-data}
+
+networks:
+  dokploy-network:
+    name: agents-flow-local-app
+    external: false
+  database-private:
+    name: agents-flow-local-db
+    internal: true
+    external: false

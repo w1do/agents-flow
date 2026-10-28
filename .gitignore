@@ -3,6 +3,7 @@
 .env
 .env.*
 !.env.example
+.secrets/
 workflow/.agent-token
 __pycache__/
 *.pyc

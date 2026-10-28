@@ -1,9 +1,12 @@
 from secrets import token_urlsafe
+from pathlib import Path
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from pydantic import ValidationError
 
-from app.core.config import Settings
+from app.core.config import DatabaseSettings, Settings
 
 
 def test_required_settings(monkeypatch):
@@ -12,6 +15,18 @@ def test_required_settings(monkeypatch):
     with pytest.raises(ValidationError) as error:
         Settings(_env_file=None)
     assert {item["loc"] for item in error.value.errors()} == {("database_url",), ("jwt_secret",)}
+
+
+def test_alembic_reads_database_url_from_standard_dotenv(tmp_path, monkeypatch):
+    env_file = tmp_path / ".env"
+    database_path = tmp_path / "migration.db"
+    env_file.write_text(f"DATABASE_URL=sqlite+pysqlite:///{database_path}\n", encoding="utf-8")
+    monkeypatch.setitem(DatabaseSettings.model_config, "env_file", env_file)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("JWT_SECRET", raising=False)
+    config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    command.upgrade(config, "head")
+    assert database_path.is_file()
 
 
 def test_secrets_are_hidden_and_integrations_optional(monkeypatch):

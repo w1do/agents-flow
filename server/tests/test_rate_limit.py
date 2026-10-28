@@ -1,7 +1,10 @@
 from concurrent.futures import ThreadPoolExecutor
 
+from fastapi import Request
+
 from app.api import rate_limit
 from app.api.rate_limit import LoginRateLimiter
+from app.api.proxy import client_ip
 
 
 def test_concurrent_acquire_reserves_only_allowed_attempts():
@@ -75,6 +78,16 @@ def test_reset_keeps_ip_budget():
     assert limiter.acquire("other@example.test", "192.0.2.1")
     limiter.reset("success@example.test", "192.0.2.1")
     assert not limiter.acquire("another@example.test", "192.0.2.1")
+
+
+def test_forwarded_chain_preserves_trusted_ipv4_and_ipv6_networks(monkeypatch):
+    request = Request({
+        "type": "http", "method": "GET", "path": "/", "headers": [
+            (b"x-forwarded-for", b"198.51.100.7, 2001:db8::2"),
+        ], "client": ("192.0.2.3", 1234), "scheme": "http", "server": ("test", 80),
+        "query_string": b"",
+    })
+    assert client_ip(request, ["192.0.2.0/24", "2001:db8::/32"]) == "198.51.100.7"
 
 
 def test_equivalent_ipv6_addresses_share_budget():
