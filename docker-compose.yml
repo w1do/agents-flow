@@ -1,0 +1,108 @@
+services:
+  migrate:
+    image: ${SERVER_IMAGE:-agents-flow-server:local}
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    command: [alembic, upgrade, head]
+    restart: "no"
+    secrets: [database_url]
+    group_add: ["${SECRETS_GID:-1000}"]
+    networks: [dokploy-network, database-private]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+
+  server:
+    image: ${SERVER_IMAGE:-agents-flow-server:local}
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    environment:
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      TRANSCRIPTION_PROVIDER: ${TRANSCRIPTION_PROVIDER:-stub}
+      TRANSCRIPTION_MODEL: ${TRANSCRIPTION_MODEL:-whisper-1}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8000}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      AGENT_PROVIDER: ${AGENT_PROVIDER:-stub}
+      AGENT_MODEL: ${AGENT_MODEL:-}
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-[]}
+    secrets:
+      - database_url
+      - jwt_secret
+      - admin_password
+      - telegram_bot_token
+      - telegram_webhook_secret
+      - transcription_api_key
+      - openai_api_key
+    group_add: ["${SECRETS_GID:-1000}"]
+    networks: [dokploy-network, database-private]
+    ports:
+      - "${SERVER_BIND_ADDRESS:-127.0.0.1}:${SERVER_PORT:-8000}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+
+  console:
+    image: ${SERVER_IMAGE:-agents-flow-server:local}
+    profiles: [tools]
+    entrypoint: [python, -m, app.console]
+    command: [--help]
+    environment:
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+    secrets: [database_url, jwt_secret, admin_password]
+    group_add: ["${SECRETS_GID:-1000}"]
+    networks: [dokploy-network, database-private]
+    stdin_open: true
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+
+secrets:
+  database_url:
+    file: ${SECRETS_DIR:-./.secrets}/database_url
+  jwt_secret:
+    file: ${SECRETS_DIR:-./.secrets}/jwt_secret
+  admin_password:
+    file: ${SECRETS_DIR:-./.secrets}/admin_password
+  telegram_bot_token:
+    file: ${SECRETS_DIR:-./.secrets}/telegram_bot_token
+  telegram_webhook_secret:
+    file: ${SECRETS_DIR:-./.secrets}/telegram_webhook_secret
+  transcription_api_key:
+    file: ${SECRETS_DIR:-./.secrets}/transcription_api_key
+  openai_api_key:
+    file: ${SECRETS_DIR:-./.secrets}/openai_api_key
+
+networks:
+  dokploy-network:
+    external: true
+    name: dokploy-network
+  database-private:
+    external: true
+    name: agents-flow-database-private

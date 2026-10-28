@@ -7,6 +7,8 @@ from time import monotonic
 from fastapi import HTTPException, Request
 
 from app.api.rate_window import RateWindow
+from app.api.proxy import client_ip
+from app.core.config import get_settings
 from app.schemas.auth import LoginRequest
 
 
@@ -127,7 +129,7 @@ class LoginLimit:
 
 
 def login_rate_limit(request: Request, body: LoginRequest) -> LoginLimit:
-    ip = request.client.host if request.client else "unknown"
+    ip = client_ip(request, get_settings().trusted_proxy_ips)
     if not login_limiter.acquire(body.email, ip):
         retry_after = login_limiter.retry_after(body.email, ip)
         raise HTTPException(429, "Too Many Requests", headers={"Retry-After": str(retry_after)})
