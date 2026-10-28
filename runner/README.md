@@ -74,15 +74,20 @@ Checkpoint продолжает входной объект, отражая за
 - Коммит делает runner на этапе publication: изменение фиксируется в ветке
   `task/<task_id>` до отчёта `result`, чтобы опубликованное состояние было
   воспроизводимым. Публикация запускается только после решения `publish`.
-- `result_data.changed_paths` — **заявленные** пути. Runner перечисляет в нём
-  файлы, которые, по его данным, изменил; сервер сохраняет список как есть и
-  не сверяет его с `git diff`/`git status`. Это известное ограничение MVP.
-- Ограничение реализации: собственного шага `git commit` в коде runner нет,
-  git-команды берутся из skills этапа publication, а команды skills
-  выполняются в изолированной копии worktree без `.git` (см. `safe_fs.py`,
-  `sandbox_paths.py`). Для реального коммита нужен runner, который коммитит до
-  отчёта, либо команда git вне такой копии. Сквозной прогон 12.1 использовал
-  внешний stub-runner, который коммитил сам.
+- `result_data.changed_paths` — **заявленные** пути. На publication runner берёт
+  их из диффа созданного коммита (`diff-tree`, `git_commit.py`), но для сервера
+  это по-прежнему утверждение агента, а не доверенный факт: проверяется только
+  схема ([git-claims.json](../docs/api-schemas/git-claims.json)), на статус и
+  приёмку пути не влияют. Решение —
+  [2026-10-28-agents-flow-mvp-group-12.md](../docs/decisions/2026-10-28-agents-flow-mvp-group-12.md).
+- Коммит делает сам runner в хостовом worktree после успешной publication
+  (`git_commit.py`), а не команды skills: команды по-прежнему идут в
+  изолированной копии без `.git`. Staging, проверка путей и `commit` работают
+  через приватный `GIT_INDEX_FILE`, реальный индекс не меняется.
+- В `result_data.verification` runner отдаёт `base_sha`, `head_sha`, `commits`,
+  `status`, `diff_name_only` и `worktree_clean`. Сервер принимает их как
+  claims с `source: "agent_reported"`; на статус и приёмку они не влияют.
+  Подробнее — [2026-10-28-agents-flow-mvp-group-12.md](../docs/decisions/2026-10-28-agents-flow-mvp-group-12.md).
 
 ## Stub и команды skills
 
