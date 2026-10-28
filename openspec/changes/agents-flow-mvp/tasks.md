@@ -63,14 +63,14 @@
 
 ## 8. Harness
 
-- [ ] 8.1 Реализовать разбор команд `init` и `run`, чтение `workflow/config.yaml` и `.agent-token`. Проверка: `cd harness && go build ./...` и `go test ./internal/config/...`.
-- [ ] 8.2 Реализовать `init`: поиск Git-корня, чтение remote, `POST /harness/init`, создание только `workflow/` с `config.yaml`, `.gitignore`, `.agent-token` (0600) и skills. Проверка: `go test ./internal/...` с httptest-сервером; отдельно — запуск в тестовом репозитории даёт ожидаемое дерево, `.agent-token` не виден в `git status`.
-- [ ] 8.3 Реализовать API-клиент сервера с agent-токеном и повторами с backoff. Проверка: `go test ./internal/api/...` — таймаут и 5xx повторяются, 4xx нет.
-- [ ] 8.4 Реализовать синхронизацию skills: скачивание новых, обновление изменённых, удаление снятых, без изменений во время активной задачи. Проверка: `go test ./internal/skills/...`.
-- [ ] 8.5 Реализовать claim быстрее интервала опроса, проверку «занят» и пустой ответ, heartbeat в отдельной горутине. Проверка: `go test ./internal/leases/...`.
-- [ ] 8.6 Реализовать создание и повторное использование worktree на ветке `task/<id>` без изменений основной копии. Проверка: `go test ./internal/workspace/...` на временном репозитории; основная ветка и файлы не меняются.
-- [ ] 8.7 Реализовать цикл `run`: этапы, передача JSON в runner, чтение событий, ожидание решений, передача skills публикации только после `publish`. Проверка: `go test ./internal/agent/...` с фейковым runner-процессом; все этапы отрабатывают.
-- [ ] 8.8 Убедиться, что в `harness/` нет команд сборки, тестов проекта, push, GitHub/GitLab, Dokploy. Проверка: `grep -rniE "dokploy|git push|github|gitlab|npm |pytest " harness/` не находит вхождений в коде.
+- [x] 8.1 Реализовать разбор команд `init` и `run`, чтение `workflow/config.yaml` и `.agent-token`. Проверка: `cd harness && go build ./...` и `go test ./internal/config/...`.
+- [x] 8.2 Реализовать `init`: поиск Git-корня, чтение remote, `POST /harness/init`, создание только `workflow/` с `config.yaml`, `.gitignore`, `.agent-token` (0600) и skills. Проверка: `go test ./internal/...` с httptest-сервером; отдельно — запуск в тестовом репозитории даёт ожидаемое дерево, `.agent-token` не виден в `git status`.
+- [x] 8.3 Реализовать API-клиент сервера с agent-токеном и повторами с backoff. Проверка: `go test ./internal/api/...` — таймаут и 5xx повторяются, 4xx нет.
+- [x] 8.4 Реализовать синхронизацию skills: скачивание новых, обновление изменённых, удаление снятых, без изменений во время активной задачи. Проверка: `go test ./internal/skills/...`.
+- [x] 8.5 Реализовать claim быстрее интервала опроса, проверку «занят» и пустой ответ, heartbeat в отдельной горутине. Проверка: `go test ./internal/leases/...`.
+- [x] 8.6 Реализовать создание и повторное использование worktree на ветке `task/<id>` без изменений основной копии. Проверка: `go test ./internal/workspace/...` на временном репозитории; основная ветка и файлы не меняются.
+- [x] 8.7 Реализовать цикл `run`: этапы, передача JSON в runner, чтение событий, ожидание решений, передача skills публикации только после `publish`. Проверка: `go test ./internal/agent/...` с фейковым runner-процессом; все этапы отрабатывают.
+- [x] 8.8 Убедиться, что в `harness/` нет команд сборки, тестов проекта, push, GitHub/GitLab, Dokploy. Проверка: `grep -rniE "dokploy|git push|github|gitlab|npm |pytest " harness/` не находит вхождений в коде.
 
 ## 9. Runner агента
 
