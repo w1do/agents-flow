@@ -17,5 +17,5 @@ where = ["."]
 include = ["app", "app.*"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "web/tests"]
 asyncio_mode = "auto"

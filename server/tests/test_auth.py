@@ -69,6 +69,17 @@ async def test_login(client, admin_user):
     response = await client.post("/api/v1/auth/login", json={
         "email": admin_user.email, "password": "correct-password",
     })
+    assert response.status_code == 204
+    assert response.content == b""
+    cookie = response.headers["set-cookie"].lower()
+    assert "httponly" in cookie and "samesite=strict" in cookie and "path=/" in cookie
+    assert (await client.get("/api/v1/projects")).status_code == 200
+
+
+async def test_token_endpoint_returns_bearer_token(client, admin_user):
+    response = await client.post("/api/v1/auth/token", json={
+        "email": admin_user.email, "password": "correct-password",
+    })
     assert response.status_code == 200
     assert response.json()["token_type"] == "bearer"
     assert response.json()["expires_in"] == 12 * 60 * 60
@@ -79,6 +90,34 @@ async def test_login(client, admin_user):
     assert (await client.get("/api/v1/projects", headers={
         "Authorization": f"Bearer {token}",
     })).status_code == 200
+
+
+async def test_cookie_auth_requires_csrf_header_for_mutations(client, admin_user):
+    login_response = await client.post("/api/v1/auth/login", json={
+        "email": admin_user.email, "password": "correct-password",
+    })
+    assert login_response.status_code == 204
+    assert (await client.get("/api/v1/auth/session")).status_code == 204
+    assert (await client.post("/api/v1/projects", json={"name": "No header"})).status_code == 403
+    created = await client.post("/api/v1/projects", json={"name": "Cookie project"}, headers={
+        "X-Requested-With": "XMLHttpRequest", "Idempotency-Key": "cookie-project-1",
+    })
+    assert created.status_code == 201
+    token_response = await client.post("/api/v1/auth/token", json={
+        "email": admin_user.email, "password": "correct-password",
+    })
+    token = token_response.json()["access_token"]
+    bearer_created = await client.post("/api/v1/projects", json={"name": "CLI project"}, headers={
+        "Authorization": f"Bearer {token}", "Idempotency-Key": "cli-project-1",
+    })
+    assert bearer_created.status_code == 201
+
+
+async def test_logout_clears_cookie(client, admin_user):
+    await client.post("/api/v1/auth/login", json={"email": admin_user.email, "password": "correct-password"})
+    response = await client.post("/api/v1/auth/logout", headers={"X-Requested-With": "XMLHttpRequest"})
+    assert response.status_code == 204
+    assert 'session=""' in response.headers["set-cookie"]
 
 
 @pytest.mark.parametrize("email,password", [
@@ -103,7 +142,7 @@ async def test_login_rate_limit_and_success_reset(client, admin_user):
     key = {"email": admin_user.email, "password": "correct-password"}
     for _ in range(4):
         assert (await client.post("/api/v1/auth/login", json=key | {"password": "wrong"})).status_code == 401
-    assert (await client.post("/api/v1/auth/login", json=key)).status_code == 200
+    assert (await client.post("/api/v1/auth/login", json=key)).status_code == 204
     assert (await client.post("/api/v1/auth/login", json=key | {"password": "wrong"})).status_code == 401
     login_limiter.clear()
 

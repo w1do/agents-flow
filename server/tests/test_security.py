@@ -19,6 +19,29 @@ def test_access_token_has_expected_signature_and_claims(app):
     assert claims["exp"] - claims["iat"] == 43200
 
 
+async def test_security_headers_are_set_on_api_responses(client):
+    response = await client.get("/healthz")
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    policy = response.headers["content-security-policy"]
+    assert "frame-ancestors 'none'" in policy and "'unsafe-eval'" not in policy
+    assert "style-src 'self' 'unsafe-inline'" in policy
+
+
+async def test_security_headers_are_set_on_unhandled_500(app, client):
+    async def fail():
+        raise RuntimeError("test failure")
+
+    app.add_api_route("/test-unhandled-error", fail, methods=["GET"])
+    response = await client.get("/test-unhandled-error")
+    assert response.status_code == 500
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
+
+
 @pytest.mark.parametrize("case", ["missing_exp", "missing_iat", "missing_sub", "wrong_key",
                                  "wrong_algorithm", "unknown_user", "invalid_sub"])
 async def test_admin_rejects_invalid_claims(client, admin_user, case):
