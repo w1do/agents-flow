@@ -11,16 +11,7 @@ func filterOptions(ctx context.Context, dir string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	keys, worktree := configKeys(string(data))
-	if worktree {
-		args = append(args, "--worktree")
-		extra, err := configuredCommand(ctx, dir, nil, true, false, args...).Output()
-		if err != nil {
-			return nil, err
-		}
-		more, _ := configKeys(string(extra))
-		keys += more
-	}
+	keys, _ := configKeys(string(data))
 	return neutralFilters(keys), nil
 }
 
