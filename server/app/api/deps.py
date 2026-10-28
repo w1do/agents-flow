@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends
+from fastapi import Cookie, Depends, Header, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session, object_session
 
@@ -17,8 +17,14 @@ Credentials = Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)]
 Database = Annotated[Session, Depends(get_db)]
 
 
-def require_admin(credentials: Credentials, session: Database) -> User:
-    user = authenticate_admin(session, credentials.credentials) if credentials else None
+def require_admin(credentials: Credentials, session: Database, request: Request,
+                  session_cookie: Annotated[str | None, Cookie(alias="session")] = None,
+                  requested_with: Annotated[str | None, Header(alias="X-Requested-With")] = None) -> User:
+    token = credentials.credentials if credentials else session_cookie
+    if credentials is None and session_cookie and request.method not in {"GET", "HEAD", "OPTIONS"} \
+            and requested_with != "XMLHttpRequest":
+        raise HTTPException(403, "CSRF validation failed")
+    user = authenticate_admin(session, token) if token else None
     if user is None:
         raise unauthorized()
     return user
