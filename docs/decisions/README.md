@@ -32,3 +32,8 @@
 ## Решения
 
 - [2026-10-27 — Фундамент сервера: группы 1–3 change `agents-flow-mvp`](2026-10-27-agents-flow-mvp-groups-1-3.md)
+- [2026-10-27 — Skills, задачи, аренда, события: группы 4–5](2026-10-27-agents-flow-mvp-groups-4-5.md)
+- [2026-10-27 — MCP, SSE и решения: группа 6](2026-10-27-agents-flow-mvp-group-6.md)
+- [2026-10-27 — Telegram и транскрибация: группа 7](2026-10-27-agents-flow-mvp-group-7.md)
+- [2026-10-27 — Harness: группа 8](2026-10-27-agents-flow-mvp-group-8.md)
+- [2026-10-28 — Runner, панель, деплой, приёмка: группы 9–12](2026-10-28-agents-flow-mvp-groups-9-12.md)

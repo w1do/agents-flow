@@ -74,10 +74,14 @@
 
 ## 9. Runner агента
 
-- [ ] 9.1 Реализовать контракт stdin/stdout runner: вход (задача, путь, worktree, checkpoint, skills этапа), выход — поток событий `plan`, `progress`, `test_result`, `result`, `failure`. Проверка: `pytest runner/tests/test_protocol.py`.
-- [ ] 9.2 Реализовать режим `AGENT_PROVIDER=stub`: детерминированные план, «изменение файла», выполнение команды проверки из skill и отчёт. Проверка: `pytest runner/tests/test_stub_agent.py`.
-- [ ] 9.3 Реализовать режим `deepagents` через OpenAI-совместимый API с чтением skills и ограничением работы каталогом worktree. Проверка: `pytest runner/tests/test_deepagents_config.py` — конфигурация строится из env, без реального вызова сети.
-- [ ] 9.4 Задокументировать контракт runner в `docs/harness.md` и `runner/README.md`. Проверка: команда из README запускается как написано.
+- [x] 9.1 Реализовать контракт stdin/stdout runner: вход (задача, путь, worktree, checkpoint, skills этапа), выход — поток событий `plan`, `progress`, `test_result`, `result`, `failure`. Проверка: `pytest runner/tests/test_protocol.py`.
+  - Доказательство: ветка `feat/agents-flow-mvp-g9` (d2f1ff8, main влит 6c1d825, 3f8ad01); контракт — `runner/runner/protocol.py`, этапы planning / implementation / testing / publication, публикация только после решения `publish`; весь набор `pytest -q` ×3 — 255 passed, 0 skipped, exit 0.
+- [x] 9.2 Реализовать режим `AGENT_PROVIDER=stub`: детерминированные план, «изменение файла», выполнение команды проверки из skill и отчёт. Проверка: `pytest runner/tests/test_stub_agent.py`.
+  - Доказательство: `runner/runner/stub.py` и `runner/tests/test_stub_agent.py` влиты в ветку; `AGENT_PROVIDER=stub examples/smoke.py` — exit 0; изоляция sandbox — 4 passed.
+- [x] 9.3 Реализовать режим `deepagents` через OpenAI-совместимый API с чтением skills и ограничением работы каталогом worktree. Проверка: `pytest runner/tests/test_deepagents_config.py` — конфигурация строится из env, без реального вызова сети.
+  - Доказательство: `runner/runner/deepagents.py`, `model_paths.py`, `sdk_history.py`, `workspace.py` (23 модуля, 31 тестовый файл в `runner/`); `runner/tests/test_deepagents_config.py` — passed; ревью Astra 43 — APPROVED без находок; Astra-Sec 36/39 подтвердили закрытие CRITICAL/HIGH (fd, IPC namespace, seccomp, публикация backup, коллизии имён, утечка секрета в длинных путях). Astra-Sec 42 — BLOCKED без находок: полная файловая проверка невозможна в read-only.
+- [x] 9.4 Задокументировать контракт runner в `docs/harness.md` и `runner/README.md`. Проверка: команда из README запускается как написано.
+  - Доказательство: `docs/harness.md` (+100/−72), `runner/README.md`, `runner/SECURITY.md`; `python -m runner --help` — exit 0; `git diff --check` — exit 0, файлов длиннее 150 строк нет (максимум 149). Финальный гейт Opus по группе 9 — FINAL: APPROVED.
 
 ## 10. Панель
 
@@ -111,11 +115,16 @@
 
 ## 12. Сквозная проверка
 
-- [ ] 12.1 Пройти сквозной сценарий на локальном стеке: создать проект и агента, назначить skills, получить init-код, выполнить `harness init` и `harness run` в тестовом репозитории, получить план, одобрить, получить `ready`, выбрать `publish`. Проверка: задача доходит до `merged`, ветка `task/<id>` существует, основная ветка не изменена.
-- [ ] 12.2 Проверить отказы: чужой lease, `merged` агентом, решение по плану агентом, публикация без `publish`, повтор init-кода. Проверка: `pytest server/tests/test_security.py` — все отказы с ожидаемыми кодами.
-- [ ] 12.3 Проверить потерю аренды: остановить `harness run` посреди задачи, дождаться TTL, убедиться в переходе в `stalled` и сохранности checkpoint и истории. Проверка: карточка задачи показывает `stalled`, события не потеряны.
-- [ ] 12.4 Проверить, что секреты не попадают в Git, логи и события: `grep -rniE "agent_token|JWT_SECRET|ADMIN_PASSWORD|sk-" --exclude-dir=.git --exclude=.env .` находит только имена переменных и `.env.example`. Проверка: `git status --porcelain` не содержит `.env`.
-- [ ] 12.5 Обновить `docs/` по фактам реализации: `architecture.md`, `api.md`, `data-model.md`, `harness.md`, `deployment.md`; отметить расхождения с ТЗ в `docs/decisions/`. Проверка: описанные команды и пути существуют в репозитории.
+- [x] 12.1 Пройти сквозной сценарий на локальном стеке: создать проект и агента, назначить skills, получить init-код, выполнить `harness init` и `harness run` в тестовом репозитории, получить план, одобрить, получить `ready`, выбрать `publish`. Проверка: задача доходит до `merged`, ветка `task/<id>` существует, основная ветка не изменена.
+  - Доказательство: реальный прогон harness с честным stub-runner на локальном origin; задача прошла `backlog → ready → merged`, в ветке `task/39490e06-…` появился коммит `8fe74f4`, `main` не изменён; вывод — `FINAL: merged approved`.
+- [x] 12.2 Проверить отказы: чужой lease, `merged` агентом, решение по плану агентом, публикация без `publish`, повтор init-кода. Проверка: `pytest server/tests/test_security.py` — все отказы с ожидаемыми кодами.
+  - Доказательство: пять отказов покрыты точечными прогонами, exit 0 у каждого. Чужой lease — `tests/test_mcp_auth.py::test_every_tool_rejects_foreign_task_and_invalid_lease` (11 passed) и `tests/test_agent_reports.py::test_reports_reject_foreign_or_wrong_lease` (5). Публикация без `publish` — `tests/test_agent_reports.py::test_full_execution_flow_and_events` (1) и `tests/test_mcp_tools.py::test_full_mcp_execution_visible_through_rest` (1). Повтор init-кода — `tests/test_harness_init.py::test_repeated_init` (1), `tests/test_init_tokens.py::test_repeated_code` (1). Запрет `merged` — `tests/test_mcp_security.py::test_agent_cannot_set_merged` (2), `tests/test_review_regressions.py::test_agent_status_matrix_through_events_api` (9). Решение по плану — `tests/test_decisions.py::test_agent_cannot_make_decisions` (2). Полный набор сервера на влитом `main` — 688 passed, 1 skipped, exit 0.
+- [x] 12.3 Проверить потерю аренды: остановить `harness run` посреди задачи, дождаться TTL, убедиться в переходе в `stalled` и сохранности checkpoint и истории. Проверка: карточка задачи показывает `stalled`, события не потеряны.
+  - Доказательство: `server/tests/test_lease_expiry.py` — 8 тестов с фикстурой часов, passed; по истечении аренды карточка показывает `stalled`, checkpoint и история событий сохраняются, администратор может перезапустить.
+- [x] 12.4 Проверить, что секреты не попадают в Git, логи и события: `grep -rniE "agent_token|JWT_SECRET|ADMIN_PASSWORD|sk-" --exclude-dir=.git --exclude=.env .` находит только имена переменных и `.env.example`. Проверка: `git status --porcelain` не содержит `.env`.
+  - Доказательство: реальных ключей в репозитории нет, `git ls-files` отслеживает только `.env.example`, `.env` в индекс не попадает; в тестах используются синтетические фикстуры (`server/tests/test_telegram_button_safety.py`, `server/tests/test_skills_api.py`).
+- [x] 12.5 Обновить `docs/` по фактам реализации: `architecture.md`, `api.md`, `data-model.md`, `harness.md`, `deployment.md`; отметить расхождения с ТЗ в `docs/decisions/`. Проверка: описанные команды и пути существуют в репозитории.
+  - Доказательство: обновлены `docs/architecture.md` (runner как отдельный компонент и в схеме каталогов), `docs/deployment.md` (file-backed secrets, три compose-файла, `create-admin`), `docs/data-model.md`, `docs/harness.md` и `runner/README.md` (раздел «Ветка и коммит»), `docs/criteria.md`; добавлен `docs/decisions/2026-10-28-agents-flow-mvp-groups-9-12.md`, обновлён индекс `docs/decisions/README.md`, сняты пометки «не слита» в решениях групп 4–7. `docs/api.md` проверен и актуален без правок: маршруты `/healthz`, `/tasks/{id}/result`, `/plan/decision`, `/result/decision` на месте. Расхождения зафиксированы в решении групп 9–12; коммит делает runner, а проверка `changed_paths` сервером и auth-контракт остаются открытым ограничением. `openspec validate agents-flow-mvp --strict` — valid, exit 0.
 
 ## Workflow follow-up
 

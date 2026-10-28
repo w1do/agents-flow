@@ -1,7 +1,7 @@
 # Skills, задачи и аренда: группы 4–5 change `agents-flow-mvp`
 
 Дата: 2026-10-27. Worktree: `/home/dev/agents-server-g45`, ветка
-`feature/mvp-groups-4-5` (в `main` не слита).
+`feature/mvp-groups-4-5` (влита в `main` merge-коммитом `cf0d4a7`).
 Коммиты: `50e608f`, `c0e6982`, `398a358`, `1f26051`, `d633862`, `fc1c9e3`.
 
 ## Что сделано
