@@ -6,7 +6,6 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.time import LEASE_TTL_SECONDS, POLL_INTERVAL_SECONDS
 from app.schemas.harness import HarnessInitRequest, HarnessInitResponse
 from app.services.agent_auth import generate_agent_token
 from app.services.init_tokens import consume_init_token
@@ -27,6 +26,17 @@ def _validate_git_remote(remote: str) -> None:
         _remote_error("git_remote contains invalid characters")
     if re.match(r"^[A-Za-z][A-Za-z0-9+.-]*::", remote):
         _remote_error("git_remote must not use remote-helper syntax")
+    if remote.startswith("file://"):
+        try:
+            parsed = urlsplit(remote)
+        except ValueError:
+            _remote_error("git_remote must be a valid local file URL")
+        if (parsed.netloc not in {"", "localhost"} or not parsed.path.startswith("/")
+                or parsed.path == "/" or parsed.query or parsed.fragment):
+            _remote_error("git_remote must be a local file URL without parameters")
+        return
+    if remote.startswith(("/", "./", "../")) or (remote and ":" not in remote and not remote.startswith("-")):
+        return
     if _SCP_REMOTE.fullmatch(remote):
         return
     match = _REMOTE_URL.fullmatch(remote)
@@ -71,7 +81,8 @@ def initialize_harness(session: Session, body: HarnessInitRequest) -> HarnessIni
         response = HarnessInitResponse(
             agent_id=agent.id, agent_token=plain_token,
             server_url=get_settings().public_base_url,
-            poll_interval_seconds=POLL_INTERVAL_SECONDS, lease_ttl_seconds=LEASE_TTL_SECONDS,
+            poll_interval_seconds=get_settings().poll_interval_seconds,
+            lease_ttl_seconds=get_settings().lease_ttl_seconds,
             skills=skills,
         )
     session.commit()

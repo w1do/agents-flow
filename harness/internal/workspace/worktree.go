@@ -39,7 +39,7 @@ func Ensure(ctx context.Context, repository, taskID string) (string, error) {
 	if _, err := os.Lstat(path); err == nil || !os.IsNotExist(err) {
 		return "", errors.New("task worktree path already exists but is not registered")
 	}
-	args := []string{"worktree", "add"}
+	args := []string{"worktree", "add", "--no-checkout"}
 	if _, err := gitrepo.Run(ctx, root, "show-ref", "--verify", "--quiet", "refs/heads/"+branch); err != nil {
 		args = append(args, "-b", branch, path, "HEAD")
 	} else {
@@ -51,6 +51,9 @@ func Ensure(ctx context.Context, repository, taskID string) (string, error) {
 		if found := registered(listing, branch); found != "" {
 			return reuse(ctx, root, found, branch)
 		}
+		return "", err
+	}
+	if _, err := gitrepo.Run(ctx, path, "checkout", "--force", "HEAD"); err != nil {
 		return "", err
 	}
 	return path, nil

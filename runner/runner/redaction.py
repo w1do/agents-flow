@@ -4,6 +4,8 @@ import decimal
 import re
 
 from .secrets import SECRET_NAME, current, normalize
+from .safe_fs import sensitive
+from .protected_text import redact_paths
 
 TOKEN = re.compile(r"\b(?:sk-[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9_]{12,}|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)\b")
 ASSIGNMENT = re.compile(r"(?i)\b([A-Z0-9]*_(?:KEY|TOKEN|SECRET)|PASSWORD)\s*=\s*(?:\"[^\"]*\"|'[^']*'|[^\s;]+)")
@@ -11,7 +13,17 @@ BEARER = re.compile(r"(?i)(authorization\s*:\s*bearer\s+)\S+")
 MASK = "[REDACTED]"
 
 
+def safe_path(path):
+    return MASK if any(sensitive(part) for part in path.split("/")) else redact(path)
+
+
+def safe_command(command):
+    # Hide the whole command if any argument mentions protected filesystem data.
+    return MASK if redact_paths(command) != command else redact(command)
+
+
 def _text(raw, variants):
+    raw = redact_paths(raw)
     raw = ASSIGNMENT.sub(r"\1=[REDACTED]", raw)
     raw = BEARER.sub(r"\1[REDACTED]", raw)
     for secret in variants:

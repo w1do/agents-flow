@@ -2,12 +2,15 @@ from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import HTTPException
-from pydantic import BaseModel, StringConstraints, field_validator, model_validator
+from pydantic import BaseModel, Field, StringConstraints, field_validator, model_validator
 
 from app.schemas.common import Input, Text
 from app.schemas.tasks import TaskStatus
+from app.schemas.git_claims import git_claims
 from app.services.report_event_types import is_reserved_event
 from app.services.skill_content import contains_secret
+from app.services.protected_paths import redact_paths
+from app.schemas.payload_limits import bounded_payload
 
 
 class Report(Input):
@@ -20,7 +23,7 @@ class Report(Input):
     @field_validator("event_id")
     @classmethod
     def reject_secret_ids(cls, value):
-        if contains_secret(value):
+        if contains_secret(value) or redact_paths(value) != value:
             raise ValueError("event_id must not contain a secret")
         return value
 
@@ -37,6 +40,8 @@ class EventRequest(Report):
     payload: dict[str, Any] | None = None
     checkpoint: dict[str, Any] | None = None
 
+    _git_payload = field_validator("payload")(git_claims)
+
     @field_validator("event_type", mode="before")
     @classmethod
     def reject_reserved_event_types(cls, value):
@@ -51,6 +56,11 @@ class EventRequest(Report):
             raise ValueError("event_type must not contain a secret")
         return value
 
+    @field_validator("checkpoint")
+    @classmethod
+    def bounded_checkpoint(cls, value):
+        return bounded_payload(value) if value is not None else None
+
     @model_validator(mode="after")
     def validate_status_type(self):
         status = (self.payload or {}).get("status")
@@ -61,7 +71,9 @@ class EventRequest(Report):
 
 class ResultRequest(Report):
     result_summary: str
-    result_data: dict[str, Any]
+    result_data: dict[str, Any] = Field(description="At most 256 KiB of compact UTF-8 JSON")
+
+    _git_data = field_validator("result_data")(git_claims)
 
 
 class PublicationResultRequest(Report):
@@ -69,10 +81,14 @@ class PublicationResultRequest(Report):
     message: str
     payload: dict[str, Any] | None = None
 
+    _git_payload = field_validator("payload")(git_claims)
+
 
 class FailRequest(Report):
     message: str
     payload: dict[str, Any] | None = None
+
+    _git_payload = field_validator("payload")(git_claims)
 
 
 class ReportResponse(BaseModel):

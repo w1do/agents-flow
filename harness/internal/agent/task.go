@@ -83,6 +83,9 @@ func (e *Engine) runTask(parent context.Context) error {
 
 func (e *Engine) execution(ctx context.Context) (api.ExecutionState, error) {
 	var state api.ExecutionState
+	if err := e.cfg.CheckUnchanged(); err != nil {
+		return state, err
+	}
 	err := e.retry(ctx, func() error {
 		var err error
 		state, err = e.api.ExecutionState(ctx, e.state.Claim.Task.ID, e.state.Claim.LeaseID)

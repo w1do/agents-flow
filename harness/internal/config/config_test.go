@@ -28,6 +28,7 @@ func fixture(t *testing.T) (string, Config) {
 func TestRoundTrip(t *testing.T) {
 	root, want := fixture(t)
 	got, token, err := Load(root)
+	want.sourcePath, want.sourceHash = got.sourcePath, got.sourceHash
 	if err != nil || !reflect.DeepEqual(got, want) || token != "private-agent-token" {
 		t.Fatal("configuration did not round trip", err)
 	}

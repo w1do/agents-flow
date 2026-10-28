@@ -32,6 +32,8 @@ services:
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       AGENT_PROVIDER: ${AGENT_PROVIDER:-stub}
       AGENT_MODEL: ${AGENT_MODEL:-}
+      LEASE_TTL_SECONDS: ${LEASE_TTL_SECONDS:-60}
+      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-5}
       TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-[]}
     secrets:
       - database_url

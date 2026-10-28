@@ -6,8 +6,10 @@ import stat
 from pathlib import Path
 
 from .errors import RunnerError
+from .mounts import reject_mount
+from .safe_fs import checked_fd, same_device, sensitive
+from .workspace_listing import list_files
 
-FORBIDDEN = {".git", ".agent-token"}
 MAX_FILE = 256 * 1024
 
 
@@ -18,6 +20,7 @@ class Workspace:
             raise RunnerError("worktree must be an existing absolute directory")
         self.root = path.resolve(strict=True)
         self.fd = os.open(self.root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        self.device = os.fstat(self.fd).st_dev
         self.read_only = read_only
 
     def close(self):
@@ -30,7 +33,7 @@ class Workspace:
         if not isinstance(name, str) or not name or "\0" in name or os.path.isabs(name):
             raise RunnerError("Invalid workspace path")
         parts = tuple(p for p in name.split("/") if p not in ("", "."))
-        if any(p == ".." or p.startswith(".env") or p in FORBIDDEN for p in parts):
+        if any(p == ".." or sensitive(p) for p in parts):
             raise RunnerError("Path escapes worktree or names forbidden metadata")
         return parts
 
@@ -42,21 +45,27 @@ class Workspace:
         try:
             for part in parts:
                 try:
-                    child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=current)
+                    child = checked_fd(os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                                               dir_fd=current), self.device)
                 except FileNotFoundError:
                     if not create:
                         raise
                     os.mkdir(part, 0o755, dir_fd=current)
-                    child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=current)
+                    child = checked_fd(os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                                               dir_fd=current), self.device)
                 os.close(current)
                 current = child
             return current
+        except RunnerError:
+            os.close(current)
+            raise
         except OSError:
             os.close(current)
             raise RunnerError("Workspace directory is missing, escapes the worktree or is unsafe") from None
 
     def is_file(self, name):
         parts = self.parts(name)
+        reject_mount(self.root / "/".join(parts), self.root)
         if not parts:
             return False
         parent = self.open_dir(parts[:-1])
@@ -67,6 +76,7 @@ class Workspace:
                 return False
             try:
                 info = os.fstat(fd)
+                same_device(info, self.device)
                 return stat.S_ISREG(info.st_mode) and info.st_nlink == 1
             finally:
                 os.close(fd)
@@ -75,11 +85,13 @@ class Workspace:
 
     def read(self, name):
         parts = self.parts(name)
+        reject_mount(self.root / "/".join(parts), self.root)
         if not parts:
             raise RunnerError("Read requires a regular file")
         parent = self.open_dir(parts[:-1])
         try:
-            fd = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
+            fd = checked_fd(os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                                    dir_fd=parent), self.device)
             info = os.fstat(fd)
             if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_FILE or info.st_nlink > 1:
                 os.close(fd)
@@ -99,6 +111,7 @@ class Workspace:
         if not isinstance(content, str) or len(content.encode()) > MAX_FILE:
             raise RunnerError("File content must be text of at most 256 KiB")
         parts = self.parts(name)
+        reject_mount(self.root / "/".join(parts), self.root)
         if not parts:
             raise RunnerError("Invalid workspace path")
         parent = self.open_dir(parts[:-1], create=True)
@@ -106,6 +119,7 @@ class Workspace:
         try:
             try:
                 old = os.stat(parts[-1], dir_fd=parent, follow_symlinks=False)
+                same_device(old, self.device)
                 if old.st_nlink > 1:
                     raise RunnerError("Hard-linked files are forbidden")
                 if not stat.S_ISREG(old.st_mode):
@@ -127,23 +141,4 @@ class Workspace:
             os.close(parent)
 
     def list_files(self, directory="."):
-        parts = self.parts(directory)
-        fd = self.open_dir(parts)
-        try:
-            result = []
-            for name in sorted(os.listdir(fd)):
-                if name.startswith(".env") or name in FORBIDDEN:
-                    continue
-                try:
-                    info = os.stat(name, dir_fd=fd, follow_symlinks=False)
-                except OSError:
-                    continue
-                if stat.S_ISDIR(info.st_mode):
-                    result.append("/".join(parts + (name,)) + "/")
-                elif stat.S_ISREG(info.st_mode) and info.st_nlink == 1:
-                    result.append("/".join(parts + (name,)))
-                if len(result) == 1000:
-                    break
-            return result
-        finally:
-            os.close(fd)
+        return list_files(self, directory)

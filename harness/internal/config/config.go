@@ -1,6 +1,7 @@
 package config
 
 import (
+	"crypto/sha256"
 	"errors"
 	"io"
 	"os"
@@ -12,6 +13,8 @@ import (
 )
 
 type Config struct {
+	sourcePath          string
+	sourceHash          [32]byte
 	ServerURL           string `yaml:"server_url"`
 	ProjectID           string `yaml:"project_id"`
 	AgentID             string `yaml:"agent_id"`
@@ -52,6 +55,8 @@ func Load(root string) (Config, string, error) {
 	if err := cfg.Validate(); err != nil {
 		return cfg, "", err
 	}
+	cfg.sourcePath = filepath.Join(dir, "config.yaml")
+	cfg.sourceHash = sha256.Sum256(data)
 	path := filepath.Join(dir, ".agent-token")
 	info, err := os.Lstat(path)
 	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0600 {

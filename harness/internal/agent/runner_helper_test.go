@@ -120,8 +120,15 @@ func TestRunnerHelper(t *testing.T) {
 			os.Exit(31)
 		}
 		emit(runnerEvent{Type: "test_result", Command: "configured check", ExitCode: 0, Summary: "passed"})
+		if mode == "facts" {
+			emit(runnerEvent{Type: "result", ResultData: map[string]any{"base_sha": "test-base", "verification": map[string]any{"head_sha": "test-head"}}})
+			os.Exit(0)
+		}
 		emit(runnerEvent{Type: "result", ResultSummary: "Ready", ResultData: map[string]any{"changed_paths": []string{"change.txt"}}})
 	case "publication":
+		if mode == "facts" && (input.ResultData["base_sha"] != "test-base" || input.ResultData["verification"] == nil) {
+			os.Exit(35)
+		}
 		if mode == "publication-failure" {
 			emit(runnerEvent{Type: "failure"})
 			os.Exit(17)

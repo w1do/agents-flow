@@ -4,7 +4,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core.errors import not_found
-from app.core.time import LEASE_TTL_SECONDS, as_utc
+from app.core.time import lease_ttl_seconds, as_utc
 from app.models.project import Project
 from app.repositories.agent import AgentRepository, get_for_project
 from app.repositories.project import ProjectRepository
@@ -28,7 +28,7 @@ def get_agent_for_project(session: Session, agent_id: UUID, project_id: UUID):
 
 def _agent_summary(agent, now: datetime) -> AgentSummary:
     heartbeat = as_utc(agent.last_heartbeat_at) if agent.last_heartbeat_at else None
-    cutoff = now - timedelta(seconds=2 * LEASE_TTL_SECONDS)
+    cutoff = now - timedelta(seconds=2 * lease_ttl_seconds())
     status = agent.status if heartbeat and heartbeat >= cutoff else "offline"
     return AgentSummary(
         id=agent.id, project_id=agent.project_id, name=agent.name, status=status,

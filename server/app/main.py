@@ -12,6 +12,7 @@ from app.core.config import get_settings
 from app.mcp.tools import create_server
 from app.mcp.transport import AgentTokenMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
+from app.middleware.body_limit import BodyLimitMiddleware
 from app.schemas.health import HealthResponse
 
 @asynccontextmanager
@@ -42,6 +43,7 @@ async def lifespan(application: FastAPI):
 def create_app(*, web_dist: Path | None = None) -> FastAPI:
     application = FastAPI(title="Agents Flow", version="0.1.0", lifespan=lifespan)
     application.add_middleware(SecurityHeadersMiddleware)
+    application.add_middleware(BodyLimitMiddleware)
 
     application.include_router(router, prefix="/api/v1")
     settings = get_settings()

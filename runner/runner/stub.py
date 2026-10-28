@@ -1,6 +1,6 @@
 """A deterministic agent with no API or third-party dependencies."""
 
-from .checks import finish_checks
+from .check_results import finish_checks
 
 STUB_FILE = "runner-stub.txt"
 STUB_CONTENT = "Agents Flow stub implementation.\n"

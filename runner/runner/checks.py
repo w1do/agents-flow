@@ -7,7 +7,7 @@ import subprocess
 import time
 
 from .errors import RunnerError
-from .redaction import redact
+from .redaction import redact, safe_command
 from .skills import commands
 from .sandbox import sandbox_args
 from .sandbox_paths import projected_worktree
@@ -70,7 +70,7 @@ def run_one(request, events, bwrap, language, command, projected_fd):
     try:
         argv = program(language, command)
     except RunnerError:
-        events.emit("test_result", command=command, exit_code=126,
+        events.emit("test_result", command=safe_command(command), exit_code=126,
                     code="unsupported_language", summary=f"Unsupported skill language: {language or '(empty)'}")
         raise RunnerError(f"unsupported_language: {language or '(empty)'}") from None
     env = {k: os.environ[k] for k in ("PATH", "LANG", "TZ", "TERM") if k in os.environ}
@@ -94,7 +94,7 @@ def run_one(request, events, bwrap, language, command, projected_fd):
     except subprocess.TimeoutExpired:
         _kill_process_group(process)
         code, summary = 124, f"timed out after {TIMEOUT} seconds"
-    events.emit("test_result", command=redact(command), exit_code=code, summary=redact(summary))
+    events.emit("test_result", command=safe_command(command), exit_code=code, summary=redact(summary))
     return code
 
 
@@ -105,7 +105,7 @@ def run_checks(request, events):
     bwrap = shutil.which("bwrap")
     if selected and not bwrap:
         language, command = selected[0]
-        events.emit("test_result", command=command, exit_code=127, code="sandbox_unavailable",
+        events.emit("test_result", command=safe_command(command), exit_code=127, code="sandbox_unavailable",
                     summary="bubblewrap (bwrap) is required; skill command was not run")
         raise RunnerError("sandbox_unavailable: install bubblewrap to run skill commands")
     passed = True
@@ -117,18 +117,3 @@ def run_checks(request, events):
         checkpoint.update(stage=request.stage, checks_completed=index + 1)
         events.emit("progress", message="Skill command completed", checkpoint=checkpoint)
     return {"checks_run": len(selected), "checks_passed": passed}
-
-
-def finish_checks(request, events):
-    data = dict(request.data.get("result_data") or {})
-    data.update(run_checks(request, events))
-    if request.stage == "publication":
-        success = data["checks_passed"] and data["checks_run"] > 0
-        events.emit("result", success=success,
-                    message="Publication commands passed" if success else "Publication did not succeed",
-                    result_data=data)
-    else:
-        if not data["checks_passed"]:
-            raise RunnerError("Skill verification failed")
-        summary = "Checks passed" if data["checks_run"] else "No check commands supplied"
-        events.emit("result", result_summary=summary, result_data=data)

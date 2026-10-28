@@ -128,3 +128,22 @@ event_id/Idempotency-Key. Сетевые ошибки повторяются; з
 Supervisor останавливает runner и потомков, включая double-fork/setsid.
 Сбой публикации передаётся через publication-result с success=false.
 Runner stderr и сырые ошибки не выводятся, секреты в отчётах маскируются.
+
+Конфигурация фиксируется при загрузке. Изменение или удаление config.yaml,
+в том числе во время ожидания задачи, завершает harness невосстанавливаемой
+ошибкой `config changed, restart harness`; повторов нет, нужен перезапуск.
+Host runner готовит индекс без clean/smudge, проверяет staged blob и типы записей;
+пустой staged diff возвращает `success:true, commit_sha:null, no_changes:true`.
+Модель и sandbox не видят `.secrets`, `.env*`, `*.env`, `*.pem`, `*.key`,
+`id_rsa*`, `.npmrc`, `.pypirc`, `.git`, `.agent-token`.
+Git verification не содержит subject и сырых строк status; защищённые пути скрыты.
+Сервер хранит эти сведения только как `claims` с `source:"agent_reported"`;
+они не влияют на статус/приёмку. commit_sha сохраняется и без verification.
+
+Все Git-команды harness изолированы от унаследованных Git-переменных и system/global config.
+Hooks, fsmonitor, подписи и внешние filter-драйверы отключены; clean/smudge заменены на cat.
+Новый worktree создаётся через `worktree add --no-checkout`, затем безопасный checkout.
+Runner проверяет и коммитит приватную копию индекса, сохраняя реальный индекс побайтно.
+После commit verification сравнивает worktree с HEAD через отдельный индекс;
+обычный git status может показывать расхождение сохранённого реального индекса с новым HEAD.
+Пути проверяются через casefold; переход на другой st_dev отклоняется как `mount_crossing`.

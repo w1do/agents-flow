@@ -18,6 +18,7 @@ func TestRunnerConfigRoundTrip(t *testing.T) {
 	}
 	testutil.Write(t, filepath.Join(root, "workflow/config.yaml"), string(data))
 	got, _, err := Load(root)
+	cfg.sourcePath, cfg.sourceHash = got.sourcePath, got.sourceHash
 	if err != nil || !reflect.DeepEqual(got, cfg) {
 		t.Fatal("runner configuration did not round trip", err)
 	}

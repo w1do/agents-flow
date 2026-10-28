@@ -28,7 +28,7 @@ def expire_due(session, project_id=None):
 
 async def monitor():
     while True:
-        await asyncio.sleep(time.POLL_INTERVAL_SECONDS)
+        await asyncio.sleep(time.poll_interval_seconds())
         try:
             await run_expiry_in_thread()
         except Exception:

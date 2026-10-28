@@ -1,7 +1,14 @@
 from datetime import datetime, timezone
 
-LEASE_TTL_SECONDS = 60
-POLL_INTERVAL_SECONDS = 5
+from app.core.config import get_settings
+
+
+def lease_ttl_seconds() -> int:
+    return get_settings().lease_ttl_seconds
+
+
+def poll_interval_seconds() -> int:
+    return get_settings().poll_interval_seconds
 
 
 def as_utc(value: datetime) -> datetime:
