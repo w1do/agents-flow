@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agents-flow-runner"
+version = "0.1.0"
+description = "Stage runner for the Agents Flow harness"
+requires-python = ">=3.11"
+dependencies = ["deepagents>=0.5.4,<1", "langchain-openai>=0.3,<2"]
+
+[project.optional-dependencies]
+openai-compatible = ["openai>=1.30,<3"]
+test = ["pytest>=8,<10"]
+
+[project.scripts]
+agents-flow-runner = "runner.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["runner*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
